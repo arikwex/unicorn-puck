@@ -140,7 +140,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
           ? [-13, 13]
           : [Math.cos(playerAngle) >= 0 ? 13 : -13];
         const eyePlaneX = headCenterX + Math.cos(playerAngle);
-        const eyePlaneY = headCenterY - Math.sin(playerAngle);
+        const eyePlaneY = headCenterY - Math.sin(playerAngle) - 2;
 
         context.fillStyle = '#111';
         eyeSides.forEach((side) => {
@@ -150,18 +150,21 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
             side,
           );
           context.beginPath();
-          context.arc(eyeX, eyeY, 5, 0, Math.PI * 2);
+          context.arc(eyeX, eyeY, 6, 0, Math.PI * 2);
           context.fill();
         });
 
         // Both nostrils disappear together once the snout crosses its horizon.
         if (Math.sin(playerAngle - Math.PI / 10) <= 0) {
+          const nostrilX = snoutCenterX + Math.cos(playerAngle) * 6;
+          const nostrilY = snoutCenterY - Math.sin(playerAngle) * 6;
+          const nostrilGap = 8;
           context.fillStyle = '#999';
-          [-4, 4].forEach((side) => {
+          [-0.5, 0.5].forEach((offset) => {
             context.beginPath();
             context.arc(
-              snoutCenterX + Math.cos(playerAngle) * 6 + Math.sin(playerAngle) * side,
-              snoutCenterY - Math.sin(playerAngle) * 6 + Math.cos(playerAngle) * side * 0.35,
+              nostrilX + offset * nostrilGap,
+              nostrilY,
               2.5,
               0,
               Math.PI * 2,
