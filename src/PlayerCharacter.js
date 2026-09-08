@@ -241,6 +241,67 @@ function renderTail(context, player, angle, anim) {
   });
 }
 
+function traceFeather(context, length, width) {
+  context.moveTo(0, 0);
+  context.bezierCurveTo(
+    length * 0.32, -width * 0.62,
+    length * 0.74, -width * 0.48,
+    length, -width * 0.06,
+  );
+  context.bezierCurveTo(
+    length * 0.78, width * 0.16,
+    length * 0.36, width * 0.22,
+    0, 0,
+  );
+}
+
+function renderWingFeathers(context, pivotX, pivotY, baseAngle, mirror, scale, colors) {
+  const feathers = [
+    { fan: -0.08, length: 66, width: 38 },
+    { fan: 0.2, length: 60, width: 34 },
+    { fan: 0.48, length: 49, width: 29 },
+    { fan: 0.74, length: 34, width: 22 },
+  ];
+
+  context.save();
+  context.translate(pivotX, pivotY);
+  context.scale(mirror * scale, scale);
+  fillCircle(context, 0, 0, 22, colors[2]);
+  context.rotate(baseAngle);
+
+  feathers.forEach(({ fan, length, width }, i) => {
+    context.save();
+    context.rotate(fan);
+    fillShape(context, colors[i], () => traceFeather(context, length, width));
+    context.restore();
+  });
+
+  context.restore();
+}
+
+function renderWings(context, player, angle, anim, foreground) {
+  const flap = Math.sin(anim * 3) * 0.12 - 0.06;
+  // Sweep the wings away from whichever screen side the head currently
+  // faces, so they never fan out over the face as the body turns.
+  const back = Math.cos(angle) >= 0 ? -1 : 1;
+  const baseAngle = -Math.PI / 2 + back * 0.6 + flap;
+  const spacing = 14;
+  const shoulderX = player.x - back * 12 - Math.cos(angle) * 4;
+  const shoulderY = player.y - 22 - Math.sin(angle) * 4;
+
+  [-spacing, spacing].forEach((offset) => {
+    if (earFacesCamera(angle, offset) !== foreground) return;
+    const [rootX, rootY] = zPosition(angle, shoulderX, shoulderY, offset * 2.2);
+    const mirror = offset < 0 ? -1 : 1;
+    const scale = foreground ? 1.15 : 0.85;
+    const colors = foreground
+      ? ['#fff', '#fff', '#cce', '#aac']
+      : ['#dde', '#dde', '#bcd', '#99b'];
+
+    renderWingFeathers(context, rootX, rootY, baseAngle, mirror, scale, colors);
+  });
+}
+
 function renderTorso(context, player, anim) {
   const heightScale = 0.95 + Math.sin(anim * 12 + 0.4) * 0.05;
   const radiusY = 38 * heightScale;
@@ -274,6 +335,7 @@ function renderPlayer(context, player, anim) {
   const tailInFront = Math.sin(angle) > 0;
 
   if (!tailInFront) renderTail(context, player, angle, anim);
+  renderWings(context, player, angle, anim, false);
   if (Math.sin(angle) > 0) {
     renderHead(context, angle, headX, headY, snoutX, snoutY);
     renderTorso(context, player, anim);
@@ -281,6 +343,7 @@ function renderPlayer(context, player, anim) {
     renderTorso(context, player, anim);
     renderHead(context, angle, headX, headY, snoutX, snoutY);
   }
+  renderWings(context, player, angle, anim, true);
   if (tailInFront) renderTail(context, player, angle, anim);
 }
 
