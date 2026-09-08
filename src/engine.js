@@ -1,0 +1,99 @@
+import { canvas, ctx } from './canvas.js';
+import { TAG_CAMERA } from './tags.js';
+
+let objects = [];
+let objectsByTag = new Map();
+let running = false;
+let lastFrame = 0;
+let startedAt = 0;
+
+function add(object) {
+  objects.push(object);
+  objects.sort((a, b) => (a.order || 0) - (b.order || 0));
+  object.tags?.forEach((objectTag) => index(object, objectTag));
+  object.start?.();
+  return object;
+}
+
+function index(object, objectTag) {
+  let tagged = objectsByTag.get(objectTag);
+  if (!tagged) objectsByTag.set(objectTag, tagged = new Set());
+  tagged.add(object);
+}
+
+function tag(object, objectTag) {
+  object.tags ||= [];
+  if (!object.tags.includes(objectTag)) object.tags.push(objectTag);
+  index(object, objectTag);
+  return object;
+}
+
+function untag(object, objectTag) {
+  object.tags = object.tags?.filter((value) => value !== objectTag) || [];
+  objectsByTag.get(objectTag)?.delete(object);
+  return object;
+}
+
+function remove(objectOrObjects) {
+  const removed = new Set(Array.isArray(objectOrObjects) ? objectOrObjects : [objectOrObjects]);
+  objects = objects.filter((object) => !removed.has(object));
+  removed.forEach((object) => {
+    object.tags?.forEach((objectTag) => objectsByTag.get(objectTag)?.delete(object));
+    object.destroy?.();
+  });
+}
+
+function clear() {
+  objects.forEach((object) => object.destroy?.());
+  objects = [];
+  objectsByTag = new Map();
+}
+
+function getObjectsByTag(objectTag) {
+  return [...(objectsByTag.get(objectTag) || [])];
+}
+
+function getObjects() {
+  return [...objects];
+}
+
+function tick(now) {
+  if (!running) return;
+  const dt = Math.min((now - lastFrame) / 1000, 1 / 20) || 0;
+  lastFrame = now;
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+
+  const camera = getObjectsByTag(TAG_CAMERA)[0];
+  camera?.set(ctx);
+
+  const expired = [];
+  objects.forEach((object) => {
+    if (object.update?.(dt)) expired.push(object);
+  });
+  if (expired.length) remove(expired);
+  objects.forEach((object) => object.render?.(ctx));
+
+  ctx.restore();
+  requestAnimationFrame(tick);
+}
+
+function start() {
+  if (running) return;
+  running = true;
+  startedAt = Date.now();
+  lastFrame = performance.now();
+  requestAnimationFrame(tick);
+}
+
+function stop() {
+  running = false;
+}
+
+function getStartTime() {
+  return startedAt;
+}
+
+export { add, clear, getObjects, getObjectsByTag, getStartTime, remove, start, stop, tag, untag };

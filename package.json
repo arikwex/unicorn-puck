@@ -1,0 +1,18 @@
+{
+  "name": "unicorn-puck",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node tools/build.js --watch",
+    "dev:minify": "node tools/build.js --watch --minify",
+    "build": "node tools/build.js --minify --roadroll"
+  },
+  "devDependencies": {
+    "bestzip": "4.0.0",
+    "chalk": "5.6.2",
+    "esbuild": "0.28.2",
+    "roadroller": "2.1.0",
+    "terser": "5.51.2"
+  }
+}
