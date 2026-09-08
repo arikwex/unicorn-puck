@@ -13,19 +13,19 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
 
     update(dt) {
       this.angle += (
-        (keys.has('ArrowRight') ? 1 : 0) -
-        (keys.has('ArrowLeft') ? 1 : 0)
+        (keys.has('ArrowLeft') ? 1 : 0) -
+        (keys.has('ArrowRight') ? 1 : 0)
       ) * 3 * dt;
     },
 
     render(context) {
       const playerAngle = this.angle;
       const headCenterX = this.x + Math.cos(playerAngle) * 21;
-      const headCenterY = this.y - 14 + Math.sin(playerAngle) * 5;
+      const headCenterY = this.y - 14 - Math.sin(playerAngle) * 5;
       const headRadius = 22;
       const snoutCenterX = headCenterX + Math.cos(playerAngle) * 23;
       const snoutCenterY = headCenterY + 8
-        + Math.sin(playerAngle) * 14;
+        - Math.sin(playerAngle) * 14;
       const snoutRadius = 13;
 
       function renderTorso() {
@@ -53,13 +53,13 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
           const cameraFacing = Math.cos(playerAngle) * Math.sign(offset);
           const depthAdjustedOffset = offset * (1 - cameraFacing * 0.2);
           return [
-            headCenterX - Math.sin(playerAngle) * depthAdjustedOffset,
+            headCenterX + Math.sin(playerAngle) * depthAdjustedOffset,
             headCenterY - 11 + Math.cos(playerAngle) * depthAdjustedOffset * 0.35,
           ];
         }
 
         function earFacesCamera(angle, offset) {
-          return Math.sin(angle) + Math.sign(offset) * Math.cos(angle) >= 0;
+          return -Math.sin(angle) + Math.sign(offset) * Math.cos(angle) >= 0;
         }
 
         function renderEar(angle, offset) {
@@ -140,8 +140,8 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
         }
       }
 
-      // The head clears the torso after rotating past horizon angle toward the camera.
-      if (Math.sin(playerAngle + Math.PI / 10) < 0) {
+      // Positive angles turn into the page; beyond this horizon the torso occludes the head.
+      if (Math.sin(playerAngle - Math.PI / 10) > 0) {
         renderHead();
         renderTorso.call(this);
       } else {
