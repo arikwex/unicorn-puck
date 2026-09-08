@@ -1,10 +1,19 @@
 import { canvas } from './canvas.js';
-import { TAG_CAMERA } from './tags.js';
+import { getObjectsByTag } from './engine.js';
+import { TAG_CAMERA, TAG_PLAYER } from './tags.js';
 
 function Camera(x = 0, y = 0, zoom = 1) {
   let target;
+  let camera;
 
-  return {
+  function centerOnTarget() {
+    const followed = target || getObjectsByTag(TAG_PLAYER)[0];
+    if (!followed) return;
+    camera.x = followed.x;
+    camera.y = followed.y;
+  }
+
+  camera = {
     x,
     y,
     zoom,
@@ -16,14 +25,12 @@ function Camera(x = 0, y = 0, zoom = 1) {
       return this;
     },
 
-    update(dt) {
-      if (!target) return;
-      const smoothing = 1 - Math.exp(-8 * dt);
-      this.x += (target.x - this.x) * smoothing;
-      this.y += (target.y - this.y) * smoothing;
+    update() {
+      centerOnTarget();
     },
 
     set(context) {
+      centerOnTarget();
       context.translate(canvas.width / 2, canvas.height / 2);
       context.scale(this.zoom, this.zoom);
       context.translate(-this.x, -this.y);
@@ -36,6 +43,10 @@ function Camera(x = 0, y = 0, zoom = 1) {
       };
     },
   };
+
+  // Center correctly even before the camera's first update pass.
+  camera.update();
+  return camera;
 }
 
 export default Camera;

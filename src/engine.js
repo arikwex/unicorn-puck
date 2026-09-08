@@ -66,14 +66,14 @@ function tick(now) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.save();
 
-  const camera = getObjectsByTag(TAG_CAMERA)[0];
-  camera?.set(ctx);
-
   const expired = [];
   objects.forEach((object) => {
     if (object.update?.(dt)) expired.push(object);
   });
   if (expired.length) remove(expired);
+
+  const camera = getObjectsByTag(TAG_CAMERA)[0];
+  camera?.set(ctx);
   objects.forEach((object) => object.render?.(ctx));
 
   ctx.restore();

@@ -1,4 +1,7 @@
-import { start } from './engine.js';
+import Camera from './camera.js';
+import { add, start } from './engine.js';
+import PlayerCharacter from './PlayerCharacter.js';
 
-// The starting scene is intentionally empty. Add cameras and game objects here.
+add(PlayerCharacter());
+add(Camera());
 start();
