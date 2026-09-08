@@ -185,6 +185,32 @@ function renderNostrils(context, angle, snoutX, snoutY) {
   fillCircle(context, nostrilX + gap / 2, nostrilY, 2.5, '#999');
 }
 
+function renderTail(context, player, angle, anim) {
+  const depth = Math.sin(angle);
+  const front = depth * depth;
+  const side = 1 - front;
+  const horizontal = Math.cos(angle);
+  const depthY = depth * 5;
+  const point = (sideX, sideY, frontX, frontY) => [
+    player.x + sideX * horizontal + frontX * front,
+    player.y + sideY * side + frontY * front + depthY - Math.sin(anim * 12 + 0.8) * 3,
+  ];
+
+  const start = point(-28, -10, 0, 5);
+  const topControlA = point(-68, -18, -18, 12);
+  const topControlB = point(-35, 15, -15, 42);
+  const tip = point(-68, 20 + Math.sin(anim * 12 + 1.2) * 2, 0, 60);
+  const bottomControlA = point(-22, 35, 15, 42);
+  const bottomControlB = point(-52, 15, 18, 12);
+  const end = point(-28, 8, 0, 5);
+
+  fillShape(context, '#aac', () => {
+    context.moveTo(...start);
+    context.bezierCurveTo(...topControlA, ...topControlB, ...tip);
+    context.bezierCurveTo(...bottomControlA, ...bottomControlB, ...start);
+  });
+}
+
 function renderTorso(context, player, anim) {
   const heightScale = 0.95 + Math.sin(anim * 12 + 0.4) * 0.05;
   const radiusY = 38 * heightScale;
@@ -215,7 +241,9 @@ function renderPlayer(context, player, anim) {
   const snoutX = headX + Math.cos(angle) * 23;
   const snoutY = headY + 8 - Math.sin(angle) * 14
     + (1 - Math.sin(anim * 12 - 0.9));
+  const tailInFront = Math.sin(angle) > 0;
 
+  if (!tailInFront) renderTail(context, player, angle, anim);
   if (Math.sin(angle) > 0) {
     renderHead(context, angle, headX, headY, snoutX, snoutY);
     renderTorso(context, player, anim);
@@ -223,6 +251,7 @@ function renderPlayer(context, player, anim) {
     renderTorso(context, player, anim);
     renderHead(context, angle, headX, headY, snoutX, snoutY);
   }
+  if (tailInFront) renderTail(context, player, angle, anim);
 }
 
 function PlayerCharacter(x = 0, y = 0, angle = 0) {
