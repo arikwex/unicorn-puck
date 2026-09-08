@@ -24,8 +24,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
       const headCenterY = this.y - 14 + Math.sin(playerAngle) * 5;
       const headRadius = 22;
       const snoutCenterX = headCenterX + Math.cos(playerAngle) * 23;
-      const snoutCenterY = headCenterY
-        + Math.cos(playerAngle) * 8
+      const snoutCenterY = headCenterY + 8
         + Math.sin(playerAngle) * 14;
       const snoutRadius = 13;
 
@@ -55,7 +54,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
           const depthAdjustedOffset = offset * (1 - cameraFacing * 0.2);
           return [
             headCenterX - Math.sin(playerAngle) * depthAdjustedOffset,
-            headCenterY - 14 + Math.cos(playerAngle) * depthAdjustedOffset * 0.35,
+            headCenterY - 11 + Math.cos(playerAngle) * depthAdjustedOffset * 0.35,
           ];
         }
 
@@ -67,32 +66,36 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
           const facesCamera = earFacesCamera(angle, offset);
           const [earCenterX, earBaseY] = earPosition(offset);
 
-          function earPath(halfWidth, height) {
+          function earPath(halfWidth, height, baseY = earBaseY) {
             const tipX = earCenterX;
-            const tipY = earBaseY - height;
+            const tipY = baseY - height;
             const turn = height * 0.22;
 
             context.beginPath();
-            context.moveTo(earCenterX - halfWidth, earBaseY);
+            context.moveTo(earCenterX - halfWidth, baseY);
             context.bezierCurveTo(
-              earCenterX - halfWidth, earBaseY - height * 0.42,
+              earCenterX - halfWidth, baseY - height * 0.42,
               tipX - turn, tipY + turn,
               tipX, tipY,
             );
             context.bezierCurveTo(
               tipX + turn, tipY + turn,
-              earCenterX + halfWidth, earBaseY - height * 0.42,
-              earCenterX + halfWidth, earBaseY,
+              earCenterX + halfWidth, baseY - height * 0.42,
+              earCenterX + halfWidth, baseY,
+            );
+            context.quadraticCurveTo(
+              earCenterX, baseY + 2,
+              earCenterX - halfWidth, baseY,
             );
             context.closePath();
           }
 
-          earPath(8, 27);
+          earPath(8, 24);
           context.fillStyle = facesCamera ? '#fff' : '#cce';
           context.fill();
 
           if (facesCamera) {
-            earPath(4.5, 18);
+            earPath(4.5, 15, earBaseY - 3);
             context.fillStyle = '#cce';
             context.fill();
           }
@@ -137,8 +140,8 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
         }
       }
 
-      // Up points away from the tilted camera, so the head passes behind the torso.
-      if (Math.sin(playerAngle) < 0) {
+      // The head clears the torso after rotating past horizon angle toward the camera.
+      if (Math.sin(playerAngle + Math.PI / 10) < 0) {
         renderHead();
         renderTorso.call(this);
       } else {
