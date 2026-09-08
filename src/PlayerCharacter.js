@@ -5,6 +5,8 @@ addEventListener('keydown', ({ code }) => keys.add(code));
 addEventListener('keyup', ({ code }) => keys.delete(code));
 
 function PlayerCharacter(x = 0, y = 0, angle = 0) {
+  let anim = 0;
+
   return {
     x,
     y,
@@ -12,6 +14,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
     tags: [TAG_PLAYER, TAG_PUCK],
 
     update(dt) {
+      anim += dt;
       this.angle += (
         (keys.has('ArrowLeft') ? 1 : 0) -
         (keys.has('ArrowRight') ? 1 : 0)
@@ -21,17 +24,27 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
     render(context) {
       const playerAngle = this.angle;
       const headCenterX = this.x + Math.cos(playerAngle) * 21;
-      const headCenterY = this.y - 14 - Math.sin(playerAngle) * 5;
+      const headCenterY = this.y - 14 - Math.sin(playerAngle) * 5 + (1 - Math.sin(anim * 12)) * 3;
       const headRadius = 22;
       const snoutCenterX = headCenterX + Math.cos(playerAngle) * 23;
       const snoutCenterY = headCenterY + 8
-        - Math.sin(playerAngle) * 14;
+        - Math.sin(playerAngle) * 14  + (1 - Math.sin(anim * 12 - 0.9)) * 1;
       const snoutRadius = 13;
 
       function renderTorso() {
+        const heightScale = 0.95 + Math.sin(anim * 12 + 0.4) * 0.05;
+        const torsoRadiusY = 38 * heightScale;
         context.fillStyle = '#cce';
         context.beginPath();
-        context.arc(this.x, this.y, 38, 0, Math.PI * 2);
+        context.ellipse(
+          this.x,
+          this.y + 38 - torsoRadiusY,
+          38,
+          torsoRadiusY,
+          0,
+          0,
+          Math.PI * 2,
+        );
         context.fill();
       }
 
@@ -65,8 +78,8 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
         function renderEar(angle, offset) {
           const facesCamera = earFacesCamera(angle, offset);
           const [earCenterX, earBaseY] = zPosition(
-            headCenterX,
-            headCenterY - 11,
+            headCenterX - Math.cos(playerAngle) * 5,
+            headCenterY - 11 + Math.sin(playerAngle) * 5,
             offset,
           );
 
@@ -94,7 +107,11 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
             context.closePath();
           }
 
-          earPath(8, 24);
+          earPath(
+            8,
+            facesCamera ? 27 : 24,
+            facesCamera ? earBaseY + 3 : earBaseY,
+          );
           context.fillStyle = facesCamera ? '#fff' : '#cce';
           context.fill();
 
@@ -142,20 +159,25 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
         const eyePlaneX = headCenterX + Math.cos(playerAngle);
         const eyePlaneY = headCenterY - Math.sin(playerAngle) - 2;
 
-        context.fillStyle = '#111';
         eyeSides.forEach((side) => {
           const [eyeX, eyeY] = zPosition(
             eyePlaneX,
             eyePlaneY,
             side,
           );
+          context.fillStyle = '#111';
           context.beginPath();
           context.arc(eyeX, eyeY, 6, 0, Math.PI * 2);
+          context.fill();
+
+          context.fillStyle = '#fff';
+          context.beginPath();
+          context.arc(eyeX + 2, eyeY - 2, 2, 0, Math.PI * 2);
           context.fill();
         });
 
         // Both nostrils disappear together once the snout crosses its horizon.
-        if (Math.sin(playerAngle - Math.PI / 10) <= 0) {
+        if (Math.sin(playerAngle) <= 0) {
           const nostrilX = snoutCenterX + Math.cos(playerAngle) * 6;
           const nostrilY = snoutCenterY - Math.sin(playerAngle) * 6;
           const nostrilGap = 8;
@@ -183,7 +205,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
       }
 
       // Positive angles turn into the page; beyond this horizon the torso occludes the head.
-      if (Math.sin(playerAngle - Math.PI / 10) > 0) {
+      if (Math.sin(playerAngle) > 0) {
         renderHead();
         renderTorso.call(this);
       } else {
