@@ -49,12 +49,12 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
         const bottomX = ux * along - uy * across;
         const bottomY = uy * along + ux * across;
 
-        function earPosition(offset) {
+        function zPosition(centerX, centerY, offset) {
           const cameraFacing = Math.cos(playerAngle) * Math.sign(offset);
           const depthAdjustedOffset = offset * (1 - cameraFacing * 0.2);
           return [
-            headCenterX + Math.sin(playerAngle) * depthAdjustedOffset,
-            headCenterY - 11 + Math.cos(playerAngle) * depthAdjustedOffset * 0.35,
+            centerX + Math.sin(playerAngle) * depthAdjustedOffset,
+            centerY + Math.cos(playerAngle) * depthAdjustedOffset * 0.35,
           ];
         }
 
@@ -64,7 +64,11 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
 
         function renderEar(angle, offset) {
           const facesCamera = earFacesCamera(angle, offset);
-          const [earCenterX, earBaseY] = earPosition(offset);
+          const [earCenterX, earBaseY] = zPosition(
+            headCenterX,
+            headCenterY - 11,
+            offset,
+          );
 
           function earPath(halfWidth, height, baseY = earBaseY) {
             const tipX = earCenterX;
@@ -130,6 +134,41 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
         context.beginPath();
         context.arc(snoutCenterX, snoutCenterY, snoutRadius, 0, Math.PI * 2);
         context.fill();
+
+        const lookingForward = -Math.sin(playerAngle) >= Math.cos(Math.PI / 8);
+        const eyeSides = lookingForward
+          ? [-13, 13]
+          : [Math.cos(playerAngle) >= 0 ? 13 : -13];
+        const eyePlaneX = headCenterX + Math.cos(playerAngle);
+        const eyePlaneY = headCenterY - Math.sin(playerAngle);
+
+        context.fillStyle = '#111';
+        eyeSides.forEach((side) => {
+          const [eyeX, eyeY] = zPosition(
+            eyePlaneX,
+            eyePlaneY,
+            side,
+          );
+          context.beginPath();
+          context.arc(eyeX, eyeY, 5, 0, Math.PI * 2);
+          context.fill();
+        });
+
+        // Both nostrils disappear together once the snout crosses its horizon.
+        if (Math.sin(playerAngle - Math.PI / 10) <= 0) {
+          context.fillStyle = '#999';
+          [-4, 4].forEach((side) => {
+            context.beginPath();
+            context.arc(
+              snoutCenterX + Math.cos(playerAngle) * 6 + Math.sin(playerAngle) * side,
+              snoutCenterY - Math.sin(playerAngle) * 6 + Math.cos(playerAngle) * side * 0.35,
+              2.5,
+              0,
+              Math.PI * 2,
+            );
+            context.fill();
+          });
+        }
 
         // Camera-facing ears always sit on top of the head circles.
         if (earFacesCamera(leftEarAngle, -earSpacing)) {
