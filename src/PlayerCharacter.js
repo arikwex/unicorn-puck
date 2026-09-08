@@ -187,22 +187,47 @@ function renderNostrils(context, angle, snoutX, snoutY) {
 
 function renderTail(context, player, angle, anim) {
   const depth = Math.sin(angle);
-  const front = depth * depth;
-  const side = 1 - front;
+  const front = Math.max(depth, 0) ** 2;
+  const hidden = Math.max(-depth, 0) ** 2;
+  const side = 1 - front - hidden;
   const horizontal = Math.cos(angle);
+  const sideHorizontal = horizontal * Math.abs(horizontal);
   const depthY = depth * 5;
   const point = (sideX, sideY, frontX, frontY) => [
-    player.x + sideX * horizontal + frontX * front,
-    player.y + sideY * side + frontY * front + depthY - Math.sin(anim * 12 + 0.8) * 3,
+    player.x + sideX * sideHorizontal + frontX * front,
+    player.y + sideY * side + frontY * front + 12 * hidden
+      + depthY - Math.sin(anim * 12 + 0.8) * 3,
   ];
 
+  // Exchange the two side-view contours after each end-on extreme. At the
+  // exchange point their side contribution is zero, so the swap is seamless.
+  const swapCurves = horizontal < 0;
   const start = point(-28, -10, 0, 5);
-  const topControlA = point(-68, -18, -18, 12);
-  const topControlB = point(-35, 15, -15, 42);
+  const topControlA = point(
+    swapCurves ? -52 : -68,
+    swapCurves ? 15 : -18,
+    -18,
+    12,
+  );
+  const topControlB = point(
+    swapCurves ? -22 : -35,
+    swapCurves ? 35 : 15,
+    -15,
+    42,
+  );
   const tip = point(-68, 20 + Math.sin(anim * 12 + 1.2) * 2, 0, 60);
-  const bottomControlA = point(-22, 35, 15, 42);
-  const bottomControlB = point(-52, 15, 18, 12);
-  const end = point(-28, 8, 0, 5);
+  const bottomControlA = point(
+    swapCurves ? -35 : -22,
+    swapCurves ? 15 : 35,
+    15,
+    42,
+  );
+  const bottomControlB = point(
+    swapCurves ? -68 : -52,
+    swapCurves ? -18 : 15,
+    18,
+    12,
+  );
 
   fillShape(context, '#aac', () => {
     context.moveTo(...start);
