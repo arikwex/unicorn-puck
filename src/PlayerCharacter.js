@@ -186,18 +186,23 @@ function renderNostrils(context, angle, snoutX, snoutY) {
 }
 
 function renderTail(context, player, angle, anim) {
+  const perspectiveY = 0.6;
+  const tweenGamma = 1.5;
   const depth = Math.sin(angle);
-  const front = Math.max(depth, 0) ** 2;
-  const hidden = Math.max(-depth, 0) ** 2;
+  const front = Math.max(depth, 0) ** tweenGamma;
+  const hidden = Math.max(-depth, 0) ** tweenGamma;
   const side = 1 - front - hidden;
   const horizontal = Math.cos(angle);
-  const sideHorizontal = horizontal * Math.abs(horizontal);
-  const depthY = depth * 5;
-  const point = (sideX, sideY, frontX, frontY) => [
-    player.x + sideX * sideHorizontal + frontX * front,
-    player.y + sideY * side + frontY * front + 12 * hidden
-      + depthY - Math.sin(anim * 12 + 0.8) * 3,
-  ];
+  const sideHorizontal = Math.sign(horizontal) * side;
+  const depthY = depth * 5 * perspectiveY;
+  const point = (sideX, sideY, frontX, frontY) => {
+    const frontYWithPerspective = 5 + (frontY - 5) * perspectiveY;
+    return [
+      player.x + sideX * sideHorizontal + frontX * front,
+      player.y + sideY * side + frontYWithPerspective * front + 12 * hidden
+        + depthY - Math.sin(anim * 12 + 0.8) * 3,
+    ];
+  };
 
   // Exchange the two side-view contours after each end-on extreme. At the
   // exchange point their side contribution is zero, so the swap is seamless.
