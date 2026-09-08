@@ -11,7 +11,7 @@ function PlayerCharacter(x = 0, y = 0) {
     },
 
     render(context) {
-      context.fillStyle = 'rgb(210,210,230)'; 
+      context.fillStyle = '#cce';
       context.beginPath();
       context.arc(this.x, this.y, 38, 0, Math.PI * 2);
       context.fill();
@@ -36,6 +36,44 @@ function PlayerCharacter(x = 0, y = 0) {
       const bottomX = ux * along - uy * across;
       const bottomY = uy * along + ux * across;
 
+      function renderEar(angle, offset) {
+        const facing = Math.cos(angle);
+        const widthScale = 0.35 + Math.abs(facing) * 0.65;
+        const earCenterX = headCenterX + offset;
+        const earBaseY = headCenterY - 14;
+        const earLean = Math.sin(angle) * 6;
+
+        function earPath(halfWidth, height, lean) {
+          const tipX = earCenterX + lean;
+          const tipY = earBaseY - height;
+          const turn = height * 0.22;
+
+          context.beginPath();
+          context.moveTo(earCenterX - halfWidth, earBaseY);
+          context.bezierCurveTo(
+            earCenterX - halfWidth, earBaseY - height * 0.42,
+            tipX - turn, tipY + turn,
+            tipX, tipY,
+          );
+          context.bezierCurveTo(
+            tipX + turn, tipY + turn,
+            earCenterX + halfWidth, earBaseY - height * 0.42,
+            earCenterX + halfWidth, earBaseY,
+          );
+          context.closePath();
+        }
+
+        earPath(8 * widthScale, 27, earLean);
+        context.fillStyle = facing >= 0 ? '#fff' : '#cce';
+        context.fill();
+
+        if (facing >= 0) {
+          earPath(4.5 * widthScale, 18, earLean * 0.7);
+          context.fillStyle = '#cce';
+          context.fill();
+        }
+      }
+
       // Draw the tangent connector first so the circles cover any antialias seams.
       context.fillStyle = '#fff';
       context.beginPath();
@@ -46,7 +84,12 @@ function PlayerCharacter(x = 0, y = 0) {
       context.closePath();
       context.fill();
 
+      // Paint the rear ear first so the front ear owns their overlap.
+      renderEar(Math.PI, 6);
+      renderEar(0, -6);
+
       // Placing the head and snout on the right establishes the facing direction.
+      context.fillStyle = '#fff';
       context.beginPath();
       context.arc(headCenterX, headCenterY, headRadius, 0, Math.PI * 2);
       context.fill();
