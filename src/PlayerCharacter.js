@@ -257,48 +257,118 @@ function renderTail(context, player, angle, anim) {
   });
 }
 
+// --- Tunable feather parameters (all angles in radians, all lengths as a
+// fraction of the terminal-phalanx-to-blade-of-scapula baseline length) ---
+const FEATHER_COUNT = 4;
+const FEATHER_SWEEP_ANGLE = -Math.PI / 4; // outward edge's angle off the baseline. 0 = along the baseline (invisible), PI/2 = straight out perpendicular (the old "90 degree" look).
+const FEATHER_CUT_ANGLE = Math.PI / 6; // inward cut's initial direction off the baseline, right as it leaves the tip. Smaller than FEATHER_SWEEP_ANGLE = cuts back sharply toward the root.
+const FEATHER_LENGTH_MAX = 0.34; // tip-most feather's protrusion length
+const FEATHER_LENGTH_MIN = 0.14; // root-most feather's protrusion length
+const FEATHER_CUT_PULL_1 = 0.55; // control point 1: how far from the tip, along FEATHER_CUT_ANGLE, as a fraction of that feather's own length
+const FEATHER_CUT_PULL_2 = 0.35; // control point 2: how far back from the next base point, along the baseline, as a fraction of one baseline segment
+
+function rotate(x, y, angle) {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return [x * c - y * s, x * s + y * c];
+}
+
+// Traces the trailing edge as FEATHER_COUNT feathers running from `from`
+// (the terminal phalanx) to `to` (the blade of scapula), assuming the
+// current path position is already at `from`. Each feather is a straight
+// outward edge (at FEATHER_SWEEP_ANGLE off the from->to baseline) followed
+// by a bezier cutting back in (starting at FEATHER_CUT_ANGLE, sharper, then
+// smoothing into the next base point). Feather 1 has no outward edge of its
+// own -- whatever curve already ends at `from` doubles as its top edge.
+function traceFeathers(context, from, to) {
+  for (let i = 0; i < FEATHER_COUNT; i++) {
+    const p = i / (FEATHER_COUNT - 1);
+    const q = 1 - p;
+    const tipX = from[0] * q + to[0] * p;
+    const tipY = from[1] * q + to[1] * p;
+    const innerX = (from[0] * q + to[0] * p) * 0.5;
+    const innerY = (from[1] * q + to[1] * p) * 0.8 + 2;
+    const curve1X = (from[0] * q + to[0] * p) * 0.9;
+    const curve1Y = (from[1] * q + to[1] * p)  * 0.8 + 6;
+    const curve2X = (from[0] * q + to[0] * p) * 0.5;
+    const curve2Y = (from[1] * q + to[1] * p) * 0.8 + 6;
+    context.lineTo(tipX, tipY);
+    context.bezierCurveTo(curve1X, curve1Y, curve2X, curve2Y, innerX, innerY);
+  }
+
+  // const baseline = [to[0] - from[0], to[1] - from[1]];
+  // const baselineLength = Math.hypot(baseline[0], baseline[1]);
+  // const baselineDir = [baseline[0] / baselineLength, baseline[1] / baselineLength];
+
+  // // Perpendicular to the baseline, pointing away from the wing's interior
+  // // (away from the coracoid, which sits at the origin).
+  // const [perpX, perpY] = rotate(baselineDir[0], baselineDir[1], Math.PI / 2);
+  // const midpoint = [from[0] + baseline[0] / 2, from[1] + baseline[1] / 2];
+  // const outwardSign = (midpoint[0] * perpX + midpoint[1] * perpY) > 0 ? 1 : -1;
+
+  // const [featherX, featherY] = rotate(baselineDir[0], baselineDir[1], outwardSign * FEATHER_SWEEP_ANGLE);
+  // const [cutX, cutY] = rotate(baselineDir[0], baselineDir[1], outwardSign * FEATHER_CUT_ANGLE);
+
+  // for (let i = 0; i < FEATHER_COUNT; i++) {
+  //   const baseStart = [
+  //     from[0] + baseline[0] * (i / FEATHER_COUNT),
+  //     from[1] + baseline[1] * (i / FEATHER_COUNT),
+  //   ];
+  //   const baseEnd = [
+  //     from[0] + baseline[0] * ((i + 1) / FEATHER_COUNT),
+  //     from[1] + baseline[1] * ((i + 1) / FEATHER_COUNT),
+  //   ];
+  //   const lengthFraction = FEATHER_LENGTH_MAX
+  //     + (FEATHER_LENGTH_MIN - FEATHER_LENGTH_MAX) * (i / (FEATHER_COUNT - 1));
+  //   const length = lengthFraction * baselineLength;
+
+  //   // Feather 1's tip is `from` itself -- whatever curve already ends
+  //   // there doubles as its outward edge, so there's nothing to draw here.
+  //   const tip = i === 0 ? from : [baseStart[0] + featherX * length, baseStart[1] + featherY * length];
+  //   if (i > 0) context.lineTo(tip[0], tip[1]);
+
+  //   const control1 = [tip[0] + cutX * length * FEATHER_CUT_PULL_1, tip[1] + cutY * length * FEATHER_CUT_PULL_1];
+  //   const control2 = [
+  //     baseEnd[0] - baselineDir[0] * (baselineLength / FEATHER_COUNT) * FEATHER_CUT_PULL_2,
+  //     baseEnd[1] - baselineDir[1] * (baselineLength / FEATHER_COUNT) * FEATHER_CUT_PULL_2,
+  //   ];
+  //   context.bezierCurveTo(control1[0], control1[1], control2[0], control2[1], baseEnd[0], baseEnd[1]);
+  // }
+}
+
 function traceWing(context, W, H) {
   context.moveTo(0, 0); // coracoid
 
-  // Leading edge: coracoid -> radiale -> terminal phalanx.
-  // context.bezierCurveTo(W * 0.12, -L * 0.25, W * 0.28, -H * 0.55, W * 0.40, -H * 0.65);
-  // context.bezierCurveTo(W * 0.60, -L * 0.75, W * 0.85, -H * 0.55, W * 1.00, -H * 0.25);
-  context.lineTo(W * -0.15, -H * 0.5);
-  context.lineTo(W * -1.0, -H * 1.0);
-  context.lineTo(W * -0.8, -H * 0.1);
+  // Leading edge: coracoid -> radiale -> terminal phalanx. This curve's
+  // endpoint doubles as feather 1's outward (top) edge.
+  context.bezierCurveTo(W * -0.02, -H * 0.10, W * -0.10, -H * 0.32, W * -0.15, -H * 0.50); // -> radiale
+  const terminalPhalanx = [W * -1.00, -H * 1.00];
+  context.bezierCurveTo(W * -0.32, -H * 0.72, W * -0.68, -H * 0.92, terminalPhalanx[0], terminalPhalanx[1]);
 
-  // Trailing edge: 4 feathers, two beziers each (out to the tip, in to the notch).
-  // context.bezierCurveTo(L * 0.92, -W * 0.02, L * 0.86, W * 0.10, L * 0.80, W * 0.15);
-  // context.bezierCurveTo(L * 0.72, W * 0.10, L * 0.66, W * 0.06, L * 0.62, W * 0.05);
-  // context.bezierCurveTo(L * 0.60, W * 0.20, L * 0.60, W * 0.30, L * 0.58, W * 0.35);
-  // context.bezierCurveTo(L * 0.50, W * 0.28, L * 0.45, W * 0.24, L * 0.42, W * 0.22);
-  // context.bezierCurveTo(L * 0.40, W * 0.36, L * 0.39, W * 0.45, L * 0.38, W * 0.50);
-  // context.bezierCurveTo(L * 0.30, W * 0.44, L * 0.26, W * 0.40, L * 0.24, W * 0.38);
-  // context.bezierCurveTo(L * 0.22, W * 0.50, L * 0.21, W * 0.57, L * 0.20, W * 0.60);
-  // context.bezierCurveTo(L * 0.13, W * 0.58, L * 0.08, W * 0.56, L * 0.06, W * 0.55); // -> blade of scapula
+  const bladeOfScapula = [W * -0.80, -H * 0.10];
+  traceFeathers(context, terminalPhalanx, bladeOfScapula);
 
   // Close: blade of scapula -> coracoid.
-  // context.bezierCurveTo(L * 0.02, W * 0.35, L * 0.00, W * 0.15, 0, 0);
+  context.bezierCurveTo(W * -0.55, -H * 0.05, W * -0.20, -H * 0.02, 0, 0);
 }
 
 const WING_LENGTH = 48;
-const WING_WIDTH = 64;
+const WING_WIDTH = 53;
 
-function renderWingShape(context, pivotX, pivotY, angle) {
-  const flipX = 1;//-Math.sin(angle);//(angle > 0 && angle) ? -1 : 1;
+function renderWingShape(context, pivotX, pivotY, angle, wingDir) {
   context.save();
   context.translate(pivotX, pivotY);
-  context.scale(flipX, 1);
   const WW = WING_WIDTH * Math.cos(angle);
 
-  if (flipX == -1) {
-    fillOutlinedShape(context, '#aac', 5, () => traceWing(context, WW, WING_LENGTH));
+  if (Math.cos(angle) > 0 ^ wingDir) {
+    fillOutlinedShape(context, '#aac', 4, () => traceWing(context, WW, WING_LENGTH));
   } else {
-    fillOutlinedShape(context, '#fff', 5, () => traceWing(context, WW, WING_LENGTH));
+    fillOutlinedShape(context, '#fff', 4, () => traceWing(context, WW, WING_LENGTH));
     context.save();
-    context.scale(0.6, 0.6);
+    context.scale(0.65, 0.65);
+    context.translate(-3, 3);
     // Scale compensates for the 0.6x context so the stroke still renders 9 units wide.
-    fillOutlinedShape(context, '#aac', 5 / 0.6, () => traceWing(context, WW, WING_LENGTH));
+    fillOutlinedShape(context, '#aac', 2 / 0.65, () => traceWing(context, WW, WING_LENGTH));
     context.restore();
   }
 
@@ -317,26 +387,40 @@ function orbit3d(x, y, z, angle) {
   const sinA = Math.sin(angle);
   const rotatedX = x * cosA - z * sinA;
   const rotatedZ = x * sinA + z * cosA;
-  return [rotatedX, y - rotatedZ * 0.4];
+  return [rotatedX, y - rotatedZ * 0.4, rotatedZ];
 }
 
-function renderWings(context, player, angle, foreground, anim) {
-  // Matches the depth convention used everywhere else in this file
-  // (facesCamera / tailInFront): a mount point faces the camera, and so
-  // belongs in the foreground pass, exactly when sin(itsPlacementAngle) <= 0.
-  [-Math.PI * 5 / 8, Math.PI * 5 / 8]
-    .map((defaultPlacement) => {
-      const placementAngle = normalizeAngle(angle + defaultPlacement);
-      return { defaultPlacement, depth: Math.sin(placementAngle) };
-    })
-    .filter(({ depth }) => (depth <= 0) === foreground)
+// Draws the wings and the tail together, sorted by their actual orbit3d
+// depth, so the tail can land between the two wings (in front of one,
+// behind the other) rather than always drawing as one block before or
+// after both of them. Matches the depth convention used everywhere else
+// in this file (facesCamera / old tailInFront): a mount point faces the
+// camera, and so belongs in the foreground pass, exactly when its
+// rotatedZ <= 0.
+function renderWingsAndTail(context, player, angle, anim, foreground) {
+  const items = [-Math.PI * 5 / 8, Math.PI * 5 / 8].map((defaultPlacement) => {
+    const [rx, ry, depth] = orbit3d(-9, -10, Math.sin(defaultPlacement) * 29, angle);
+    return {
+      depth,
+      draw: () => renderWingShape(
+        context,
+        player.x + rx,
+        player.y + ry - Math.sin(anim * 12 + 1.6) * 3.0,
+        angle - defaultPlacement * 0.15,
+        Math.sign(defaultPlacement) < 0,
+      ),
+    };
+  });
+
+  // The tail is mounted opposite the head, straight back, with no
+  // left/right offset.
+  const [, , tailDepth] = orbit3d(-30, 0, 0, angle);
+  items.push({ depth: tailDepth, draw: () => renderTail(context, player, angle, anim) });
+
+  items
+    .filter((item) => (item.depth <= 0) === foreground)
     .sort((a, b) => b.depth - a.depth) // farthest first, nearest drawn last (on top)
-    .forEach(({ defaultPlacement }) => {
-      const [rx, ry] = orbit3d(Math.cos(defaultPlacement) * 29, -10, Math.sin(defaultPlacement) * 29, angle);
-      const rootX = player.x + rx;
-      const rootY = player.y + ry - Math.sin(anim * 12 + 1.6) * 3.0;
-      renderWingShape(context, rootX, rootY, angle - defaultPlacement * 0.15);
-    });
+    .forEach((item) => item.draw());
 }
 
 function renderTorso(context, player, anim) {
@@ -369,10 +453,8 @@ function renderPlayer(context, player, anim) {
   const snoutX = headX + Math.cos(angle) * 23;
   const snoutY = headY + 8 - Math.sin(angle) * 14
     + (1 - Math.sin(anim * 12 - 0.9));
-  const tailInFront = Math.sin(angle) > 0;
 
-  if (!tailInFront) renderTail(context, player, angle, anim);
-  renderWings(context, player, angle, false, anim);
+  renderWingsAndTail(context, player, angle, anim, false);
   if (Math.sin(angle) > 0) {
     renderHead(context, angle, headX, headY, snoutX, snoutY);
     renderTorso(context, player, anim);
@@ -380,8 +462,7 @@ function renderPlayer(context, player, anim) {
     renderTorso(context, player, anim);
     renderHead(context, angle, headX, headY, snoutX, snoutY);
   }
-  renderWings(context, player, angle, true, anim);
-  if (tailInFront) renderTail(context, player, angle, anim);
+  renderWingsAndTail(context, player, angle, anim, true);
 }
 
 function PlayerCharacter(x = 0, y = 0, angle = 0) {
