@@ -28,6 +28,22 @@ function fillShape(context, color, trace) {
   context.fill();
 }
 
+// Fill plus a rounded stroke of the same color. The stroke keeps a thin
+// sliver of a shape visible (as a rounded line) even when it's foreshortened
+// down to near-zero fill area at a glancing angle.
+function fillOutlinedShape(context, color, lineWidth, trace) {
+  context.beginPath();
+  trace();
+  context.closePath();
+  context.fillStyle = color;
+  context.fill();
+  context.strokeStyle = color;
+  context.lineWidth = lineWidth;
+  context.lineJoin = 'round';
+  context.lineCap = 'round';
+  context.stroke();
+}
+
 function zPosition(angle, centerX, centerY, offset) {
   const cameraFacing = Math.cos(angle) * Math.sign(offset);
   const depthAdjustedOffset = offset * (1 - cameraFacing * 0.2);
@@ -276,12 +292,13 @@ function renderWingShape(context, pivotX, pivotY, angle) {
   const WW = WING_WIDTH * Math.cos(angle);
 
   if (flipX == -1) {
-    fillShape(context, '#aac', () => traceWing(context, WW, WING_LENGTH));
+    fillOutlinedShape(context, '#aac', 5, () => traceWing(context, WW, WING_LENGTH));
   } else {
-    fillShape(context, '#fff', () => traceWing(context, WW, WING_LENGTH));
+    fillOutlinedShape(context, '#fff', 5, () => traceWing(context, WW, WING_LENGTH));
     context.save();
     context.scale(0.6, 0.6);
-    fillShape(context, '#aac', () => traceWing(context, WW, WING_LENGTH));
+    // Scale compensates for the 0.6x context so the stroke still renders 9 units wide.
+    fillOutlinedShape(context, '#aac', 5 / 0.6, () => traceWing(context, WW, WING_LENGTH));
     context.restore();
   }
 
@@ -304,13 +321,22 @@ function orbit3d(x, y, z, angle) {
 }
 
 function renderWings(context, player, angle, foreground, anim) {
-  [-Math.PI*5/8, Math.PI*5/8].forEach((defaultPlacement) => {
-    const placementAngle = normalizeAngle(angle + defaultPlacement);
-    const [rx, ry] = orbit3d(Math.cos(defaultPlacement) * 29, -10, Math.sin(defaultPlacement) * 29, angle);
-    const rootX = player.x + rx;
-    const rootY = player.y + ry - Math.sin(anim * 12 + 1.6) * 3.0;
-    renderWingShape(context, rootX, rootY, angle);
-  });
+  // Matches the depth convention used everywhere else in this file
+  // (facesCamera / tailInFront): a mount point faces the camera, and so
+  // belongs in the foreground pass, exactly when sin(itsPlacementAngle) <= 0.
+  [-Math.PI * 5 / 8, Math.PI * 5 / 8]
+    .map((defaultPlacement) => {
+      const placementAngle = normalizeAngle(angle + defaultPlacement);
+      return { defaultPlacement, depth: Math.sin(placementAngle) };
+    })
+    .filter(({ depth }) => (depth <= 0) === foreground)
+    .sort((a, b) => b.depth - a.depth) // farthest first, nearest drawn last (on top)
+    .forEach(({ defaultPlacement }) => {
+      const [rx, ry] = orbit3d(Math.cos(defaultPlacement) * 29, -10, Math.sin(defaultPlacement) * 29, angle);
+      const rootX = player.x + rx;
+      const rootY = player.y + ry - Math.sin(anim * 12 + 1.6) * 3.0;
+      renderWingShape(context, rootX, rootY, angle - defaultPlacement * 0.15);
+    });
 }
 
 function renderTorso(context, player, anim) {
