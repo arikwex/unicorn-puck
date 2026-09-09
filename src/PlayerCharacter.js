@@ -241,47 +241,47 @@ function renderTail(context, player, angle, anim) {
   });
 }
 
-function traceWing(context, length, width) {
-  const L = length;
-  const W = -width;
-
+function traceWing(context, W, H) {
   context.moveTo(0, 0); // coracoid
 
   // Leading edge: coracoid -> radiale -> terminal phalanx.
-  context.bezierCurveTo(L * 0.12, -W * 0.25, L * 0.28, -W * 0.55, L * 0.40, -W * 0.65);
-  context.bezierCurveTo(L * 0.60, -W * 0.75, L * 0.85, -W * 0.55, L * 1.00, -W * 0.25);
+  // context.bezierCurveTo(W * 0.12, -L * 0.25, W * 0.28, -H * 0.55, W * 0.40, -H * 0.65);
+  // context.bezierCurveTo(W * 0.60, -L * 0.75, W * 0.85, -H * 0.55, W * 1.00, -H * 0.25);
+  context.lineTo(W * -0.15, -H * 0.5);
+  context.lineTo(W * -1.0, -H * 1.0);
+  context.lineTo(W * -0.8, -H * 0.1);
 
   // Trailing edge: 4 feathers, two beziers each (out to the tip, in to the notch).
-  context.bezierCurveTo(L * 0.92, -W * 0.02, L * 0.86, W * 0.10, L * 0.80, W * 0.15);
-  context.bezierCurveTo(L * 0.72, W * 0.10, L * 0.66, W * 0.06, L * 0.62, W * 0.05);
-  context.bezierCurveTo(L * 0.60, W * 0.20, L * 0.60, W * 0.30, L * 0.58, W * 0.35);
-  context.bezierCurveTo(L * 0.50, W * 0.28, L * 0.45, W * 0.24, L * 0.42, W * 0.22);
-  context.bezierCurveTo(L * 0.40, W * 0.36, L * 0.39, W * 0.45, L * 0.38, W * 0.50);
-  context.bezierCurveTo(L * 0.30, W * 0.44, L * 0.26, W * 0.40, L * 0.24, W * 0.38);
-  context.bezierCurveTo(L * 0.22, W * 0.50, L * 0.21, W * 0.57, L * 0.20, W * 0.60);
-  context.bezierCurveTo(L * 0.13, W * 0.58, L * 0.08, W * 0.56, L * 0.06, W * 0.55); // -> blade of scapula
+  // context.bezierCurveTo(L * 0.92, -W * 0.02, L * 0.86, W * 0.10, L * 0.80, W * 0.15);
+  // context.bezierCurveTo(L * 0.72, W * 0.10, L * 0.66, W * 0.06, L * 0.62, W * 0.05);
+  // context.bezierCurveTo(L * 0.60, W * 0.20, L * 0.60, W * 0.30, L * 0.58, W * 0.35);
+  // context.bezierCurveTo(L * 0.50, W * 0.28, L * 0.45, W * 0.24, L * 0.42, W * 0.22);
+  // context.bezierCurveTo(L * 0.40, W * 0.36, L * 0.39, W * 0.45, L * 0.38, W * 0.50);
+  // context.bezierCurveTo(L * 0.30, W * 0.44, L * 0.26, W * 0.40, L * 0.24, W * 0.38);
+  // context.bezierCurveTo(L * 0.22, W * 0.50, L * 0.21, W * 0.57, L * 0.20, W * 0.60);
+  // context.bezierCurveTo(L * 0.13, W * 0.58, L * 0.08, W * 0.56, L * 0.06, W * 0.55); // -> blade of scapula
 
   // Close: blade of scapula -> coracoid.
-  context.bezierCurveTo(L * 0.02, W * 0.35, L * 0.00, W * 0.15, 0, 0);
+  // context.bezierCurveTo(L * 0.02, W * 0.35, L * 0.00, W * 0.15, 0, 0);
 }
 
-const WING_LENGTH = 64;
-const WING_WIDTH = 48;
-const WING_ROTATION = -Math.PI / 2;
+const WING_LENGTH = 48;
+const WING_WIDTH = 64;
 
-function renderWingShape(context, pivotX, pivotY, mirror, singleColor) {
+function renderWingShape(context, pivotX, pivotY, angle) {
+  const flipX = 1;//-Math.sin(angle);//(angle > 0 && angle) ? -1 : 1;
   context.save();
   context.translate(pivotX, pivotY);
-  context.scale(mirror, 1);
-  context.rotate(WING_ROTATION);
+  context.scale(flipX, 1);
+  const WW = WING_WIDTH * Math.cos(angle);
 
-  if (singleColor) {
-    fillShape(context, singleColor, () => traceWing(context, WING_LENGTH, WING_WIDTH));
+  if (flipX == -1) {
+    fillShape(context, '#aac', () => traceWing(context, WW, WING_LENGTH));
   } else {
-    fillShape(context, '#fff', () => traceWing(context, WING_LENGTH, WING_WIDTH));
+    fillShape(context, '#fff', () => traceWing(context, WW, WING_LENGTH));
     context.save();
     context.scale(0.6, 0.6);
-    fillShape(context, '#aac', () => traceWing(context, WING_LENGTH, WING_WIDTH));
+    fillShape(context, '#aac', () => traceWing(context, WW, WING_LENGTH));
     context.restore();
   }
 
@@ -295,21 +295,21 @@ function normalizeAngle(value) {
   return normalized;
 }
 
-function renderWings(context, player, angle, foreground) {
-  // Both wings share one flip: they face "right" while the character is
-  // roughly facing right on screen, and flip together once angle crosses
-  // the +-pi/2 horizon.
-  const mirror = angle > -Math.PI / 2 && angle < Math.PI / 2 ? 1 : -1;
-  const shoulderY = player.y - 20;
-  const spread = 16;
+function orbit3d(x, y, z, angle) {
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+  const rotatedX = x * cosA - z * sinA;
+  const rotatedZ = x * sinA + z * cosA;
+  return [rotatedX, y - rotatedZ * 0.4];
+}
 
-  [-Math.PI / 2, Math.PI / 2].forEach((defaultPlacement) => {
-    const placement = normalizeAngle(angle + defaultPlacement);
-    const backward = placement > 0 && placement < Math.PI;
-    if (backward !== !foreground) return;
-
-    const [rootX, rootY] = zPosition(placement, player.x, shoulderY, spread);
-    renderWingShape(context, rootX, rootY, mirror, backward ? '#aac' : null);
+function renderWings(context, player, angle, foreground, anim) {
+  [-Math.PI*5/8, Math.PI*5/8].forEach((defaultPlacement) => {
+    const placementAngle = normalizeAngle(angle + defaultPlacement);
+    const [rx, ry] = orbit3d(Math.cos(defaultPlacement) * 29, -10, Math.sin(defaultPlacement) * 29, angle);
+    const rootX = player.x + rx;
+    const rootY = player.y + ry - Math.sin(anim * 12 + 1.6) * 3.0;
+    renderWingShape(context, rootX, rootY, angle);
   });
 }
 
@@ -346,7 +346,7 @@ function renderPlayer(context, player, anim) {
   const tailInFront = Math.sin(angle) > 0;
 
   if (!tailInFront) renderTail(context, player, angle, anim);
-  renderWings(context, player, angle, false);
+  renderWings(context, player, angle, false, anim);
   if (Math.sin(angle) > 0) {
     renderHead(context, angle, headX, headY, snoutX, snoutY);
     renderTorso(context, player, anim);
@@ -354,7 +354,7 @@ function renderPlayer(context, player, anim) {
     renderTorso(context, player, anim);
     renderHead(context, angle, headX, headY, snoutX, snoutY);
   }
-  renderWings(context, player, angle, true);
+  renderWings(context, player, angle, true, anim);
   if (tailInFront) renderTail(context, player, angle, anim);
 }
 
