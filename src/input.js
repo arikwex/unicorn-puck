@@ -1,5 +1,6 @@
 import { canvas } from './canvas.js';
 import { getObjectsByTag } from './engine.js';
+import { playDungeonTheme } from './music.js';
 import { applyImpulse } from './physics.js';
 import { playLaunch } from './sounds.js';
 import { TAG_CAMERA } from './tags.js';
@@ -88,6 +89,7 @@ function renderDragIndicator(context, start, end, hueAnimator) {
 // through Pointer Events so the same code path handles desktop and mobile.
 function DragController(player) {
   let dragging = false;
+  let musicStarted = false;
   let pointerId;
   let hueAnimator = 0; // hidden animator value driving the indicator's hue; only its rate depends on drag length
   // Screen-space (canvas pixel) points. Deliberately *not* converted to
@@ -115,6 +117,10 @@ function DragController(player) {
 
   function onPointerDown(event) {
     if (dragging) return;
+    if (!musicStarted) {
+      musicStarted = true;
+      playDungeonTheme();
+    }
     dragging = true;
     pointerId = event.pointerId;
     canvas.setPointerCapture?.(pointerId);
