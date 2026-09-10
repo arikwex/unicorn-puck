@@ -1,5 +1,7 @@
-import { getObjectsByTag } from './engine.js';
+import DamageCallout from './DamageCallout.js';
+import { add, getObjectsByTag } from './engine.js';
 import renderHealthBar from './HealthBar.js';
+import SplatEffect from './SplatEffect.js';
 import { TAG_ENEMY, TAG_OBSTACLE, TAG_PLAYER } from './tags.js';
 
 const TAU = Math.PI * 2;
@@ -58,7 +60,10 @@ const COLLISION_RADIUS = 26;
 
 // -- combat -----------------------------------------------------------------
 const MAX_HP = 5;
-const MAX_DAMAGE = 3; // at player.charge = 1; always rounds to at least 1
+// Damage is always 1, except at a genuinely fast (high-charge) hit, where
+// it's 2 -- never more. player.charge is itself already a function of
+// speed (see PlayerCharacter.js), so gating off it is gating off speed.
+const HIGH_CHARGE_DAMAGE_THRESHOLD = 0.7;
 const CHARGING_THRESHOLD = 0.15; // player.charge above this counts as "charging" for damage purposes
 const HIT_COOLDOWN = 0.6; // seconds between hits even while still touching
 const FLASH_DURATION = 0.25;
@@ -66,10 +71,22 @@ const HEALTH_BAR_SHOW_DURATION = 2;
 const HEALTH_BAR_WIDTH = 60;
 const HEALTH_BAR_HEIGHT = 10;
 const HEALTH_BAR_OFFSET_Y = 46;
-const CALLOUT_DURATION = 0.5;
-const CALLOUT_RISE = 30; // px it drifts upward over its lifetime
-const CALLOUT_START_SCALE = 0.8;
-const CALLOUT_END_SCALE = 1.6;
+
+// -- hit/death splats ---------------------------------------------------
+const SPLAT_GREEN = '#3dff5c';
+const SPLAT_PURPLE = '#8b4fe0'; // matches the body's own outline color
+const HIT_SPLAT_COUNT = 3;
+const DEATH_SPLAT_GREEN_COUNT = 4;
+const DEATH_SPLAT_PURPLE_COUNT = 7;
+const SPLAT_DISTANCE_MIN = 40; // 2x their original 20
+const SPLAT_DISTANCE_MAX = 100; // 2x their original 50
+const SPLAT_SIZE_MIN = 12; // 2x their original 6
+const SPLAT_SIZE_MAX = 24; // 2x their original 12
+// Each splat's arc height is randomized within this range (as a fraction
+// of its own travel distance) for some vertical variety, rather than
+// every arc peaking at the exact same fraction of its own distance.
+const SPLAT_ARC_HEIGHT_MIN = 0.2;
+const SPLAT_ARC_HEIGHT_MAX = 0.7;
 
 // -- patrol -----------------------------------------------------------------
 const PATROL_SPEED = 45;
@@ -134,29 +151,6 @@ function renderGrub(context, grub, flashTimer) {
   fillCircle(context, faceX, faceY + 5, MOUTH_RADIUS * 0.6, FACE_COLOR);
 }
 
-// "-N hp" floating text: drifts upward, fades, and grows over its
-// CALLOUT_DURATION lifetime.
-function renderCallouts(context, callouts, time) {
-  callouts.forEach((callout) => {
-    const t = Math.min(1, (time - callout.startTime) / CALLOUT_DURATION);
-    const scale = CALLOUT_START_SCALE + (CALLOUT_END_SCALE - CALLOUT_START_SCALE) * t;
-
-    context.save();
-    context.globalAlpha = 1 - t;
-    context.translate(callout.x, callout.y - CALLOUT_RISE * t);
-    context.scale(scale, scale);
-    context.font = 'bold 14px sans-serif';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.lineWidth = 3 / scale;
-    context.strokeStyle = '#000';
-    context.strokeText(callout.text, 0, 0);
-    context.fillStyle = '#fff';
-    context.fillText(callout.text, 0, 0);
-    context.restore();
-  });
-}
-
 // A purple-outlined, four-segment grub that patrols randomly within its
 // home room and takes damage from a charging player on contact. `room` is
 // that home room in world space -- { x, y, w, h }, center + full size --
@@ -166,13 +160,26 @@ function renderCallouts(context, callouts, time) {
 function Grub(x, y, room, seed, props = {}) {
   const { bounciness = 0.4 } = props;
   const rng = mulberry32(seed);
-  let anim = 0;
   let target = null;
   let pauseTimer = randRange(rng, PAUSE_MIN, PAUSE_MAX);
   let flashTimer = 0;
   let hitCooldown = 0;
   let healthBarTimer = 0;
-  let callouts = [];
+  let deathSplatsFired = false;
+
+  // `count` splats in random directions, distances, sizes, and arc
+  // heights from (originX, originY), each a SplatEffect thrown outward
+  // and left to puddle -- see SplatEffect.js. Uses the grub's own seeded
+  // rng, so the burst pattern is reproducible too.
+  function fireSplats(originX, originY, count, color) {
+    for (let i = 0; i < count; i++) {
+      const splatAngle = rng() * TAU;
+      const splatDistance = randRange(rng, SPLAT_DISTANCE_MIN, SPLAT_DISTANCE_MAX);
+      const splatSize = randRange(rng, SPLAT_SIZE_MIN, SPLAT_SIZE_MAX);
+      const splatArcHeight = splatDistance * randRange(rng, SPLAT_ARC_HEIGHT_MIN, SPLAT_ARC_HEIGHT_MAX);
+      add(SplatEffect(originX, originY, splatAngle, splatDistance, color, { size: splatSize, arcHeight: splatArcHeight }));
+    }
+  }
 
   const minX = room.x - room.w / 2 + PATROL_MARGIN;
   const maxX = room.x + room.w / 2 - PATROL_MARGIN;
@@ -214,7 +221,6 @@ function Grub(x, y, room, seed, props = {}) {
     },
 
     update(dt) {
-      anim += dt;
       this.order = this.y;
 
       if (!target) {
@@ -240,26 +246,38 @@ function Grub(x, y, room, seed, props = {}) {
       flashTimer = Math.max(0, flashTimer - dt);
       hitCooldown = Math.max(0, hitCooldown - dt);
       healthBarTimer = Math.max(0, healthBarTimer - dt);
-      callouts = callouts.filter((callout) => anim - callout.startTime < CALLOUT_DURATION);
 
+      // A plain center-to-center distance check, with no facing/angle term
+      // at all -- the grub is just as hittable from behind or the side as
+      // head-on.
       const player = getObjectsByTag(TAG_PLAYER)[0];
       if (player && this.hp > 0 && hitCooldown <= 0) {
         const touching = Math.hypot(player.x - this.x, player.y - this.y) < player.radius + COLLISION_RADIUS;
         if (touching && player.charge > CHARGING_THRESHOLD) {
-          const damage = Math.max(1, Math.round(player.charge * MAX_DAMAGE));
+          const damage = player.charge >= HIGH_CHARGE_DAMAGE_THRESHOLD ? 2 : 1;
           this.hp = Math.max(0, this.hp - damage);
           flashTimer = FLASH_DURATION;
           healthBarTimer = HEALTH_BAR_SHOW_DURATION;
           hitCooldown = HIT_COOLDOWN;
-          callouts.push({ text: `-${damage} hp`, x: this.x, y: this.y - 30, startTime: anim });
+          // Its own independent, self-expiring object (see
+          // DamageCallout.js) -- it keeps playing even if this exact hit
+          // is the one that removes the grub immediately below.
+          add(DamageCallout(this.x, this.y - 30, `-${damage} hp`));
+
+          fireSplats(this.x, this.y, HIT_SPLAT_COUNT, SPLAT_GREEN);
+          if (this.hp <= 0 && !deathSplatsFired) {
+            deathSplatsFired = true;
+            fireSplats(this.x, this.y, DEATH_SPLAT_GREEN_COUNT, SPLAT_GREEN);
+            fireSplats(this.x, this.y, DEATH_SPLAT_PURPLE_COUNT, SPLAT_PURPLE);
+          }
         }
       }
 
-      // Once defeated, stick around only long enough to finish showing the
-      // killing blow's flash and callout, then expire (the engine removes
-      // any object whose update() returns truthy).
-      if (this.hp <= 0 && flashTimer <= 0 && callouts.length === 0) return true;
-      return false;
+      // Removed the instant it's defeated (the engine removes any object
+      // whose update() returns truthy) -- the flash doesn't get to play on
+      // the killing blow, but the splats/callout are independent objects
+      // that keep going regardless, so the hit still reads clearly.
+      return this.hp <= 0;
     },
 
     render(context) {
@@ -267,7 +285,6 @@ function Grub(x, y, room, seed, props = {}) {
       if (healthBarTimer > 0) {
         renderHealthBar(context, this.x, this.y - HEALTH_BAR_OFFSET_Y, HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT, this.hp, MAX_HP);
       }
-      renderCallouts(context, callouts, anim);
     },
   };
 }
