@@ -1,6 +1,7 @@
 import DamageCallout from './DamageCallout.js';
 import { add } from './engine.js';
 import renderHealthBar from './HealthBar.js';
+import orbit3d from './orbit3d.js';
 import SplatEffect from './SplatEffect.js';
 import { TAG_ENEMY, TAG_OBSTACLE, TAG_PLAYER } from './tags.js';
 
@@ -30,19 +31,6 @@ function fillCircle(context, x, y, radius, color) {
   context.fill();
 }
 
-// The same perpendicular side-mount projection PlayerCharacter's own
-// ears/eyes use for their faux-3D placement (offset foreshortened by
-// facing, y compressed for depth) -- captured here too so the grub's face
-// reads with the same "rotation" language as the rest of the cast.
-function zPosition(angle, centerX, centerY, offset) {
-  const cameraFacing = Math.cos(angle) * Math.sign(offset);
-  const depthAdjustedOffset = offset * (1 - cameraFacing * 0.2);
-  return [
-    centerX + Math.sin(angle) * depthAdjustedOffset,
-    centerY + Math.cos(angle) * depthAdjustedOffset * 0.35,
-  ];
-}
-
 // -- body -----------------------------------------------------------------
 const SEGMENT_RADII = [22, 18, 14, 10]; // head to tail
 const SEGMENT_SPACING = 15;
@@ -53,9 +41,9 @@ const OUTLINE_COLOR = '#8b4fe0';
 const OUTLINE_WIDTH = 11; // full stroke width -- see renderGrub, only half stays visible outside the fill
 const BODY_COLORS = ['#332b47', '#241d33']; // alternating segment shade
 const FACE_COLOR = '#7cff6b';
-const FACE_GLOW_COLOR = '#e3ffd9';
-const EYE_RADIUS = 4;
-const MOUTH_RADIUS = 3.5;
+const FACE_GLOW_COLOR = '#5f5';
+const EYE_RADIUS = 5;
+const MOUTH_RADIUS = 4;
 const COLLISION_RADIUS = 26;
 
 // -- combat -----------------------------------------------------------------
@@ -128,29 +116,39 @@ function renderGrub(context, grub, flashTimer) {
     context.stroke();
   });
 
-  // Fill pass, tail to head, so the head lands on top.
-  for (let i = segments.length - 1; i >= 0; i--) {
+  // Positive sin faces into the page: draw head to tail so the nearer
+  // rear segments cover the head. Facing out draws tail to head.
+  const facingIntoPage = Math.sin(grub.angle) > 0;
+  for (let step = 0; step < segments.length; step++) {
+    const i = facingIntoPage ? step : segments.length - 1 - step;
     fillCircle(context, segments[i].x, segments[i].y, segments[i].radius, BODY_COLORS[i % BODY_COLORS.length]);
     if (flash > 0) {
       context.globalAlpha = flash;
       fillCircle(context, segments[i].x, segments[i].y, segments[i].radius, '#fff');
       context.globalAlpha = 1;
     }
+    if (i === 0) renderGrubFace(context, grub, segments[i]);
   }
+}
 
+function renderGrubFace(context, grub, head) {
   // Face: two glowing eyes plus a mouth dot, riding off the head the same
-  // way PlayerCharacter's own eyes ride off its facing angle.
-  const head = segments[0];
-  const eyeSpacing = 7;
-  const faceX = head.x + Math.cos(grub.angle) * 4;
-  const faceY = head.y - Math.sin(grub.angle) * 4;
-  [-eyeSpacing, eyeSpacing].forEach((side) => {
-    const [ex, ey] = zPosition(grub.angle, faceX, faceY - 4, side);
+  // way PlayerCharacter's own eyes ride off its facing angle. Draw with
+  // the head so nearer body segments can cover the face when facing away.
+  const sway = Math.sin(grub.anim * 7) * 0.3;
+  [-1, 1].forEach((side) => {
+    if (Math.sin(grub.angle - side * 0.6) > 0.22) {
+      return;
+    }
+    const [x, y] = orbit3d(9, -4, -side * 12, grub.angle + sway);
+    const ex = head.x + x;
+    const ey = head.y + y;
     fillCircle(context, ex, ey, EYE_RADIUS, FACE_GLOW_COLOR);
-    fillCircle(context, ex, ey, EYE_RADIUS * 0.6, FACE_COLOR);
   });
-  fillCircle(context, faceX, faceY + 5, MOUTH_RADIUS, FACE_GLOW_COLOR);
-  fillCircle(context, faceX, faceY + 5, MOUTH_RADIUS * 0.6, FACE_COLOR);
+  if (Math.sin(grub.angle) < 0.22) {
+    const [mouthX, mouthY] = orbit3d(12, 5, 0, grub.angle + sway);
+    fillCircle(context, head.x + mouthX, head.y + mouthY, MOUTH_RADIUS, FACE_GLOW_COLOR);
+  }
 }
 
 // A purple-outlined, four-segment grub that patrols randomly within its
@@ -243,11 +241,10 @@ function Grub(x, y, room, seed, props = {}) {
           this.y += (dy / dist) * step;
           // Same heading convention PlayerCharacter uses: y points down on
           // screen, but a larger angle swings the head "up", so negate dy.
-          // this.angle = Math.atan2(-dy, dx);
+          this.angle = Math.atan2(-dy, dx);
           this.anim += dt;
         }
       }
-      this.angle += 0.7 * dt;
 
       flashTimer = Math.max(0, flashTimer - dt);
       hitCooldown = Math.max(0, hitCooldown - dt);

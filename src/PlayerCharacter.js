@@ -1,4 +1,5 @@
 import { applyCollisionResponse, normalizeAngle } from './physics.js';
+import orbit3d from './orbit3d.js';
 import { TAG_PLAYER, TAG_PUCK } from './tags.js';
 
 const TAU = Math.PI * 2;
@@ -67,7 +68,7 @@ const HORN_HUE_SPEED = 220; // deg/s the gradient scrolls along the horn
 const TRAIL_DURATION = 0.5; // seconds a trail sample stays visible
 
 // The trail is 6 solid ROYGBV bands riding side by side (offset via
-// zPosition, the same faux-3D side-mount projection ears/eyes use, so the
+// zPosition, the same faux-3D side-mount projection the ears use, so the
 // band foreshortens with the character's heading like everything else
 // does) rather than one shrinking, hue-cycling line -- fixed width, fixed
 // left-to-right order, fading only in alpha toward the trail's old end.
@@ -294,11 +295,10 @@ function renderEyes(context, angle, headX, headY) {
   const sides = lookingForward
     ? [-13, 13]
     : [Math.cos(angle) >= 0 ? 13 : -13];
-  const eyePlaneX = headX + Math.cos(angle);
-  const eyePlaneY = headY - Math.sin(angle) - 2;
-
   sides.forEach((side) => {
-    const [eyeX, eyeY] = zPosition(angle, eyePlaneX, eyePlaneY, side);
+    const [x, y] = orbit3d(1, -2, -side, angle);
+    const eyeX = headX + x;
+    const eyeY = headY + y;
     fillCircle(context, eyeX, eyeY, 6, '#111');
     fillCircle(context, eyeX + 2, eyeY - 2, 2, '#fff');
   });
@@ -307,11 +307,11 @@ function renderEyes(context, angle, headX, headY) {
 function renderNostrils(context, angle, snoutX, snoutY) {
   if (Math.sin(angle) > 0) return;
 
-  const nostrilX = snoutX + Math.cos(angle) * 6;
-  const nostrilY = snoutY - Math.sin(angle) * 6;
   const gap = 8;
-  fillCircle(context, nostrilX - gap / 2, nostrilY, 2.5, '#999');
-  fillCircle(context, nostrilX + gap / 2, nostrilY, 2.5, '#999');
+  [-gap / 2, gap / 2].forEach((side) => {
+    const [x, y] = orbit3d(6, 0, -side, angle);
+    fillCircle(context, snoutX + x, snoutY + y, 2.5, '#999');
+  });
 }
 
 function renderTail(context, player, angle, anim, charge) {
@@ -492,14 +492,6 @@ function renderWingShape(context, pivotX, pivotY, angle, wingDir, charge) {
   }
 
   context.restore();
-}
-
-function orbit3d(x, y, z, angle) {
-  const cosA = Math.cos(angle);
-  const sinA = Math.sin(angle);
-  const rotatedX = x * cosA - z * sinA;
-  const rotatedZ = x * sinA + z * cosA;
-  return [rotatedX, y - rotatedZ * 0.4, rotatedZ];
 }
 
 // Draws the wings and the tail together, sorted by their actual orbit3d
