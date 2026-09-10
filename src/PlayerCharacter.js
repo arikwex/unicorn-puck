@@ -17,6 +17,9 @@ const MIN_SPEED_FOR_HEADING = 4;
 const HEADING_EASE_MIN = 0.6; // rad/s-ish ease rate floor, approached as speed -> 0
 const HEADING_EASE_PER_SPEED = 0.06; // additional ease rate per unit of speed -- x3'd so fast travel snaps the heading around much quicker
 
+// See renderPlayer's head/torso draw-order comment.
+const HEAD_BEHIND_BUFFER = (20 * Math.PI) / 180;
+
 // `charge` is a smoothed 0..1 read of how fast the player is currently
 // moving, driving every "charging forward" render tweak below (squish,
 // head/horn lean, wing sweep, rainbow horn, trail). It stays 0 below
@@ -586,7 +589,11 @@ function renderPlayer(context, player, anim, charge, trail) {
     + (1 - Math.sin(anim * 12 - 0.9));
 
   renderWingsAndTail(context, player, angle, anim, false, charge);
-  if (Math.sin(angle) > 0) {
+  // A plain `sin(angle) > 0` flips the draw order right at angle = 0/180 --
+  // exactly the dead-on side profile where the head/torso silhouettes
+  // overlap most, so the pop is at its most visible. HEAD_BEHIND_BUFFER
+  // holds the previous order for a few degrees past each crossing instead.
+  if (angle > HEAD_BEHIND_BUFFER && angle < Math.PI - HEAD_BEHIND_BUFFER) {
     renderHead(context, angle, headX, headY, snoutX, snoutY, charge, anim);
     renderTorso(context, player, anim, charge);
   } else {
