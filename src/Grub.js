@@ -1,5 +1,5 @@
 import DamageCallout from './DamageCallout.js';
-import { add, getObjectsByTag } from './engine.js';
+import { add } from './engine.js';
 import renderHealthBar from './HealthBar.js';
 import SplatEffect from './SplatEffect.js';
 import { TAG_ENEMY, TAG_OBSTACLE, TAG_PLAYER } from './tags.js';
@@ -246,36 +246,27 @@ function Grub(x, y, room, seed, props = {}) {
       hitCooldown = Math.max(0, hitCooldown - dt);
       healthBarTimer = Math.max(0, healthBarTimer - dt);
 
-      // A plain center-to-center distance check, with no facing/angle term
-      // at all -- the grub is just as hittable from behind or the side as
-      // head-on.
-      const player = getObjectsByTag(TAG_PLAYER)[0];
-      if (player && this.hp > 0 && hitCooldown <= 0) {
-        const touching = Math.hypot(player.x - this.x, player.y - this.y) < player.radius + COLLISION_RADIUS;
-        if (touching && player.charge > CHARGING_THRESHOLD) {
-          const damage = player.charge >= HIGH_CHARGE_DAMAGE_THRESHOLD ? 2 : 1;
-          this.hp = Math.max(0, this.hp - damage);
-          flashTimer = FLASH_DURATION;
-          healthBarTimer = HEALTH_BAR_SHOW_DURATION;
-          hitCooldown = HIT_COOLDOWN;
-          // Its own independent, self-expiring object (see
-          // DamageCallout.js) -- it keeps playing even if this exact hit
-          // is the one that removes the grub immediately below.
-          add(DamageCallout(this.x, this.y - 30, `-${damage} hp`));
+      return this.hp <= 0;
+    },
 
-          fireSplats(this.x, this.y, HIT_SPLAT_COUNT, SPLAT_GREEN, player.vx, player.vy);
-          if (this.hp <= 0 && !deathSplatsFired) {
-            deathSplatsFired = true;
-            fireSplats(this.x, this.y, DEATH_SPLAT_GREEN_COUNT, SPLAT_GREEN, player.vx, player.vy);
-            fireSplats(this.x, this.y, DEATH_SPLAT_PURPLE_COUNT, SPLAT_PURPLE, player.vx, player.vy);
-          }
-        }
+    onCollision(other, collision) {
+      if (!other.tags?.includes(TAG_PLAYER) || this.hp <= 0 || hitCooldown > 0) return;
+      const player = collision.otherBody;
+      if (player.charge <= CHARGING_THRESHOLD) return;
+
+      const damage = player.charge >= HIGH_CHARGE_DAMAGE_THRESHOLD ? 2 : 1;
+      this.hp = Math.max(0, this.hp - damage);
+      flashTimer = FLASH_DURATION;
+      healthBarTimer = HEALTH_BAR_SHOW_DURATION;
+      hitCooldown = HIT_COOLDOWN;
+      // These independent effects survive removal on the killing blow.
+      add(DamageCallout(this.x, this.y - 30, `-${damage} hp`));
+      fireSplats(this.x, this.y, HIT_SPLAT_COUNT, SPLAT_GREEN, player.vx, player.vy);
+      if (this.hp <= 0 && !deathSplatsFired) {
+        deathSplatsFired = true;
+        fireSplats(this.x, this.y, DEATH_SPLAT_GREEN_COUNT, SPLAT_GREEN, player.vx, player.vy);
+        fireSplats(this.x, this.y, DEATH_SPLAT_PURPLE_COUNT, SPLAT_PURPLE, player.vx, player.vy);
       }
-
-      // Removed the instant it's defeated (the engine removes any object
-      // whose update() returns truthy) -- the flash doesn't get to play on
-      // the killing blow, but the splats/callout are independent objects
-      // that keep going regardless, so the hit still reads clearly.
       return this.hp <= 0;
     },
 

@@ -67,10 +67,15 @@ function tick(now) {
   ctx.save();
 
   const expired = [];
-  objects.forEach((object) => {
+  // Callbacks may add effects and re-sort objects. Iterate a snapshot so
+  // every object present at the start of the phase updates exactly once.
+  [...objects].forEach((object) => {
     if (object.update?.(dt)) expired.push(object);
   });
   if (expired.length) remove(expired);
+
+  // Physics always runs after input and AI, independent of drawing depth.
+  [...objects].forEach((object) => object.physicsUpdate?.(dt));
 
   const camera = getObjectsByTag(TAG_CAMERA)[0];
   camera?.set(ctx);

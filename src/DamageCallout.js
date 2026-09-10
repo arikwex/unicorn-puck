@@ -4,10 +4,10 @@
 // keep rendering -- so a killing blow can remove its grub immediately and
 // the callout still plays out on its own.
 
-const CALLOUT_DURATION = 0.5;
-const CALLOUT_RISE = 30; // px it drifts upward over its lifetime
+const CALLOUT_DURATION = 0.7;
+const CALLOUT_RISE = 90; // px it drifts upward over its lifetime
 const CALLOUT_START_SCALE = 0.8;
-const CALLOUT_END_SCALE = 1.6;
+const CALLOUT_END_SCALE = 2.1;
 
 function DamageCallout(x, y, text) {
   let elapsed = 0;
@@ -22,11 +22,12 @@ function DamageCallout(x, y, text) {
 
     render(context) {
       const t = Math.min(1, elapsed / CALLOUT_DURATION);
-      const scale = CALLOUT_START_SCALE + (CALLOUT_END_SCALE - CALLOUT_START_SCALE) * t;
+      const p = (1.0 - Math.exp(-t * 6.0));
+      const scale = CALLOUT_START_SCALE + (CALLOUT_END_SCALE - CALLOUT_START_SCALE) * p;
 
       context.save();
       context.globalAlpha = 1 - t;
-      context.translate(x, y - CALLOUT_RISE * t);
+      context.translate(x, y - CALLOUT_RISE * p);
       context.scale(scale, scale);
       context.font = 'bold 14px sans-serif';
       context.textAlign = 'center';

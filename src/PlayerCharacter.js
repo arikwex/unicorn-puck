@@ -1,4 +1,4 @@
-import { normalizeAngle } from './physics.js';
+import { applyCollisionResponse, normalizeAngle } from './physics.js';
 import { TAG_PLAYER, TAG_PUCK } from './tags.js';
 
 const TAU = Math.PI * 2;
@@ -669,6 +669,14 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     // character directly.
     puck() {
       return this;
+    },
+
+    onCollision(other, collision) {
+      this.bounce(collision.response);
+    },
+
+    bounce(response) {
+      applyCollisionResponse(this, response);
     },
 
     update(dt) {

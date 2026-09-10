@@ -100,35 +100,37 @@ function circleBoxContact(circlePuck, boxPuck) {
   };
 }
 
-// Resolves an elastic-with-restitution collision between two puck structs
-// given a contact normal (pointing a -> b) and penetration depth. Mutates
-// both pucks' position and velocity in place; a puck with mass: Infinity
-// never moves.
-function resolveCollision(a, b, nx, ny, penetration) {
+// Compute both bodies' reactions from their captured impact state without
+// moving either body. The collision pass can collect every contact before
+// object callbacks apply these changes. The normal points a -> b.
+function collisionResponses(a, b, nx, ny, penetration) {
+  const responseA = { dx: 0, dy: 0, dvx: 0, dvy: 0, domega: 0 };
+  const responseB = { dx: 0, dy: 0, dvx: 0, dvy: 0, domega: 0 };
+  const responses = [responseA, responseB];
   const invMassA = a.mass === Infinity ? 0 : 1 / a.mass;
   const invMassB = b.mass === Infinity ? 0 : 1 / b.mass;
   const invMassSum = invMassA + invMassB;
-  if (invMassSum === 0) return;
+  if (invMassSum === 0) return responses;
 
   const correction = penetration / invMassSum;
-  a.x -= nx * correction * invMassA;
-  a.y -= ny * correction * invMassA;
-  b.x += nx * correction * invMassB;
-  b.y += ny * correction * invMassB;
+  responseA.dx = -nx * correction * invMassA;
+  responseA.dy = -ny * correction * invMassA;
+  responseB.dx = nx * correction * invMassB;
+  responseB.dy = ny * correction * invMassB;
 
   const relVx = b.vx - a.vx;
   const relVy = b.vy - a.vy;
   const relVelAlongNormal = relVx * nx + relVy * ny;
-  if (relVelAlongNormal > 0) return; // already separating
+  if (relVelAlongNormal > 0) return responses; // already separating
 
   const restitution = Math.min(a.bounciness, b.bounciness);
   const impulseMagnitude = -(1 + restitution) * relVelAlongNormal / invMassSum;
   const ix = impulseMagnitude * nx;
   const iy = impulseMagnitude * ny;
-  a.vx -= ix * invMassA;
-  a.vy -= iy * invMassA;
-  b.vx += ix * invMassB;
-  b.vy += iy * invMassB;
+  responseA.dvx = -ix * invMassA;
+  responseA.dvy = -iy * invMassA;
+  responseB.dvx = ix * invMassB;
+  responseB.dvy = iy * invMassB;
 
   // A slice of the tangential relative velocity becomes spin on both
   // bodies, so a glancing hit leaves the puck rotating rather than only
@@ -137,16 +139,26 @@ function resolveCollision(a, b, nx, ny, penetration) {
   const ty = nx;
   const relVelAlongTangent = relVx * tx + relVy * ty;
   const spinTransfer = relVelAlongTangent * 0.3;
-  if (invMassA) a.omega -= spinTransfer / momentOfInertia(a);
-  if (invMassB) b.omega += spinTransfer / momentOfInertia(b);
+  if (invMassA) responseA.domega = -spinTransfer / momentOfInertia(a);
+  if (invMassB) responseB.domega = spinTransfer / momentOfInertia(b);
+  return responses;
+}
+
+function applyCollisionResponse(puck, response) {
+  puck.x += response.dx;
+  puck.y += response.dy;
+  puck.vx += response.dvx;
+  puck.vy += response.dvy;
+  puck.omega += response.domega;
 }
 
 export {
+  applyCollisionResponse,
   applyDamping,
   applyImpulse,
   circleBoxContact,
   circleCircleContact,
+  collisionResponses,
   integratePuck,
   normalizeAngle,
-  resolveCollision,
 };
