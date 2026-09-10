@@ -78,15 +78,13 @@ const SPLAT_PURPLE = '#8b4fe0'; // matches the body's own outline color
 const HIT_SPLAT_COUNT = 3;
 const DEATH_SPLAT_GREEN_COUNT = 4;
 const DEATH_SPLAT_PURPLE_COUNT = 7;
-const SPLAT_DISTANCE_MIN = 40; // 2x their original 20
-const SPLAT_DISTANCE_MAX = 100; // 2x their original 50
+const SPLAT_SPEED_MAX = 250; // world units per second, before the hit bias
+const SPLAT_IMPACT_TRANSFER = 0.25; // fraction of player velocity added to each splat
 const SPLAT_SIZE_MIN = 12; // 2x their original 6
 const SPLAT_SIZE_MAX = 24; // 2x their original 12
-// Each splat's arc height is randomized within this range (as a fraction
-// of its own travel distance) for some vertical variety, rather than
-// every arc peaking at the exact same fraction of its own distance.
-const SPLAT_ARC_HEIGHT_MIN = 0.2;
-const SPLAT_ARC_HEIGHT_MAX = 0.7;
+// Multiplying launch speed by these times gives a varied peak arc height.
+const SPLAT_ARC_HEIGHT_TIME_MIN = 0.08;
+const SPLAT_ARC_HEIGHT_TIME_MAX = 0.28;
 
 // -- patrol -----------------------------------------------------------------
 const PATROL_SPEED = 45;
@@ -167,17 +165,18 @@ function Grub(x, y, room, seed, props = {}) {
   let healthBarTimer = 0;
   let deathSplatsFired = false;
 
-  // `count` splats in random directions, distances, sizes, and arc
-  // heights from (originX, originY), each a SplatEffect thrown outward
-  // and left to puddle -- see SplatEffect.js. Uses the grub's own seeded
-  // rng, so the burst pattern is reproducible too.
-  function fireSplats(originX, originY, count, color) {
+  // Sample launch velocity uniformly across a disk, then shift it by a
+  // fraction of the player's hit velocity. The seeded rng keeps the
+  // launch pattern reproducible.
+  function fireSplats(originX, originY, count, color, impactVx, impactVy) {
     for (let i = 0; i < count; i++) {
-      const splatAngle = rng() * TAU;
-      const splatDistance = randRange(rng, SPLAT_DISTANCE_MIN, SPLAT_DISTANCE_MAX);
+      const angle = rng() * TAU;
+      const speed = Math.sqrt(rng()) * SPLAT_SPEED_MAX;
+      const vx = Math.cos(angle) * speed + impactVx * SPLAT_IMPACT_TRANSFER;
+      const vy = Math.sin(angle) * speed + impactVy * SPLAT_IMPACT_TRANSFER;
       const splatSize = randRange(rng, SPLAT_SIZE_MIN, SPLAT_SIZE_MAX);
-      const splatArcHeight = splatDistance * randRange(rng, SPLAT_ARC_HEIGHT_MIN, SPLAT_ARC_HEIGHT_MAX);
-      add(SplatEffect(originX, originY, splatAngle, splatDistance, color, { size: splatSize, arcHeight: splatArcHeight }));
+      const splatArcHeight = Math.hypot(vx, vy) * randRange(rng, SPLAT_ARC_HEIGHT_TIME_MIN, SPLAT_ARC_HEIGHT_TIME_MAX);
+      add(SplatEffect(originX, originY, vx, vy, color, { size: splatSize, arcHeight: splatArcHeight }));
     }
   }
 
@@ -264,11 +263,11 @@ function Grub(x, y, room, seed, props = {}) {
           // is the one that removes the grub immediately below.
           add(DamageCallout(this.x, this.y - 30, `-${damage} hp`));
 
-          fireSplats(this.x, this.y, HIT_SPLAT_COUNT, SPLAT_GREEN);
+          fireSplats(this.x, this.y, HIT_SPLAT_COUNT, SPLAT_GREEN, player.vx, player.vy);
           if (this.hp <= 0 && !deathSplatsFired) {
             deathSplatsFired = true;
-            fireSplats(this.x, this.y, DEATH_SPLAT_GREEN_COUNT, SPLAT_GREEN);
-            fireSplats(this.x, this.y, DEATH_SPLAT_PURPLE_COUNT, SPLAT_PURPLE);
+            fireSplats(this.x, this.y, DEATH_SPLAT_GREEN_COUNT, SPLAT_GREEN, player.vx, player.vy);
+            fireSplats(this.x, this.y, DEATH_SPLAT_PURPLE_COUNT, SPLAT_PURPLE, player.vx, player.vy);
           }
         }
       }

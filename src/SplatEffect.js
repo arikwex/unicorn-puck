@@ -15,30 +15,31 @@ const PUDDLE_DURATION = 0.5; // seconds the puddle takes to fade out
 const PUDDLE_GROWTH = 0.6; // fraction the puddle's scale grows by over its fade
 const PUDDLE_ASPECT = 0.55; // radiusY / radiusX -- flattened into an oval on the ground
 
-// `distance` and `angle` describe the outward throw from (x, y); `size` is
+// `vx` and `vy` are ground-plane velocity in world units per second; `size` is
 // the puddle's base radius. Both the arc and the puddle are filled/stroked
 // with `color`. `arcHeight` overrides the default distance-proportional
 // peak height -- callers firing off a burst of splats can randomize this
 // per-splat for some vertical variety instead of every arc peaking at
 // exactly the same fraction of its own distance.
-function SplatEffect(x, y, angle, distance, color, props = {}) {
+function SplatEffect(x, y, vx, vy, color, props = {}) {
+  const flightDuration = Math.random() * (FLIGHT_DURATION_MAX - FLIGHT_DURATION_MIN) + FLIGHT_DURATION_MIN;
+  const distance = Math.hypot(vx, vy) * flightDuration;
   const { size = 10, arcHeight = distance * ARC_HEIGHT_RATIO } = props;
 
   let elapsed = 0;
   let landed = false;
   let puddleElapsed = 0;
-  let flightDuration = Math.random() * (FLIGHT_DURATION_MAX - FLIGHT_DURATION_MIN) + FLIGHT_DURATION_MIN;
 
-  const landX = x + Math.cos(angle) * distance;
-  const landY = y + Math.sin(angle) * distance;
+  const landX = x + vx * flightDuration;
+  const landY = y + vy * flightDuration;
 
   // A point along the parabola at fraction `t` (0 = launch, 1 = landed).
   // The "height" term only ever offsets screen-y upward, the same
   // convention every other bit of faux-3D lift in this game uses.
   function pointAt(t) {
     return [
-      x + Math.cos(angle) * distance * t,
-      y + Math.sin(angle) * distance * t - arcHeight * 4 * t * (1 - t),
+      x + vx * flightDuration * t,
+      y + vy * flightDuration * t - arcHeight * 4 * t * (1 - t),
     ];
   }
 
