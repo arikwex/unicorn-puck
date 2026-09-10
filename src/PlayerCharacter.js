@@ -2,11 +2,13 @@ import { add } from './engine.js';
 import { applyCollisionResponse, applyImpulse, normalizeAngle } from './physics.js';
 import orbit3d from './orbit3d.js';
 import SplatEffect from './SplatEffect.js';
-import { TAG_PLAYER, TAG_PROJECTILE, TAG_PUCK } from './tags.js';
+import { playPlayerDamage, playWallBounce } from './sounds.js';
+import { TAG_ENEMY, TAG_PLAYER, TAG_PROJECTILE, TAG_PUCK } from './tags.js';
 
 const TAU = Math.PI * 2;
 const DAMAGE_FLASH_DURATION = 0.6;
 const PROJECTILE_KNOCKBACK = 120;
+const WALL_BOUNCE_SOUND_MIN_SPEED = 30; // world units/s of velocity change -- below this, a resting/sliding contact stays silent
 const DAMAGE_CANVAS_SIZE = 320;
 
 // -- damage splats -----------------------------------------------------------
@@ -726,6 +728,13 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
         }
         return;
       }
+      // Grub's own onCollision plays its hit sound when a charging hit
+      // actually lands, so a plain bump into an enemy that does no damage
+      // stays silent here rather than doubling up on the wall-bounce sound.
+      if (!other.tags?.includes(TAG_ENEMY)) {
+        const impactSpeed = Math.hypot(collision.response.dvx, collision.response.dvy);
+        if (impactSpeed >= WALL_BOUNCE_SOUND_MIN_SPEED) playWallBounce(impactSpeed);
+      }
       this.bounce(collision.response);
     },
 
@@ -738,6 +747,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
       this.hp = Math.max(0, this.hp - Math.max(0, amount));
       damageFlashTimer = DAMAGE_FLASH_DURATION;
       fireDamageSplats(this.x, this.y);
+      playPlayerDamage();
     },
 
     update(dt) {

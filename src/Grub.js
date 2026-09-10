@@ -4,6 +4,7 @@ import GrubProjectile from './GrubProjectile.js';
 import renderHealthBar from './HealthBar.js';
 import orbit3d from './orbit3d.js';
 import SplatEffect from './SplatEffect.js';
+import { playEnemyHit, playOozeShot } from './sounds.js';
 import { TAG_ENEMY, TAG_OBSTACLE, TAG_PLAYER } from './tags.js';
 
 const TAU = Math.PI * 2;
@@ -348,6 +349,7 @@ function Grub(x, y, room, seed, props = {}) {
             const dy = player.y - mouth.y;
             const distance = Math.hypot(dx, dy) || 1;
             add(GrubProjectile(mouth.x, mouth.y, dx / distance * PROJECTILE_SPEED, dy / distance * PROJECTILE_SPEED));
+            playOozeShot();
             this.state = 'recovering';
             recoverElapsed = 0;
             attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
@@ -407,6 +409,7 @@ function Grub(x, y, room, seed, props = {}) {
 
       const damage = player.charge >= HIGH_CHARGE_DAMAGE_THRESHOLD ? 2 : 1;
       this.hp = Math.max(0, this.hp - damage);
+      playEnemyHit(damage);
       flashTimer = FLASH_DURATION;
       healthBarTimer = HEALTH_BAR_SHOW_DURATION;
       hitCooldown = HIT_COOLDOWN;

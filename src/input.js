@@ -1,6 +1,7 @@
 import { canvas } from './canvas.js';
 import { getObjectsByTag } from './engine.js';
 import { applyImpulse } from './physics.js';
+import { playLaunch } from './sounds.js';
 import { TAG_CAMERA } from './tags.js';
 
 const MAX_LINEAR_IMPULSE = 1800;
@@ -146,6 +147,7 @@ function DragController(player) {
       const impulseX = (dx / screenDistance) * magnitude;
       const impulseY = (dy / screenDistance) * magnitude;
       applyImpulse(player.puck(), impulseX, impulseY, 0);
+      playLaunch(magnitude / MAX_LINEAR_IMPULSE);
     }
 
     start = current = null;
