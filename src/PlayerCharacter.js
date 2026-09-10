@@ -61,13 +61,26 @@ const TAIL_STRETCH = 0.5;
 
 // The horn's rainbow while charging shows the full hue spectrum along its
 // own length at once (see hornRainbowGradient), and that pattern scrolls
-// over time rather than sitting still. The trail left behind cycles hue
-// over time too. Both keyed off the character's own running animation
-// clock so they're always in motion, not just active/inactive.
+// over time rather than sitting still. Both keyed off the character's own
+// running animation clock so it's always in motion, not just active/inactive.
 const HORN_HUE_SPEED = 220; // deg/s the gradient scrolls along the horn
 const TRAIL_DURATION = 0.5; // seconds a trail sample stays visible
-const TRAIL_HUE_SPEED = 260; // deg/s
-const TRAIL_LINE_WIDTH = 30; // px, tapered by its own fade
+
+// The trail is 6 solid ROYGBV bands riding side by side (offset via
+// zPosition, the same faux-3D side-mount projection ears/eyes use, so the
+// band foreshortens with the character's heading like everything else
+// does) rather than one shrinking, hue-cycling line -- fixed width, fixed
+// left-to-right order, fading only in alpha toward the trail's old end.
+const TRAIL_STRIPE_COLORS = [
+  [228, 3, 3], // red
+  [255, 140, 0], // orange
+  [255, 237, 0], // yellow
+  [0, 128, 38], // green
+  [0, 77, 255], // blue
+  [117, 7, 135], // violet
+];
+const TRAIL_STRIPE_WIDTH = 10.5; // px, fixed -- never shrinks, only fades (50% larger than its original 7)
+const TRAIL_STRIPE_SPACING = 10.5; // px between adjacent stripe centers, scaled with the width so the band still tiles seamlessly
 
 function fillCircle(context, x, y, radius, color) {
   context.fillStyle = color;
@@ -550,28 +563,36 @@ function renderHead(context, angle, headX, headY, snoutX, snoutY, charge, anim) 
   if (facesCamera) renderHorn(context, angle, headX, headY, charge, anim);
 }
 
-// A short-lived, fading, hue-cycling ribbon behind the character while
-// charging. `trail` is a list of { x, y, t, charge } samples (oldest
-// first, already pruned to the last TRAIL_DURATION seconds -- see
-// PlayerCharacter's update()); `time` is the current animation clock.
-// Each sample keeps the charge level it was recorded at, so the trail
-// fades in and out smoothly along with charge itself, not just with age.
+// A short-lived ROYGBV ribbon behind the character while charging.
+// `trail` is a list of { x, y, t, charge, angle } samples (oldest first,
+// already pruned to the last TRAIL_DURATION seconds -- see
+// PlayerCharacter's update()); `time` is the current animation clock. Each
+// sample keeps the charge level and heading it was recorded at: charge so
+// the trail fades in and out smoothly along with charge itself (not just
+// age), heading so each stripe's sideways offset (via zPosition) matches
+// how the character was actually facing at that point along the path.
 function renderTrail(context, trail, time) {
   if (trail.length < 2) return;
   context.lineCap = 'round';
+  context.lineWidth = TRAIL_STRIPE_WIDTH;
+
   for (let i = 1; i < trail.length; i++) {
     const a = trail[i - 1];
     const b = trail[i];
     const age = time - b.t;
     const alpha = Math.max(0, 1 - age / TRAIL_DURATION) * b.charge;
     if (alpha <= 0.01) continue;
-    const hue = (b.t * TRAIL_HUE_SPEED) % 360;
-    context.strokeStyle = `hsla(${hue}, 90%, 60%, ${alpha})`;
-    context.lineWidth = TRAIL_LINE_WIDTH * alpha;
-    context.beginPath();
-    context.moveTo(a.x, a.y);
-    context.lineTo(b.x, b.y);
-    context.stroke();
+
+    TRAIL_STRIPE_COLORS.forEach(([red, green, blue], stripeIndex) => {
+      const offset = (stripeIndex - (TRAIL_STRIPE_COLORS.length - 1) / 2) * TRAIL_STRIPE_SPACING;
+      const [ax, ay] = zPosition(a.angle, a.x, a.y, offset);
+      const [bx, by] = zPosition(b.angle, b.x, b.y, offset);
+      context.strokeStyle = `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+      context.beginPath();
+      context.moveTo(ax, ay);
+      context.lineTo(bx, by);
+      context.stroke();
+    });
   }
 }
 
@@ -664,7 +685,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
       this.charge += (targetCharge - this.charge) * (1 - Math.exp(-CHARGE_EASE_RATE * dt));
 
       trail.push({
-        x: this.x, y: this.y, t: anim, charge: this.charge,
+        x: this.x, y: this.y, t: anim, charge: this.charge, angle: this.angle,
       });
       while (trail.length && anim - trail[0].t > TRAIL_DURATION) trail.shift();
 
