@@ -315,17 +315,19 @@ function removeDeadEnds(grid, isRoomAdjacent) {
   }
 }
 
-// Every uncarved cell that touches a carved one becomes a wall tile --
-// including the grid's outer ring, which is never reachable by carving
-// (see the GRID_WIDTH/GRID_HEIGHT comment), so the dungeon always ends up
-// fully enclosed ("egress=no") with no extra work needed.
-function wallsAroundFloor(grid) {
+// Every uncarved cell becomes a wall tile -- not just the ones touching
+// floor. Floor and walls are complementary and together cover the whole
+// grid, including the outer ring (never reachable by carving -- see the
+// GRID_WIDTH/GRID_HEIGHT comment, so the dungeon always ends up fully
+// enclosed for "egress=no" with no extra work needed). Filling every
+// uncarved cell, not just the boundary layer, means there's no leftover
+// unclassified "hole" cell for a later pass (e.g. inflateDungeon.js's
+// tile-for-tile upscale) to render as neither floor nor wall.
+function computeWalls(grid) {
   const walls = [];
   for (let x = 0; x < GRID_WIDTH; x++) {
     for (let y = 0; y < GRID_HEIGHT; y++) {
-      if (grid.isCarved(x, y)) continue;
-      const touchesFloor = DIRS.some(([dx, dy]) => inBounds(x + dx, y + dy) && grid.isCarved(x + dx, y + dy));
-      if (touchesFloor) walls.push({ x, y });
+      if (!grid.isCarved(x, y)) walls.push({ x, y });
     }
   }
   return walls;
@@ -359,7 +361,7 @@ function generateDonjonDungeon(seed) {
   return {
     rooms,
     floor: carvedCells(grid),
-    walls: wallsAroundFloor(grid),
+    walls: computeWalls(grid),
     gridWidth: GRID_WIDTH,
     gridHeight: GRID_HEIGHT,
   };
