@@ -4,6 +4,7 @@ import generateDungeon from './donjonDungeon.js';
 import { add } from './engine.js';
 import DragController from './input.js';
 import inflateDungeon from './inflateDungeon.js';
+import mergeWallsIntoRects from './mergeWalls.js';
 import PhysicsWorld from './PhysicsWorld.js';
 import PlayerCharacter from './PlayerCharacter.js';
 
@@ -22,30 +23,38 @@ const CORRIDOR_WIDTH_FACTOR = 2;
 // easy to reason about while debugging reflection/collision: a hit on a
 // left/right-facing wall should only ever flip vx, a top/bottom-facing one
 // should only ever flip vy.
-const HALF_EXTENT = 30;
-// At angle = PI/4 a CubeObstacle renders (and collides) as a plain
-// axis-aligned square with half-width halfExtent * sqrt(2) -- see
-// CubeObstacle.js -- so that's the world-space size of one dungeon grid
-// cell, and the full width needed to tile edge-to-edge.
-const TILE = HALF_EXTENT * 2 * Math.SQRT2;
+// World-space size of one dungeon grid cell. A CubeObstacle's w/h are its
+// exact world-space bounds now (see CubeObstacle.js), so a 1x1 wall tile
+// is simply TILE x TILE -- this value itself is arbitrary (any positive
+// number tiles edge-to-edge cleanly), just kept unchanged from before this
+// module stopped needing to think in pre-ISO-scale half-extents, so the
+// dungeon's physical scale relative to the player's radius doesn't shift.
+const TILE = 30 * 2 * Math.SQRT2;
+
+function gridToWorld(x, y, gridWidth, gridHeight) {
+  return { x: (x - gridWidth / 2) * TILE, y: (y - gridHeight / 2) * TILE };
+}
 
 // Builds the dungeon's walls as CubeObstacles and returns a world-space
 // spawn point (the center of its first room).
 function buildDungeon() {
   const dungeon = inflateDungeon(generateDungeon(DUNGEON_SEED), CORRIDOR_WIDTH_FACTOR);
-  // Center the grid on the world origin so the player spawns somewhere
-  // near (0, 0), same as every previous test scene in this file.
-  const originX = dungeon.gridWidth / 2;
-  const originY = dungeon.gridHeight / 2;
-  const gridToWorld = (x, y) => ({ x: (x - originX) * TILE, y: (y - originY) * TILE });
+  const toWorld = (x, y) => gridToWorld(x, y, dungeon.gridWidth, dungeon.gridHeight);
 
-  dungeon.walls.forEach(({ x, y }) => {
-    const world = gridToWorld(x, y);
-    add(CubeObstacle(world.x, world.y, Math.PI / 4, { halfExtent: HALF_EXTENT }));
+  // Collapses the (many, small) unit wall cells into far fewer large
+  // rectangles before ever touching the engine -- purely a performance
+  // simplification, see mergeWalls.js.
+  mergeWallsIntoRects(dungeon.walls).forEach((rect) => {
+    // A rect's grid bounds run from (rect.x, rect.y) to
+    // (rect.x + rect.w, rect.y + rect.h) exclusive; its world-space center
+    // sits half a cell in from that top-left corner, same as any single
+    // cell's own center would.
+    const center = toWorld(rect.x + (rect.w - 1) / 2, rect.y + (rect.h - 1) / 2);
+    add(CubeObstacle(center.x, center.y, rect.w * TILE, rect.h * TILE));
   });
 
   const spawnRoom = dungeon.rooms[0];
-  return gridToWorld(spawnRoom.x + spawnRoom.w / 2, spawnRoom.y + spawnRoom.h / 2);
+  return toWorld(spawnRoom.x + spawnRoom.w / 2, spawnRoom.y + spawnRoom.h / 2);
 }
 
 // Entry point for specifying everything in the scene: the player, camera,

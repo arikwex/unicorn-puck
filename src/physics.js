@@ -55,8 +55,9 @@ function circleCircleContact(a, b) {
 }
 
 // Circle-vs-oriented-box contact. `circlePuck` needs { x, y, radius },
-// `boxPuck` needs { x, y, angle, halfExtent }. Normal points from the
-// circle toward the box, matching circleCircleContact's a-to-b convention.
+// `boxPuck` needs { x, y, angle, halfWidth, halfHeight }. Normal points
+// from the circle toward the box, matching circleCircleContact's a-to-b
+// convention.
 function circleBoxContact(circlePuck, boxPuck) {
   const cos = Math.cos(-boxPuck.angle);
   const sin = Math.sin(-boxPuck.angle);
@@ -64,9 +65,10 @@ function circleBoxContact(circlePuck, boxPuck) {
   const dy = circlePuck.y - boxPuck.y;
   const localX = dx * cos - dy * sin;
   const localY = dx * sin + dy * cos;
-  const half = boxPuck.halfExtent;
-  const clampedX = Math.max(-half, Math.min(half, localX));
-  const clampedY = Math.max(-half, Math.min(half, localY));
+  const halfWidth = boxPuck.halfWidth;
+  const halfHeight = boxPuck.halfHeight;
+  const clampedX = Math.max(-halfWidth, Math.min(halfWidth, localX));
+  const clampedY = Math.max(-halfHeight, Math.min(halfHeight, localY));
 
   let localNx;
   let localNy;
@@ -74,7 +76,7 @@ function circleBoxContact(circlePuck, boxPuck) {
 
   if (clampedX === localX && clampedY === localY) {
     // Circle center is inside the box: escape through the closest face.
-    const distances = [half - localX, localX + half, half - localY, localY + half];
+    const distances = [halfWidth - localX, localX + halfWidth, halfHeight - localY, localY + halfHeight];
     const nearest = Math.min(...distances);
     localNx = nearest === distances[0] ? 1 : nearest === distances[1] ? -1 : 0;
     localNy = nearest === distances[2] ? 1 : nearest === distances[3] ? -1 : 0;

@@ -3,11 +3,11 @@ import { TAG_OBSTACLE } from './tags.js';
 // The playpen is built and drawn along the isometric basis vectors
 // (1, -1) and (1, 1) (see mapCreator.js). Both are perpendicular and the
 // same length (sqrt(2)), so a box's footprint drawn along them is always a
-// square -- just rotated 45deg and scaled by sqrt(2) relative to a plain
-// axis-aligned box of the same `halfExtent`. That's the exact rotation an
-// obstacle's own `angle` needs to be offset by for collision math to line
-// up with the isometric rendering below (and why angle = PI/4 renders as
-// an upright, edge-to-edge tiling square).
+// rectangle -- just rotated 45deg and scaled by sqrt(2) relative to a
+// plain axis-aligned box of the same width/height. That's the exact
+// rotation an obstacle's own `angle` needs to be offset by for collision
+// math to line up with the isometric rendering below (and why
+// angle = PI/4 renders as an upright, edge-to-edge tiling rectangle).
 const ISO_U = { x: 1, y: -1 };
 const ISO_V = { x: 1, y: 1 };
 const ISO_ROTATION_OFFSET = -Math.PI / 4;
@@ -22,12 +22,13 @@ function rotateVec(v, angle) {
 function topCorners(obstacle) {
   const ua = rotateVec(ISO_U, obstacle.angle);
   const ub = rotateVec(ISO_V, obstacle.angle);
-  const half = obstacle.halfExtent;
+  const halfU = obstacle.w / (2 * ISO_SCALE);
+  const halfV = obstacle.h / (2 * ISO_SCALE);
   return [
-    [obstacle.x + (-ua.x - ub.x) * half, obstacle.y + (-ua.y - ub.y) * half],
-    [obstacle.x + (ua.x - ub.x) * half, obstacle.y + (ua.y - ub.y) * half],
-    [obstacle.x + (ua.x + ub.x) * half, obstacle.y + (ua.y + ub.y) * half],
-    [obstacle.x + (-ua.x + ub.x) * half, obstacle.y + (-ua.y + ub.y) * half],
+    [obstacle.x + (-ua.x * halfU - ub.x * halfV), obstacle.y + (-ua.y * halfU - ub.y * halfV)],
+    [obstacle.x + (ua.x * halfU - ub.x * halfV), obstacle.y + (ua.y * halfU - ub.y * halfV)],
+    [obstacle.x + (ua.x * halfU + ub.x * halfV), obstacle.y + (ua.y * halfU + ub.y * halfV)],
+    [obstacle.x + (-ua.x * halfU + ub.x * halfV), obstacle.y + (-ua.y * halfU + ub.y * halfV)],
   ];
 }
 
@@ -62,9 +63,13 @@ function renderCube(context, obstacle) {
   context.fill();
 }
 
-function CubeObstacle(x = 0, y = 0, angle = Math.PI / 4, props = {}) {
+// `w`/`h` are the obstacle's full world-space width/height at angle = PI/4
+// (its usual, upright orientation) -- i.e. exactly the bounds it visually
+// spans, so a caller merging many small wall tiles into fewer, larger
+// obstacles (see mergeWalls.js) can hand this the merged rectangle's own
+// bounds directly with no unit conversion.
+function CubeObstacle(x = 0, y = 0, w = 60, h = 60, angle = Math.PI / 4, props = {}) {
   const {
-    halfExtent = 30,
     height = 26,
     bounciness = 0.4,
     topColor = '#9b8',
@@ -74,8 +79,9 @@ function CubeObstacle(x = 0, y = 0, angle = Math.PI / 4, props = {}) {
   return {
     x,
     y,
+    w,
+    h,
     angle,
-    halfExtent,
     height,
     bounciness,
     topColor,
@@ -95,7 +101,8 @@ function CubeObstacle(x = 0, y = 0, angle = Math.PI / 4, props = {}) {
         x: this.x,
         y: this.y,
         angle: this.angle + ISO_ROTATION_OFFSET,
-        halfExtent: this.halfExtent * ISO_SCALE,
+        halfWidth: this.w / 2,
+        halfHeight: this.h / 2,
         mass: Infinity,
         vx: 0,
         vy: 0,
