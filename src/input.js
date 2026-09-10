@@ -188,23 +188,32 @@ function DragController(player) {
       hueAnimator += HUE_ROTATION_RATE_AT_MAX_LENGTH * lengthRatio * dt;
     },
 
-    render(context) {
+    // A HUD element, not a world-space render: `order` only sorts among
+    // other world objects, and this scene's dungeons commonly have world-y
+    // (and therefore `.order`) values well past 1000, so drawing this in
+    // the ordinary render pass could still land underneath something. The
+    // renderHUD pass always runs after every world object is drawn, so
+    // this is guaranteed on top instead of merely "probably high enough".
+    renderHUD(context) {
       if (!dragging) return;
       // Anchor to the player's current screen position, while the gesture
       // stays relative to the original click, independent of camera motion.
-      const transform = context.getTransform();
+      // renderHUD runs with an identity transform, so the camera's own
+      // translate/scale/translate (see Camera.set()) is replicated by hand
+      // instead of reading it off the context.
+      const camera = getObjectsByTag(TAG_CAMERA)[0];
+      const zoom = camera ? camera.zoom : 1;
+      const cameraX = camera ? camera.x : 0;
+      const cameraY = camera ? camera.y : 0;
       const origin = {
-        x: transform.a * player.x + transform.c * player.y + transform.e,
-        y: transform.b * player.x + transform.d * player.y + transform.f,
+        x: canvas.width / 2 + (player.x - cameraX) * zoom,
+        y: canvas.height / 2 + (player.y - cameraY) * zoom,
       };
       const end = {
         x: origin.x + current.x - start.x,
         y: origin.y + current.y - start.y,
       };
-      context.save();
-      context.setTransform(1, 0, 0, 1, 0, 0);
       renderDragIndicator(context, origin, end, hueAnimator);
-      context.restore();
     },
   };
 }

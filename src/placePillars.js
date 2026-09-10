@@ -130,3 +130,4 @@ function placePillars(dungeon, seed) {
 }
 
 export default placePillars;
+export { findEntranceCells };

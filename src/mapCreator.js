@@ -8,7 +8,7 @@ import DragController from './input.js';
 import mergeWallsIntoRects from './mergeWalls.js';
 import PhysicsWorld from './PhysicsWorld.js';
 import Pillar from './Pillar.js';
-import placePillars from './placePillars.js';
+import placePillars, { findEntranceCells } from './placePillars.js';
 import PlayerCharacter from './PlayerCharacter.js';
 import PlayerHealthHUD from './PlayerHealthHUD.js';
 import TreasureChest, { CHEST_RADIUS } from './TreasureChest.js';
@@ -27,6 +27,7 @@ const GRUB_ROOM_MARGIN = 50;
 // pillar-crowded room just goes without rather than overlapping a wall).
 const CHEST_ROOM_MARGIN = 50;
 const CHEST_MIN_OBSTACLE_GAP = 1; // world units of clearance required off every obstacle
+const CHEST_ENTRANCE_CLEARANCE = 3; // world units of clearance required off any room entrance/doorway
 const CHEST_PLACEMENT_ATTEMPTS = 30;
 // The raw generator's corridors are a single grid cell wide -- just barely
 // wider than the player puck, which feels awful to actually fly through.
@@ -113,19 +114,21 @@ function circleCircleGap(cx, cy, cr, other) {
 }
 
 // True only once a candidate clears every known obstacle -- walls (boxes)
-// and pillars/grubs (circles) -- by at least CHEST_MIN_OBSTACLE_GAP.
-function chestSpotIsClear(x, y, walls, circles) {
+// and pillars/grubs (circles) -- by at least CHEST_MIN_OBSTACLE_GAP, and
+// every room entrance (a point, radius 0) by CHEST_ENTRANCE_CLEARANCE.
+function chestSpotIsClear(x, y, walls, circles, entrances) {
   return walls.every((wall) => circleBoxGap(x, y, CHEST_RADIUS, wall) >= CHEST_MIN_OBSTACLE_GAP)
-    && circles.every((circle) => circleCircleGap(x, y, CHEST_RADIUS, circle) >= CHEST_MIN_OBSTACLE_GAP);
+    && circles.every((circle) => circleCircleGap(x, y, CHEST_RADIUS, circle) >= CHEST_MIN_OBSTACLE_GAP)
+    && entrances.every((entrance) => circleCircleGap(x, y, CHEST_RADIUS, entrance) >= CHEST_ENTRANCE_CLEARANCE);
 }
 
 // Resamples pickChestSpawn up to CHEST_PLACEMENT_ATTEMPTS times looking for
 // a spot clear of every obstacle; returns null (give up, no chest) if none
 // of them work out.
-function findChestSpawn(room, rng, walls, circles) {
+function findChestSpawn(room, rng, walls, circles, entrances) {
   for (let attempt = 0; attempt < CHEST_PLACEMENT_ATTEMPTS; attempt++) {
     const candidate = pickChestSpawn(room, rng);
-    if (chestSpotIsClear(candidate.x, candidate.y, walls, circles)) return candidate;
+    if (chestSpotIsClear(candidate.x, candidate.y, walls, circles, entrances)) return candidate;
   }
   return null;
 }
@@ -145,6 +148,7 @@ function buildDungeon(seed) {
   // scale as the walls/pillars/grubs actually added to the engine.
   const dungeon = inflateDungeon(generateDungeon(seed), CORRIDOR_WIDTH_FACTOR);
   const toWorld = (x, y) => gridToWorld(x, y, dungeon.gridWidth, dungeon.gridHeight);
+  const floorSet = new Set(dungeon.floor.map(({ x, y }) => `${x},${y}`));
 
   // Collected as chests are placed check clearance against them below --
   // walls as boxes, pillars/grubs as circles.
@@ -195,10 +199,17 @@ function buildDungeon(seed) {
     }
 
     // Every room gets a chest, kept at least CHEST_MIN_OBSTACLE_GAP off
-    // every wall/pillar/grub -- a room too cluttered to fit one goes
-    // without rather than spawning it overlapping something.
+    // every wall/pillar/grub and CHEST_ENTRANCE_CLEARANCE off any doorway
+    // (same entrance-cell detection placePillars.js uses to keep its own
+    // pillars clear of doorways) -- a room too cluttered to fit one goes
+    // without rather than spawning it overlapping something or blocking
+    // the way in.
+    const entrancePoints = findEntranceCells(room, floorSet).map((cell) => {
+      const world = toWorld(cell.x, cell.y);
+      return { x: world.x, y: world.y, radius: 0 };
+    });
     const chestRng = mulberry32(chestSeed + roomIndex);
-    const chestSpawn = findChestSpawn(worldRoom, chestRng, wallBoxes, obstacleCircles);
+    const chestSpawn = findChestSpawn(worldRoom, chestRng, wallBoxes, obstacleCircles, entrancePoints);
     if (chestSpawn) add(TreasureChest(chestSpawn.x, chestSpawn.y));
   });
 
