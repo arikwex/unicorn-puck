@@ -3,7 +3,7 @@ import { getObjectsByTag } from './engine.js';
 import { applyImpulse } from './physics.js';
 import { TAG_CAMERA } from './tags.js';
 
-const MAX_LINEAR_IMPULSE = 900;
+const MAX_LINEAR_IMPULSE = 1800;
 // Distance (world units) that reaches max impulse, and how sharply the
 // response curves toward it. A power > 1 widens the dynamic range: a short
 // drag lands well below a proportional share of max impulse (launches
@@ -12,7 +12,7 @@ const MAX_LINEAR_IMPULSE = 900;
 // drag distance actually reads as speed control instead of everything past
 // a small flick feeling about the same.
 const IMPULSE_DISTANCE_REF = 150;
-const IMPULSE_RESPONSE_POWER = 2.2;
+const IMPULSE_RESPONSE_POWER = 2; // quadratic in drag-indicator length
 const LINE_WIDTH = 12; // fixed -- the indicator is always this thick, regardless of drag magnitude
 const ARROW_LINE_LENGTH = 16;
 const ARROW_ANGLE = Math.PI / 4; // each arrowhead stroke splays 45deg off the main line's direction

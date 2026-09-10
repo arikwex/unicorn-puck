@@ -17,6 +17,55 @@ const MIN_SPEED_FOR_HEADING = 4;
 const HEADING_EASE_MIN = 0.6; // rad/s-ish ease rate floor, approached as speed -> 0
 const HEADING_EASE_PER_SPEED = 0.06; // additional ease rate per unit of speed -- x3'd so fast travel snaps the heading around much quicker
 
+// `charge` is a smoothed 0..1 read of how fast the player is currently
+// moving, driving every "charging forward" render tweak below (squish,
+// head/horn lean, wing sweep, rainbow horn, trail). It stays 0 below
+// CHARGE_MIN_SPEED (no pose change at a crawl), ramps linearly up to
+// CHARGE_MAX_SPEED, and holds at 1 beyond that. CHARGE_EASE_RATE then
+// smooths *that* target over time so a sudden speed change doesn't pop
+// the visuals; charge is a value, not a switch.
+const CHARGE_MIN_SPEED = 400; // x3'd so only genuinely fast travel triggers the squish pose
+const CHARGE_MAX_SPEED = 1000;
+const CHARGE_EASE_RATE = 24; // x4'd so the squish pose snaps in/out much quicker
+
+// Squash-and-stretch on the torso: shorter top-to-bottom, wider
+// side-to-side, at charge = 1.
+const TORSO_SQUISH_Y = 0.32;
+const TORSO_SQUISH_X = 0.22;
+// Extra forward reach for the head assembly at charge = 1 (world units),
+// on top of its normal offset from the body, plus how much lower (both
+// head and snout) drop as part of the squish.
+const HEAD_LEAN_FORWARD = 14;
+const HEAD_DROP = 10;
+const SNOUT_DROP = 9;
+// The snout tucks in closer to the head (world units less than its normal
+// offset) as it squishes, rather than staying stretched out.
+const SNOUT_CLOSER = 8;
+// The horn's own tilt: more forward push, less vertical rise, at charge = 1.
+const HORN_LEAN_FORWARD = 10;
+const HORN_LEAN_FLATTEN = 10;
+// Wings shrink, rake backward (away from the direction of travel), drop
+// lower, and stretch a bit wider along that sweep for an
+// elongated-behind-the-body look, all at charge = 1.
+const WING_SHORTEN = 0.3;
+const WING_ELONGATE = 0.25;
+const WING_SWEEP_BACK = 0.18; // 20% of its original 0.9
+const WING_DROP = 10;
+// The tail stretches further out behind the body at charge = 1 -- a
+// multiplier on its own reach, not a flat offset, so it stays attached at
+// the torso and only its far end streams outward.
+const TAIL_STRETCH = 0.5;
+
+// The horn's rainbow while charging shows the full hue spectrum along its
+// own length at once (see hornRainbowGradient), and that pattern scrolls
+// over time rather than sitting still. The trail left behind cycles hue
+// over time too. Both keyed off the character's own running animation
+// clock so they're always in motion, not just active/inactive.
+const HORN_HUE_SPEED = 220; // deg/s the gradient scrolls along the horn
+const TRAIL_DURATION = 0.5; // seconds a trail sample stays visible
+const TRAIL_HUE_SPEED = 260; // deg/s
+const TRAIL_LINE_WIDTH = 30; // px, tapered by its own fade
+
 function fillCircle(context, x, y, radius, color) {
   context.fillStyle = color;
   context.beginPath();
@@ -104,19 +153,60 @@ function traceHorn(context, halfWidth, length) {
   context.lineTo(0, -length);
 }
 
-function renderHorn(context, angle, headX, headY) {
+function traceHornStripe(context, halfWidth, y) {
+  context.moveTo(-halfWidth, y);
+  context.lineTo(halfWidth, y - 4);
+  context.lineTo(halfWidth, y - 1);
+  context.lineTo(-halfWidth, y + 3);
+}
+
+// Fills `trace` with `baseColor`, then -- if charge > 0 -- fills it again
+// with `rainbowStyle` (a color or gradient) at globalAlpha = charge, so
+// the rainbow fades smoothly in and out with charge instead of snapping on.
+function fillRainbowBlend(context, charge, baseColor, rainbowStyle, trace) {
+  fillShape(context, baseColor, trace);
+  if (charge > 0) {
+    context.globalAlpha = charge;
+    fillShape(context, rainbowStyle, trace);
+    context.globalAlpha = 1;
+  }
+}
+
+// The full hue spectrum spread along the horn's own length (base to tip)
+// at once, rather than one color at a time -- `hueOffset` shifts where
+// each hue sits along that length, so animating it scrolls the whole
+// rainbow pattern rather than just rotating a single flat color.
+function hornRainbowGradient(context, length, hueOffset) {
+  const gradient = context.createLinearGradient(0, 0, 0, -length);
+  const steps = 12;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const hue = (t * 360 + hueOffset) % 360;
+    gradient.addColorStop(t, `hsl(${hue}, 85%, 65%)`);
+  }
+  return gradient;
+}
+
+function renderHorn(context, angle, headX, headY, charge, anim) {
   const baseX = headX + Math.cos(angle) * 8;
   const baseY = headY - 13 - Math.sin(angle) * 6;
-  const dx = Math.cos(angle) * 14;
-  const dy = -20 - Math.sin(angle) * 4;
+  const dx = Math.cos(angle) * (14 + HORN_LEAN_FORWARD * charge);
+  const dy = -20 + HORN_LEAN_FLATTEN * charge - Math.sin(angle) * 4;
   const length = Math.hypot(dx, dy);
   const halfWidth = 4;
+  const hueOffset = (anim * HORN_HUE_SPEED) % 360;
 
   context.save();
   context.translate(baseX, baseY);
   context.rotate(Math.atan2(dx, -dy));
   context.scale(2, 2);
-  fillShape(context, '#ec6', () => traceHorn(context, halfWidth, length));
+  fillRainbowBlend(
+    context,
+    charge,
+    '#ec6',
+    hornRainbowGradient(context, length, hueOffset),
+    () => traceHorn(context, halfWidth, length),
+  );
 
   context.beginPath();
   traceHorn(context, halfWidth, length);
@@ -124,12 +214,8 @@ function renderHorn(context, angle, headX, headY) {
   context.clip();
 
   for (let y = -4; y > -length; y -= 8) {
-    fillShape(context, '#c94', () => {
-      context.moveTo(-halfWidth, y);
-      context.lineTo(halfWidth, y - 4);
-      context.lineTo(halfWidth, y - 1);
-      context.lineTo(-halfWidth, y + 3);
-    });
+    const hue = (Math.min(1, -y / length) * 360 + hueOffset) % 360;
+    fillRainbowBlend(context, charge, '#c94', `hsl(${hue}, 80%, 40%)`, () => traceHornStripe(context, halfWidth, y));
   }
   context.restore();
 }
@@ -212,7 +298,7 @@ function renderNostrils(context, angle, snoutX, snoutY) {
   fillCircle(context, nostrilX + gap / 2, nostrilY, 2.5, '#999');
 }
 
-function renderTail(context, player, angle, anim) {
+function renderTail(context, player, angle, anim, charge) {
   const perspectiveY = 0.6;
   const tweenGamma = 1.5;
   const depth = Math.sin(angle);
@@ -231,34 +317,39 @@ function renderTail(context, player, angle, anim) {
     ];
   };
 
+  // How much farther out the tail's far end (everything but its torso
+  // attachment point) reaches at charge = 1 -- a streaming-behind-you
+  // stretch, not a change to the tail's shape or attachment.
+  const stretch = 1 + TAIL_STRETCH * charge;
+
   // Exchange the two side-view contours after each end-on extreme. At the
   // exchange point their side contribution is zero, so the swap is seamless.
   const swapCurves = horizontal < 0;
   const start = point(-28, -10, 0, 5);
   const topControlA = point(
-    swapCurves ? -52 : -68,
+    (swapCurves ? -52 : -68) * stretch,
     swapCurves ? 15 : -18,
     -18,
-    12,
+    12 * stretch,
   );
   const topControlB = point(
-    swapCurves ? -22 : -35,
+    (swapCurves ? -22 : -35) * stretch,
     swapCurves ? 35 : 15,
     -15,
-    42,
+    42 * stretch,
   );
-  const tip = point(-68, 20 + Math.sin(anim * 12 + 1.2) * 2, 0, 60);
+  const tip = point(-68 * stretch, 20 + Math.sin(anim * 12 + 1.2) * 2, 0, 60 * stretch);
   const bottomControlA = point(
-    swapCurves ? -35 : -22,
+    (swapCurves ? -35 : -22) * stretch,
     swapCurves ? 15 : 35,
     15,
-    42,
+    42 * stretch,
   );
   const bottomControlB = point(
-    swapCurves ? -68 : -52,
+    (swapCurves ? -68 : -52) * stretch,
     swapCurves ? -18 : 15,
     18,
-    12,
+    12 * stretch,
   );
 
   fillShape(context, '#aac', () => {
@@ -366,20 +457,21 @@ function traceWing(context, W, H) {
 const WING_LENGTH = 48;
 const WING_WIDTH = 53;
 
-function renderWingShape(context, pivotX, pivotY, angle, wingDir) {
+function renderWingShape(context, pivotX, pivotY, angle, wingDir, charge) {
   context.save();
   context.translate(pivotX, pivotY);
-  const WW = WING_WIDTH * Math.cos(angle);
+  const length = WING_LENGTH * (1 - WING_SHORTEN * charge);
+  const WW = WING_WIDTH * (1 + WING_ELONGATE * charge) * Math.cos(angle);
 
   if (Math.cos(angle) > 0 ^ wingDir) {
-    fillOutlinedShape(context, '#aac', 4, () => traceWing(context, WW, WING_LENGTH));
+    fillOutlinedShape(context, '#aac', 4, () => traceWing(context, WW, length));
   } else {
-    fillOutlinedShape(context, '#fff', 4, () => traceWing(context, WW, WING_LENGTH));
+    fillOutlinedShape(context, '#fff', 4, () => traceWing(context, WW, length));
     context.save();
     context.scale(0.65, 0.65);
     context.translate(-3, 3);
     // Scale compensates for the 0.6x context so the stroke still renders 9 units wide.
-    fillOutlinedShape(context, '#aac', 2 / 0.65, () => traceWing(context, WW, WING_LENGTH));
+    fillOutlinedShape(context, '#aac', 2 / 0.65, () => traceWing(context, WW, length));
     context.restore();
   }
 
@@ -401,17 +493,22 @@ function orbit3d(x, y, z, angle) {
 // in this file (facesCamera / old tailInFront): a mount point faces the
 // camera, and so belongs in the foreground pass, exactly when its
 // rotatedZ <= 0.
-function renderWingsAndTail(context, player, angle, anim, foreground) {
+function renderWingsAndTail(context, player, angle, anim, foreground, charge) {
   const items = [-Math.PI * 5 / 8, Math.PI * 5 / 8].map((defaultPlacement) => {
     const [rx, ry, depth] = orbit3d(-9, -10, Math.sin(defaultPlacement) * 29, angle);
+    // Raking backward means increasing each wing's own sweep away from its
+    // default mount angle, in the direction that default already leans --
+    // hence scaling by the mount's own sign rather than a fixed direction.
+    const sweepBack = WING_SWEEP_BACK * charge * Math.sign(defaultPlacement);
     return {
       depth,
       draw: () => renderWingShape(
         context,
         player.x + rx,
-        player.y + ry - Math.sin(anim * 12 + 1.6) * 3.0,
-        angle - defaultPlacement * 0.15,
+        player.y + ry - Math.sin(anim * 12 + 1.6) * 3.0 + WING_DROP * charge,
+        angle - defaultPlacement * 0.15 + sweepBack,
         Math.sign(defaultPlacement) < 0,
+        charge,
       ),
     };
   });
@@ -419,7 +516,7 @@ function renderWingsAndTail(context, player, angle, anim, foreground) {
   // The tail is mounted opposite the head, straight back, with no
   // left/right offset.
   const [, , tailDepth] = orbit3d(-30, 0, 0, angle);
-  items.push({ depth: tailDepth, draw: () => renderTail(context, player, angle, anim) });
+  items.push({ depth: tailDepth, draw: () => renderTail(context, player, angle, anim, charge) });
 
   items
     .filter((item) => (item.depth <= 0) === foreground)
@@ -427,18 +524,19 @@ function renderWingsAndTail(context, player, angle, anim, foreground) {
     .forEach((item) => item.draw());
 }
 
-function renderTorso(context, player, anim) {
+function renderTorso(context, player, anim, charge) {
   const heightScale = 0.95 + Math.sin(anim * 12 + 0.4) * 0.05;
-  const radiusY = 38 * heightScale;
-  fillEllipse(context, player.x, player.y + 38 - radiusY, 38, radiusY, '#cce');
+  const radiusY = 38 * heightScale * (1 - TORSO_SQUISH_Y * charge);
+  const radiusX = 38 * (1 + TORSO_SQUISH_X * charge);
+  fillEllipse(context, player.x, player.y + 38 - radiusY, radiusX, radiusY, '#cce');
 }
 
-function renderHead(context, angle, headX, headY, snoutX, snoutY) {
+function renderHead(context, angle, headX, headY, snoutX, snoutY, charge, anim) {
   const headRadius = 22;
   const snoutRadius = 13;
   const facesCamera = Math.sin(angle) <= 0;
 
-  if (!facesCamera) renderHorn(context, angle, headX, headY);
+  if (!facesCamera) renderHorn(context, angle, headX, headY, charge, anim);
   renderConnector(context, headX, headY, headRadius, snoutX, snoutY, snoutRadius);
   renderEars(context, angle, headX, headY, false);
   fillCircle(context, headX, headY, headRadius, '#fff');
@@ -446,27 +544,56 @@ function renderHead(context, angle, headX, headY, snoutX, snoutY) {
   renderEyes(context, angle, headX, headY);
   renderNostrils(context, angle, snoutX, snoutY);
   renderEars(context, angle, headX, headY, true);
-  if (facesCamera) renderHorn(context, angle, headX, headY);
+  if (facesCamera) renderHorn(context, angle, headX, headY, charge, anim);
 }
 
-function renderPlayer(context, player, anim) {
+// A short-lived, fading, hue-cycling ribbon behind the character while
+// charging. `trail` is a list of { x, y, t, charge } samples (oldest
+// first, already pruned to the last TRAIL_DURATION seconds -- see
+// PlayerCharacter's update()); `time` is the current animation clock.
+// Each sample keeps the charge level it was recorded at, so the trail
+// fades in and out smoothly along with charge itself, not just with age.
+function renderTrail(context, trail, time) {
+  if (trail.length < 2) return;
+  context.lineCap = 'round';
+  for (let i = 1; i < trail.length; i++) {
+    const a = trail[i - 1];
+    const b = trail[i];
+    const age = time - b.t;
+    const alpha = Math.max(0, 1 - age / TRAIL_DURATION) * b.charge;
+    if (alpha <= 0.01) continue;
+    const hue = (b.t * TRAIL_HUE_SPEED) % 360;
+    context.strokeStyle = `hsla(${hue}, 90%, 60%, ${alpha})`;
+    context.lineWidth = TRAIL_LINE_WIDTH * alpha;
+    context.beginPath();
+    context.moveTo(a.x, a.y);
+    context.lineTo(b.x, b.y);
+    context.stroke();
+  }
+}
+
+function renderPlayer(context, player, anim, charge, trail) {
+  renderTrail(context, trail, anim);
+
   const angle = player.angle;
-  const headX = player.x + Math.cos(angle) * 21;
-  const headY = player.y - 14 - Math.sin(angle) * 5
+  const headForward = 21 + HEAD_LEAN_FORWARD * charge;
+  const headX = player.x + Math.cos(angle) * headForward;
+  const headY = player.y - 14 + HEAD_DROP * charge - Math.sin(angle) * 5
     + (1 - Math.sin(anim * 12)) * 3;
-  const snoutX = headX + Math.cos(angle) * 23;
-  const snoutY = headY + 8 - Math.sin(angle) * 14
+  const snoutForward = 23 - SNOUT_CLOSER * charge;
+  const snoutX = headX + Math.cos(angle) * snoutForward;
+  const snoutY = headY + 8 + SNOUT_DROP * charge - Math.sin(angle) * 14
     + (1 - Math.sin(anim * 12 - 0.9));
 
-  renderWingsAndTail(context, player, angle, anim, false);
+  renderWingsAndTail(context, player, angle, anim, false, charge);
   if (Math.sin(angle) > 0) {
-    renderHead(context, angle, headX, headY, snoutX, snoutY);
-    renderTorso(context, player, anim);
+    renderHead(context, angle, headX, headY, snoutX, snoutY, charge, anim);
+    renderTorso(context, player, anim, charge);
   } else {
-    renderTorso(context, player, anim);
-    renderHead(context, angle, headX, headY, snoutX, snoutY);
+    renderTorso(context, player, anim, charge);
+    renderHead(context, angle, headX, headY, snoutX, snoutY, charge, anim);
   }
-  renderWingsAndTail(context, player, angle, anim, true);
+  renderWingsAndTail(context, player, angle, anim, true, charge);
 }
 
 // Puck-like character properties. `mass`, `radius`, and `bounciness` are
@@ -476,6 +603,7 @@ function renderPlayer(context, player, anim) {
 // means tuning a multiplier.
 function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
   let anim = 0;
+  let trail = []; // recent { x, y, t, charge } samples, for renderTrail -- see update()
   const {
     mass = 1,
     radius = 38,
@@ -494,6 +622,9 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     // Driven by DragController while the player is aiming a launch.
     aiming: false,
     targetAngle: angle,
+    // Smoothed 0..1 "how fast am I currently going" -- see the
+    // CHARGE_SPEED_REF/CHARGE_EASE_RATE comment above.
+    charge: 0,
     // Draw order keyed off y, recomputed every update -- see CubeObstacle.js
     // for why (same painter's-algorithm depth illusion), but a moving puck
     // needs it refreshed every frame rather than set once.
@@ -516,28 +647,38 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
       anim += dt;
       this.order = this.y;
 
-      let targetAngle;
-      let easeRate;
+      const speed = Math.hypot(this.vx, this.vy);
+      // Above the same speed that starts the charging pose, drag triples --
+      // reads as air resistance actually fighting back once you're really
+      // moving, rather than a flat, speed-independent decay throughout.
+      this.viscosity = speed >= CHARGE_MIN_SPEED ? 5 : 1;
+
+      const targetCharge = Math.min(Math.max((speed - CHARGE_MIN_SPEED) / (CHARGE_MAX_SPEED - CHARGE_MIN_SPEED), 0), 1);
+      this.charge += (targetCharge - this.charge) * (1 - Math.exp(-CHARGE_EASE_RATE * dt));
+
+      trail.push({
+        x: this.x, y: this.y, t: anim, charge: this.charge,
+      });
+      while (trail.length && anim - trail[0].t > TRAIL_DURATION) trail.shift();
+
       if (this.aiming) {
-        targetAngle = this.targetAngle;
-        easeRate = AIM_EASE_RATE;
-      } else {
-        const speed = Math.hypot(this.vx, this.vy);
-        if (speed <= MIN_SPEED_FOR_HEADING) return;
+        const ease = 1 - Math.exp(-AIM_EASE_RATE * dt);
+        const delta = normalizeAngle(this.targetAngle - this.angle);
+        this.angle = normalizeAngle(this.angle + delta * ease);
+      } else if (speed > MIN_SPEED_FOR_HEADING) {
         // Screen/world y points down, but rendering treats a larger angle
         // as swinging the head upward (see headY above), so the heading
         // that matches a given velocity needs its y-component negated.
-        targetAngle = Math.atan2(-this.vy, this.vx);
-        easeRate = HEADING_EASE_MIN + HEADING_EASE_PER_SPEED * speed;
+        const targetAngle = Math.atan2(-this.vy, this.vx);
+        const easeRate = HEADING_EASE_MIN + HEADING_EASE_PER_SPEED * speed;
+        const ease = 1 - Math.exp(-easeRate * dt);
+        const delta = normalizeAngle(targetAngle - this.angle);
+        this.angle = normalizeAngle(this.angle + delta * ease);
       }
-
-      const ease = 1 - Math.exp(-easeRate * dt);
-      const delta = normalizeAngle(targetAngle - this.angle);
-      this.angle = normalizeAngle(this.angle + delta * ease);
     },
 
     render(context) {
-      renderPlayer(context, this, anim);
+      renderPlayer(context, this, anim, this.charge, trail);
     },
   };
 }
