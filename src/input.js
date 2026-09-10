@@ -1,6 +1,5 @@
 import { canvas } from './canvas.js';
 import { getObjectsByTag } from './engine.js';
-import { playDungeonTheme } from './music.js';
 import { applyImpulse } from './physics.js';
 import { playLaunch } from './sounds.js';
 import { TAG_CAMERA } from './tags.js';
@@ -89,7 +88,6 @@ function renderDragIndicator(context, start, end, hueAnimator) {
 // through Pointer Events so the same code path handles desktop and mobile.
 function DragController(player) {
   let dragging = false;
-  let musicStarted = false;
   let pointerId;
   let hueAnimator = 0; // hidden animator value driving the indicator's hue; only its rate depends on drag length
   // Screen-space (canvas pixel) points. Deliberately *not* converted to
@@ -117,10 +115,6 @@ function DragController(player) {
 
   function onPointerDown(event) {
     if (dragging) return;
-    if (!musicStarted) {
-      musicStarted = true;
-      playDungeonTheme();
-    }
     dragging = true;
     pointerId = event.pointerId;
     canvas.setPointerCapture?.(pointerId);
@@ -167,6 +161,16 @@ function DragController(player) {
 
   return {
     order: 1000, // render the indicator above everything else in the scene
+
+    // A fresh game (fresh player) gets a fresh DragController, so the
+    // previous one's listeners must come off -- otherwise every restart
+    // stacks another set of global pointer handlers onto a stale player.
+    destroy() {
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      removeEventListener('pointermove', onPointerMove);
+      removeEventListener('pointerup', onPointerUp);
+      removeEventListener('pointercancel', onPointerUp);
+    },
 
     update(dt) {
       if (!dragging) return;

@@ -12,19 +12,12 @@ import placePillars from './placePillars.js';
 import PlayerCharacter from './PlayerCharacter.js';
 import PlayerHealthHUD from './PlayerHealthHUD.js';
 
-// Fixed for now, so the generated dungeon is reproducible while the
-// generator itself is being tuned.
-const DUNGEON_SEED = 123;
-// Deliberately different from DUNGEON_SEED, so pillar placement doesn't
-// replay the exact same random sequence the room layout already consumed.
-const PILLAR_SEED = DUNGEON_SEED + 1;
-// Every room gets GRUBS_PER_ROOM grubs, each scattered to its own spot
-// within the room (GRUB_SEED + <room index> seeds that scatter) and its
-// own patrol (GRUB_SEED + <room index> * 100 + <grub index> seeds that),
-// kept at least GRUB_MIN_PLAYER_DISTANCE from wherever the player spawns
+// GRUBS_PER_ROOM grubs per room, each scattered to its own spot within the
+// room (buildDungeon's own grubSeed offset by <room index> seeds that
+// scatter) and its own patrol (offset by <room index> * 100 + <grub index>
+// seeds that), kept at least GRUB_MIN_PLAYER_DISTANCE from wherever the player spawns
 // and GRUB_ROOM_MARGIN off its room's own walls where the room is big
 // enough to allow both.
-const GRUB_SEED = DUNGEON_SEED + 2;
 const GRUBS_PER_ROOM = 6;
 const GRUB_MIN_PLAYER_DISTANCE = 200;
 const GRUB_ROOM_MARGIN = 50;
@@ -86,9 +79,13 @@ function pickGrubSpawn(room, playerSpawn, rng) {
 }
 
 // Builds the dungeon's walls as CubeObstacles and returns a world-space
-// spawn point (the center of its first room).
-function buildDungeon() {
-  const dungeon = inflateDungeon(generateDungeon(DUNGEON_SEED), CORRIDOR_WIDTH_FACTOR);
+// spawn point (the center of its first room). `seed` drives the whole
+// layout; pillar placement and grub scatter/patrol each offset from it so
+// they don't replay the room layout's own random sequence.
+function buildDungeon(seed) {
+  const pillarSeed = seed + 1;
+  const grubSeed = seed + 2;
+  const dungeon = inflateDungeon(generateDungeon(seed), CORRIDOR_WIDTH_FACTOR);
   const toWorld = (x, y) => gridToWorld(x, y, dungeon.gridWidth, dungeon.gridHeight);
 
   // Collapses the (many, small) unit wall cells into far fewer large
@@ -106,7 +103,7 @@ function buildDungeon() {
   // Roman-esque columns dropped into rooms with enough space for them --
   // corners, a symmetric pair flanking opposing walls, or centered --
   // never within reach of a doorway. See placePillars.js.
-  placePillars(dungeon, PILLAR_SEED).forEach(({ x, y }) => {
+  placePillars(dungeon, pillarSeed).forEach(({ x, y }) => {
     const world = toWorld(x, y);
     add(Pillar(world.x, world.y));
   });
@@ -123,10 +120,10 @@ function buildDungeon() {
     const worldRoom = {
       x: roomCenter.x, y: roomCenter.y, w: room.w * TILE, h: room.h * TILE,
     };
-    const scatterRng = mulberry32(GRUB_SEED + roomIndex);
+    const scatterRng = mulberry32(grubSeed + roomIndex);
     for (let i = 0; i < GRUBS_PER_ROOM; i++) {
       const spawn = pickGrubSpawn(worldRoom, playerSpawn, scatterRng);
-      add(Grub(spawn.x, spawn.y, worldRoom, GRUB_SEED + roomIndex * 100 + i));
+      add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + i));
     }
   });
 
@@ -135,15 +132,18 @@ function buildDungeon() {
 
 // Entry point for specifying everything in the scene: the player, camera,
 // obstacles, and input. Swap or extend this module to build different
-// maps.
-function createMap() {
-  const spawn = buildDungeon();
+// maps. `seed` drives the whole dungeon layout -- pass a fresh one per run
+// for a new map, or the same one to replay an identical layout.
+function createMap(seed) {
+  const spawn = buildDungeon(seed);
   const player = add(PlayerCharacter(spawn.x, spawn.y));
-  add(PlayerHealthHUD(player));
+  const playerHealthHUD = add(PlayerHealthHUD(player));
   add(Camera().follow(player));
-  add(DragController(player));
+  const dragController = add(DragController(player));
   add(PhysicsWorld());
-  return { player };
+  return {
+    player, dragController, playerHealthHUD,
+  };
 }
 
 export default createMap;

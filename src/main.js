@@ -1,5 +1,5 @@
 import { start } from './engine.js';
-import createMap from './mapCreator.js';
+import startGameFlow from './GameFlow.js';
 
-createMap();
+startGameFlow();
 start();

@@ -813,4 +813,4 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
 }
 
 export default PlayerCharacter;
-export { renderPlayerPortrait };
+export { renderPlayer, renderPlayerPortrait };
