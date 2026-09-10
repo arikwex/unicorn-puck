@@ -1,33 +1,35 @@
 import Camera from './camera.js';
-import CubeObstacle, { ISO_U, ISO_V } from './CubeObstacle.js';
+import CubeObstacle from './CubeObstacle.js';
 import { add } from './engine.js';
 import DragController from './input.js';
 import PhysicsWorld from './PhysicsWorld.js';
 import PlayerCharacter from './PlayerCharacter.js';
 
-// World-space spacing between playpen cubes, in units of the isometric
-// basis vectors (1, -1) / (1, 1). Kept in step with CubeObstacle's default
-// halfExtent (TILE / 2) so a ring of obstacles at angle = PI/4 tiles
-// edge-to-edge with no gaps or overlaps.
-const TILE = 60;
+// Plain axis-aligned grid -- no isometric basis, so the playpen comes out
+// as a normal rectangular room (straight walls along x and y) instead of a
+// diamond. Makes wall bounces easy to reason about while debugging
+// reflection/collision: a hit on the left/right wall should only ever flip
+// vx, a hit on the top/bottom wall should only ever flip vy.
+const HALF_EXTENT = 30;
+// At angle = PI/4 a CubeObstacle renders (and collides) as a plain
+// axis-aligned square with half-width halfExtent * sqrt(2) -- see
+// CubeObstacle.js -- so that's the full width needed to tile edge-to-edge.
+const TILE = HALF_EXTENT * 2 * Math.SQRT2;
 
 function gridToWorld(i, j) {
-  return {
-    x: (i * ISO_U.x + j * ISO_V.x) * TILE,
-    y: (i * ISO_U.y + j * ISO_V.y) * TILE,
-  };
+  return { x: i * TILE, y: j * TILE };
 }
 
-// A square ring (in grid-index space) of cube obstacles, which maps
-// through the isometric basis to a diamond-shaped playpen wall in world
-// space. Every cube uses angle = PI/4 so its footprint renders upright and
-// tiles seamlessly with its neighbors.
+// A square ring (in grid-index space) of cube obstacles, arranged on the
+// plain grid above -- a straight-walled rectangular room. Every cube uses
+// angle = PI/4 so its footprint renders upright (axis-aligned, not a
+// diamond) and tiles seamlessly with its neighbors.
 function buildPlaypen(radius) {
   for (let i = -radius; i <= radius; i++) {
     for (let j = -radius; j <= radius; j++) {
       if (Math.abs(i) !== radius && Math.abs(j) !== radius) continue;
       const { x, y } = gridToWorld(i, j);
-      add(CubeObstacle(x, y, 0));//Math.PI / 4));
+      add(CubeObstacle(x, y, Math.PI / 4, { halfExtent: HALF_EXTENT }));
     }
   }
 }
