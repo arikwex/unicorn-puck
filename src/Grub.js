@@ -40,6 +40,16 @@ const SEGMENT_SPACING = 15;
 const AIM_SEGMENT_ALONG = [0, -14, -10, -1.5 * SEGMENT_SPACING];
 const AIM_SEGMENT_LIFT = [56, 32, 14, 0];
 const AIM_SEGMENT_PULLBACK = [12, 16, 2, 0];
+// Only the head and neck shudder, and only while winding up -- amplitude
+// ramps in with progress^2 (quadratic: none at t=0, a quarter of max at
+// t=0.5, full max at t=1) so it's barely there early and most pronounced
+// right before the spit fires.
+const AIM_SEGMENT_JITTER = [8, 5, 0, 0];
+// Momentum kick on release: the head and neck whip forward past their idle
+// spot the instant the spit fires, before easing back -- see 'recovering'
+// in segmentPosition.
+const RELEASE_LUNGE_ALONG = [26, 14, 0, 0];
+const RELEASE_LUNGE_PEAK_T = 0.2; // fraction of RECOVER_DURATION spent shooting forward before it eases back
 // Matches renderTail's own perspectiveY in PlayerCharacter.js -- the same
 // depth-compression ratio, for a consistent faux-3D feel across the cast.
 const SPINE_PERSPECTIVE = 0.6;
@@ -64,6 +74,10 @@ const FLASH_DURATION = 0.25;
 const KNOCKBACK_TRANSFER = 0.6; // fraction of incoming player velocity
 const KNOCKBACK_DECAY = 16; // exponential velocity decay per second
 const AIM_DURATION = 2;
+// After firing, the body eases back to its idle pose over this long instead
+// of snapping -- reuses the aim pose's own rise/pullback curve, played in
+// reverse via aimProgress counting back down to 0.
+const RECOVER_DURATION = 0.35;
 const ATTACK_DELAY_MIN = 2;
 const ATTACK_DELAY_MAX = 4;
 const ATTACK_RANGE = 600;
@@ -103,6 +117,7 @@ const PAUSE_MAX = 1.6;
 function segmentPosition(grub, index) {
   let along = (1.5 - index) * SEGMENT_SPACING;
   let lift = 0;
+  let jitterX = 0;
   if (grub.state === 'aiming') {
     // Rise smoothly during the first part of the tell, then keep drawing
     // backward along local -x as the spit winds up. Height is screen-up,
@@ -113,13 +128,46 @@ function segmentPosition(grub, index) {
     along += (AIM_SEGMENT_ALONG[index] - along) * rise
       - AIM_SEGMENT_PULLBACK[index] * progress * progress;
     lift = AIM_SEGMENT_LIFT[index] * rise;
+    if (AIM_SEGMENT_JITTER[index] > 0) {
+      // Two off-ratio sine waves summed stand in for jitter noise without
+      // needing a per-frame rng; elapsed aim time (progress * AIM_DURATION)
+      // drives the phase since grub.anim is frozen while aiming.
+      const t = progress * AIM_DURATION;
+      const shake = Math.sin(t * 41 + index * 5) + Math.sin(t * 67 + index * 2.3) * 0.5;
+      jitterX = shake / 1.5 * AIM_SEGMENT_JITTER[index] * progress * progress;
+    }
+  } else if (grub.state === 'recovering') {
+    // aimProgress counts back down from 1 (the instant of firing, still in
+    // the fully pulled-back pose) to 0 (idle). Smoothstep it directly --
+    // no plateau this time -- so the body eases toward idle across the
+    // whole recovery instead of snapping.
+    const progress = Math.max(0, Math.min(1, grub.aimProgress));
+    const settle = progress * progress * (3 - 2 * progress);
+    along += (AIM_SEGMENT_ALONG[index] - along) * settle;
+    lift = AIM_SEGMENT_LIFT[index] * settle;
+
+    if (RELEASE_LUNGE_ALONG[index] > 0) {
+      // A fast-rise, slow-decay "hump" over elapsed recovery time: the
+      // head/neck shoot forward past idle the instant the spit releases,
+      // showing recoil momentum, then resolve back to idle.
+      const elapsed = 1 - progress;
+      let kick;
+      if (elapsed < RELEASE_LUNGE_PEAK_T) {
+        const riseX = elapsed / RELEASE_LUNGE_PEAK_T;
+        kick = 1 - (1 - riseX) * (1 - riseX);
+      } else {
+        const fallX = (elapsed - RELEASE_LUNGE_PEAK_T) / (1 - RELEASE_LUNGE_PEAK_T);
+        kick = 1 - fallX * fallX * (3 - 2 * fallX);
+      }
+      along += RELEASE_LUNGE_ALONG[index] * kick;
+    }
   }
   let motionY = 0;
   if (grub.target != null) {
     motionY = (1 - Math.abs(Math.sin(grub.anim * 6.0 + index * 2))) * (8 - index) * 1;
   }
   return {
-    x: grub.x + Math.cos(grub.angle) * along,
+    x: grub.x + Math.cos(grub.angle) * along + jitterX,
     y: grub.y - Math.sin(grub.angle) * along * SPINE_PERSPECTIVE - SEGMENT_RADII[index] / 2 + motionY - lift,
     radius: SEGMENT_RADII[index],
   };
@@ -203,6 +251,7 @@ function Grub(x, y, room, seed, props = {}) {
   let deathSplatsFired = false;
   let attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
   let aimElapsed = 0;
+  let recoverElapsed = 0;
 
   // Sample launch velocity uniformly across a disk, then shift it by a
   // fraction of the player's hit velocity. The seeded rng keeps the
@@ -273,7 +322,16 @@ function Grub(x, y, room, seed, props = {}) {
         && Math.abs(player.y - room.y) <= room.h / 2
         && Math.hypot(player.x - this.x, player.y - this.y) <= ATTACK_RANGE;
 
-      if (this.state === 'aiming') {
+      if (this.state === 'recovering') {
+        // Ease aimProgress back down to 0 instead of zeroing it outright --
+        // segmentPosition plays the aim pose's own curve in reverse off it.
+        recoverElapsed += dt;
+        this.aimProgress = Math.max(0, 1 - recoverElapsed / RECOVER_DURATION);
+        if (recoverElapsed >= RECOVER_DURATION) {
+          this.state = 'patrol';
+          this.aimProgress = 0;
+        }
+      } else if (this.state === 'aiming') {
         if (!canAim) {
           this.state = 'patrol';
           this.aimProgress = 0;
@@ -288,8 +346,8 @@ function Grub(x, y, room, seed, props = {}) {
             const dy = player.y - mouth.y;
             const distance = Math.hypot(dx, dy) || 1;
             add(GrubProjectile(mouth.x, mouth.y, dx / distance * PROJECTILE_SPEED, dy / distance * PROJECTILE_SPEED));
-            this.state = 'patrol';
-            this.aimProgress = 0;
+            this.state = 'recovering';
+            recoverElapsed = 0;
             attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
           }
         }
