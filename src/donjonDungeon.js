@@ -368,3 +368,4 @@ function generateDonjonDungeon(seed) {
 }
 
 export default generateDonjonDungeon;
+export { mulberry32 };

@@ -96,6 +96,8 @@ function CubeObstacle(x = 0, y = 0, w = 60, h = 60, angle = Math.PI / 4, props =
     // Consistent puck-like accessor (see PlayerCharacter.js and
     // physics.js): a static puck with mass: Infinity, offset into the
     // plain-axis-aligned-box terms physics.js's circleBoxContact expects.
+    // `shape: 'box'` is how PhysicsWorld tells it apart from Pillar's
+    // circles.
     puck() {
       return {
         x: this.x,
@@ -103,6 +105,7 @@ function CubeObstacle(x = 0, y = 0, w = 60, h = 60, angle = Math.PI / 4, props =
         angle: this.angle + ISO_ROTATION_OFFSET,
         halfWidth: this.w / 2,
         halfHeight: this.h / 2,
+        shape: 'box',
         mass: Infinity,
         vx: 0,
         vy: 0,

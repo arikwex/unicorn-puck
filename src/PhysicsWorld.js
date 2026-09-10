@@ -31,7 +31,9 @@ function PhysicsWorld() {
           if (contact) resolveCollision(pucks[i], pucks[j], contact.nx, contact.ny, contact.penetration);
         }
         obstacles.forEach((obstacle) => {
-          const contact = circleBoxContact(pucks[i], obstacle);
+          const contact = obstacle.shape === 'circle'
+            ? circleCircleContact(pucks[i], obstacle)
+            : circleBoxContact(pucks[i], obstacle);
           if (contact) resolveCollision(pucks[i], obstacle, contact.nx, contact.ny, contact.penetration);
         });
       }
