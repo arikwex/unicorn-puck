@@ -1,26 +1,29 @@
 // A standard, reusable health bar: an outlined rectangle divided into one
-// large tick per health point, colored green (full) fading to red (empty)
-// as it drains. Pure render function -- callers own when/where to show it
+// large tick per health point, colored green, yellow, orange, or red at
+// quarter-health cutoffs. Pure render function -- callers own when/where to show it
 // and what currentHp/maxHp are; this just draws.
-const EMPTY_COLOR = [214, 58, 58]; // red
-const FULL_COLOR = [70, 196, 92]; // green
+const GREEN = '#46c45c';
+const YELLOW = '#f2d64b';
+const ORANGE = '#ef9234';
+const RED = '#d63a3a';
 
 function healthColor(fraction) {
-  const r = Math.round(EMPTY_COLOR[0] + (FULL_COLOR[0] - EMPTY_COLOR[0]) * fraction);
-  const g = Math.round(EMPTY_COLOR[1] + (FULL_COLOR[1] - EMPTY_COLOR[1]) * fraction);
-  const b = Math.round(EMPTY_COLOR[2] + (FULL_COLOR[2] - EMPTY_COLOR[2]) * fraction);
-  return `rgb(${r}, ${g}, ${b})`;
+  if (fraction > 0.75) return GREEN;
+  if (fraction > 0.5) return YELLOW;
+  if (fraction > 0.25) return ORANGE;
+  return RED;
 }
 
 // (x, y) is the bar's center. `props` lets a caller nudge the look without
 // forking the function: outlineColor/outlineWidth, backgroundColor (shows
-// through empty ticks), tickGap.
+// through empty ticks), tickGap, padding (inside the outline).
 function renderHealthBar(context, x, y, width, height, currentHp, maxHp, props = {}) {
   const {
-    outlineColor = '#000',
+    outlineColor = '#fff',
     outlineWidth = 2,
     backgroundColor = 'rgba(0, 0, 0, 0.55)',
     tickGap = 2,
+    padding = 2,
   } = props;
 
   const fraction = Math.max(0, Math.min(1, currentHp / maxHp));
@@ -31,10 +34,14 @@ function renderHealthBar(context, x, y, width, height, currentHp, maxHp, props =
   context.fillStyle = backgroundColor;
   context.fillRect(left, top, width, height);
 
-  const tickWidth = (width - tickGap * (maxHp - 1)) / maxHp;
+  // The outline straddles the rectangle edge; measure padding from its
+  // inner edge so the full gap remains visible beside the colored ticks.
+  const inset = outlineWidth / 2 + padding;
+  const tickWidth = Math.max(0, (width - inset * 2 - tickGap * (maxHp - 1)) / maxHp);
+  const tickHeight = Math.max(0, height - inset * 2);
   context.fillStyle = color;
   for (let i = 0; i < maxHp && i < currentHp; i++) {
-    context.fillRect(left + i * (tickWidth + tickGap), top, tickWidth, height);
+    context.fillRect(left + inset + i * (tickWidth + tickGap), top + inset, tickWidth, tickHeight);
   }
 
   context.strokeStyle = outlineColor;

@@ -57,7 +57,7 @@ const HIT_COOLDOWN = 0.6; // seconds between hits even while still touching
 const FLASH_DURATION = 0.25;
 const HEALTH_BAR_SHOW_DURATION = 2;
 const HEALTH_BAR_WIDTH = 60;
-const HEALTH_BAR_HEIGHT = 10;
+const HEALTH_BAR_HEIGHT = 15;
 const HEALTH_BAR_OFFSET_Y = 46;
 
 // -- hit/death splats ---------------------------------------------------
