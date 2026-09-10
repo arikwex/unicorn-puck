@@ -8,6 +8,10 @@ import { TAG_ENEMY, TAG_PLAYER, TAG_PROJECTILE, TAG_PUCK } from './tags.js';
 const TAU = Math.PI * 2;
 const DAMAGE_FLASH_DURATION = 0.6;
 const PROJECTILE_KNOCKBACK = 120;
+// The puck's collision radius, and also the reference "size" Camera.js
+// zooms against so the character reads at a consistent fraction of the
+// screen on any device.
+const PLAYER_RADIUS = 38;
 const WALL_BOUNCE_SOUND_MIN_SPEED = 30; // world units/s of velocity change -- below this, a resting/sliding contact stays silent
 const DAMAGE_CANVAS_SIZE = 320;
 
@@ -677,7 +681,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     maxHp = 5,
     hp = maxHp,
     mass = 1,
-    radius = 38,
+    radius = PLAYER_RADIUS,
     viscosity = 1,
     angularViscosity = 1,
     bounciness = 0.55, // < 1: bounces off obstacles lose some energy
@@ -813,4 +817,4 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
 }
 
 export default PlayerCharacter;
-export { renderPlayer, renderPlayerPortrait };
+export { PLAYER_RADIUS, renderPlayer, renderPlayerPortrait };
