@@ -43,8 +43,8 @@ function rotate(x, y, angle) {
   return [x * cos - y * sin, x * sin + y * cos];
 }
 
-// Renders the drag as a straight, solid-fixed-width line from start to the
-// current pointer position, capped with a plain two-stroke arrowhead (each
+// Renders the drag as a straight, solid-fixed-width line between the supplied
+// screen-space endpoints, capped with a plain two-stroke arrowhead (each
 // stroke 45deg off the line) pointing in the launch direction. Hue is a
 // gradient along the line's length, offset by `hueAnimator` -- a value the
 // caller integrates forward over time at a drag-length-dependent rate, so
@@ -178,12 +178,20 @@ function DragController(player) {
 
     render(context) {
       if (!dragging) return;
-      // `start`/`current` are screen-space, but by the time render() runs
-      // the camera transform is already active on `context` -- undo it so
-      // the indicator draws in the same space it was captured in.
+      // Anchor to the player's current screen position, while the gesture
+      // stays relative to the original click, independent of camera motion.
+      const transform = context.getTransform();
+      const origin = {
+        x: transform.a * player.x + transform.c * player.y + transform.e,
+        y: transform.b * player.x + transform.d * player.y + transform.f,
+      };
+      const end = {
+        x: origin.x + current.x - start.x,
+        y: origin.y + current.y - start.y,
+      };
       context.save();
       context.setTransform(1, 0, 0, 1, 0, 0);
-      renderDragIndicator(context, start, current, hueAnimator);
+      renderDragIndicator(context, origin, end, hueAnimator);
       context.restore();
     },
   };

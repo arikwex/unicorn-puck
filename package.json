@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --test",
     "dev": "node tools/build.js --watch",
     "dev:minify": "node tools/build.js --watch --minify",
     "build": "node tools/build.js --minify --roadroll"
