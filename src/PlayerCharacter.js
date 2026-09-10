@@ -754,6 +754,16 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
       playPlayerDamage();
     },
 
+    // Returns the actual amount healed (0 if already dead or already at
+    // maxHp) -- callers use that to decide whether a pickup actually did
+    // anything before consuming it.
+    heal(amount = 1) {
+      if (amount <= 0 || this.hp <= 0) return 0;
+      const healed = Math.min(amount, this.maxHp - this.hp);
+      this.hp += healed;
+      return healed;
+    },
+
     update(dt) {
       anim += dt;
       damageFlashTimer = Math.max(0, damageFlashTimer - dt);

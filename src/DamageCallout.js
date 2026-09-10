@@ -9,7 +9,7 @@ const CALLOUT_RISE = 90; // px it drifts upward over its lifetime
 const CALLOUT_START_SCALE = 0.8;
 const CALLOUT_END_SCALE = 2.1;
 
-function DamageCallout(x, y, text) {
+function DamageCallout(x, y, text, color = '#fff') {
   let elapsed = 0;
 
   return {
@@ -35,7 +35,7 @@ function DamageCallout(x, y, text) {
       context.lineWidth = 3 / scale;
       context.strokeStyle = '#000';
       context.strokeText(text, 0, 0);
-      context.fillStyle = '#fff';
+      context.fillStyle = color;
       context.fillText(text, 0, 0);
       context.restore();
     },

@@ -11,6 +11,7 @@ import Pillar from './Pillar.js';
 import placePillars from './placePillars.js';
 import PlayerCharacter from './PlayerCharacter.js';
 import PlayerHealthHUD from './PlayerHealthHUD.js';
+import TreasureChest, { CHEST_RADIUS } from './TreasureChest.js';
 
 // GRUBS_PER_ROOM grubs per room, each scattered to its own spot within the
 // room (buildDungeon's own grubSeed offset by <room index> seeds that
@@ -21,6 +22,12 @@ import PlayerHealthHUD from './PlayerHealthHUD.js';
 const GRUBS_PER_ROOM = 6;
 const GRUB_MIN_PLAYER_DISTANCE = 200;
 const GRUB_ROOM_MARGIN = 50;
+// Every room gets exactly one chest (or none, if CHEST_PLACEMENT_ATTEMPTS
+// random spots in a row all land too close to something -- a small,
+// pillar-crowded room just goes without rather than overlapping a wall).
+const CHEST_ROOM_MARGIN = 50;
+const CHEST_MIN_OBSTACLE_GAP = 1; // world units of clearance required off every obstacle
+const CHEST_PLACEMENT_ATTEMPTS = 40;
 // The raw generator's corridors are a single grid cell wide -- just barely
 // wider than the player puck, which feels awful to actually fly through.
 // Post-inflating by 2x guarantees every corridor and room is at least 2
@@ -78,6 +85,51 @@ function pickGrubSpawn(room, playerSpawn, rng) {
   return { x: clamp(x, minX, maxX, room.x), y: clamp(y, minY, maxY, room.y) };
 }
 
+// A chest's spawn point: just a random point scattered across the room's
+// own interior (inset by CHEST_ROOM_MARGIN), no player-distance push --
+// unlike a grub, a chest sitting near the player's spawn isn't a problem.
+function pickChestSpawn(room, rng) {
+  const minX = room.x - room.w / 2 + CHEST_ROOM_MARGIN;
+  const maxX = room.x + room.w / 2 - CHEST_ROOM_MARGIN;
+  const minY = room.y - room.h / 2 + CHEST_ROOM_MARGIN;
+  const maxY = room.y + room.h / 2 - CHEST_ROOM_MARGIN;
+  const x = minX <= maxX ? minX + rng() * (maxX - minX) : room.x;
+  const y = minY <= maxY ? minY + rng() * (maxY - minY) : room.y;
+  return { x, y };
+}
+
+// Closest-point-on-AABB distance: 0 while inside/touching the box, the
+// true gap once outside it. Walls always come out axis-aligned (see TILE's
+// own comment above), so a plain half-width/half-height box is exact, no
+// rotation to account for.
+function circleBoxGap(cx, cy, cr, box) {
+  const dx = Math.max(Math.abs(cx - box.x) - box.halfW, 0);
+  const dy = Math.max(Math.abs(cy - box.y) - box.halfH, 0);
+  return Math.hypot(dx, dy) - cr;
+}
+
+function circleCircleGap(cx, cy, cr, other) {
+  return Math.hypot(cx - other.x, cy - other.y) - cr - other.radius;
+}
+
+// True only once a candidate clears every known obstacle -- walls (boxes)
+// and pillars/grubs (circles) -- by at least CHEST_MIN_OBSTACLE_GAP.
+function chestSpotIsClear(x, y, walls, circles) {
+  return walls.every((wall) => circleBoxGap(x, y, CHEST_RADIUS, wall) >= CHEST_MIN_OBSTACLE_GAP)
+    && circles.every((circle) => circleCircleGap(x, y, CHEST_RADIUS, circle) >= CHEST_MIN_OBSTACLE_GAP);
+}
+
+// Resamples pickChestSpawn up to CHEST_PLACEMENT_ATTEMPTS times looking for
+// a spot clear of every obstacle; returns null (give up, no chest) if none
+// of them work out.
+function findChestSpawn(room, rng, walls, circles) {
+  for (let attempt = 0; attempt < CHEST_PLACEMENT_ATTEMPTS; attempt++) {
+    const candidate = pickChestSpawn(room, rng);
+    if (chestSpotIsClear(candidate.x, candidate.y, walls, circles)) return candidate;
+  }
+  return null;
+}
+
 // Builds the dungeon's walls as CubeObstacles and returns a world-space
 // spawn point (the center of its first room). `seed` drives the whole
 // layout; pillar placement and grub scatter/patrol each offset from it so
@@ -85,8 +137,14 @@ function pickGrubSpawn(room, playerSpawn, rng) {
 function buildDungeon(seed) {
   const pillarSeed = seed + 1;
   const grubSeed = seed + 2;
+  const chestSeed = seed + 3;
   const dungeon = inflateDungeon(generateDungeon(seed), CORRIDOR_WIDTH_FACTOR);
   const toWorld = (x, y) => gridToWorld(x, y, dungeon.gridWidth, dungeon.gridHeight);
+
+  // Collected as chests are placed check clearance against them below --
+  // walls as boxes, pillars/grubs as circles.
+  const wallBoxes = [];
+  const obstacleCircles = [];
 
   // Collapses the (many, small) unit wall cells into far fewer large
   // rectangles before ever touching the engine -- purely a performance
@@ -98,6 +156,9 @@ function buildDungeon(seed) {
     // cell's own center would.
     const center = toWorld(rect.x + (rect.w - 1) / 2, rect.y + (rect.h - 1) / 2);
     add(CubeObstacle(center.x, center.y, rect.w * TILE, rect.h * TILE));
+    wallBoxes.push({
+      x: center.x, y: center.y, halfW: (rect.w * TILE) / 2, halfH: (rect.h * TILE) / 2,
+    });
   });
 
   // Roman-esque columns dropped into rooms with enough space for them --
@@ -105,7 +166,8 @@ function buildDungeon(seed) {
   // never within reach of a doorway. See placePillars.js.
   placePillars(dungeon, pillarSeed).forEach(({ x, y }) => {
     const world = toWorld(x, y);
-    add(Pillar(world.x, world.y));
+    const pillar = add(Pillar(world.x, world.y));
+    obstacleCircles.push({ x: world.x, y: world.y, radius: pillar.radius });
   });
 
   const spawnRoomGrid = dungeon.rooms[0];
@@ -123,8 +185,16 @@ function buildDungeon(seed) {
     const scatterRng = mulberry32(grubSeed + roomIndex);
     for (let i = 0; i < GRUBS_PER_ROOM; i++) {
       const spawn = pickGrubSpawn(worldRoom, playerSpawn, scatterRng);
-      add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + i));
+      const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + i));
+      obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.puck().radius });
     }
+
+    // Every room gets a chest, kept at least CHEST_MIN_OBSTACLE_GAP off
+    // every wall/pillar/grub -- a room too cluttered to fit one goes
+    // without rather than spawning it overlapping something.
+    const chestRng = mulberry32(chestSeed + roomIndex);
+    const chestSpawn = findChestSpawn(worldRoom, chestRng, wallBoxes, obstacleCircles);
+    if (chestSpawn) add(TreasureChest(chestSpawn.x, chestSpawn.y));
   });
 
   return playerSpawn;
