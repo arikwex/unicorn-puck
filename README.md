@@ -22,12 +22,19 @@ Every mode emits a self-contained `index.html` and a `build.zip`. The production
 ## Core modules
 
 - `src/engine.js` — animation loop, ordered game objects, lifecycle, and tag queries
-- `src/camera.js` — camera transform, following, zoom, and coordinate conversion
+- `src/camera.js` — camera transform, exponential x/y following (k-factor easing), zoom, and coordinate conversion
 - `src/bus.js` — event subscription, one-shot handlers, emission, and cleanup
 - `src/audio.js` — Web Audio initialization, procedural buffers, SFX playback, channel volume, and crossfading looped music
 - `src/canvas.js` — full-window canvas setup and transform helper
-- `src/tags.js` — shared numeric camera, player, and puck tags
-- `src/PlayerCharacter.js` — placeholder player object and render pass
+- `src/tags.js` — shared numeric camera, player, puck, and obstacle tags
+- `src/physics.js` — shared "puck-like" physics: damping, integration, and elastic-with-restitution collision resolution given two puck structs
+- `src/PhysicsWorld.js` — per-frame system that damps/integrates every puck and resolves puck-vs-puck and puck-vs-obstacle collisions via `physics.js`
+- `src/PlayerCharacter.js` — the hockey-puck-like player: physics state, `puck()` accessor, and render pass
+- `src/CubeObstacle.js` — static cube obstacle (`puck()` with `mass: Infinity`), rendered as a faux-3D box along the isometric basis vectors `(1, -1)` / `(1, 1)`
+- `src/input.js` — click-and-drag / touch-and-drag impulse control (Pointer Events) with the rainbow-hued drag-trail visualization
+- `src/mapCreator.js` — entry point that builds a map: player, camera, playpen obstacles, and input
+
+A "puck-like" object exposes a `puck()` method returning `{ mass, x, y, vx, vy, omega, angle, viscosity, angularViscosity, bounciness, ... }` (or, for a static obstacle, the same shape with `mass: Infinity`); `src/physics.js` operates only on that struct, so it works uniformly across every puck-like object.
 
 Game objects may implement `start()`, `update(dt)`, `render(ctx)`, and `destroy()`. Returning a truthy value from `update` removes the object. Use `add`, `remove`, `tag`, `untag`, and `getObjectsByTag` from `src/engine.js` to manage a scene.
 

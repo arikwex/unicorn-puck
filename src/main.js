@@ -1,7 +1,5 @@
-import Camera from './camera.js';
-import { add, start } from './engine.js';
-import PlayerCharacter from './PlayerCharacter.js';
+import { start } from './engine.js';
+import createMap from './mapCreator.js';
 
-add(PlayerCharacter());
-add(Camera());
+createMap();
 start();

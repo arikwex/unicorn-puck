@@ -1,10 +1,21 @@
+import { normalizeAngle } from './physics.js';
 import { TAG_PLAYER, TAG_PUCK } from './tags.js';
 
-const keys = new Set();
 const TAU = Math.PI * 2;
 
-addEventListener('keydown', ({ code }) => keys.add(code));
-addEventListener('keyup', ({ code }) => keys.delete(code));
+// While an aim drag is active (see DragController, which drives
+// `aiming`/`targetAngle` directly on the player object), heading eases
+// toward the target launch direction at a fixed, decently fast rate.
+// Otherwise it continuously eases toward the direction of travel instead,
+// with the exponential ease rate scaling with speed: fast means the
+// heading snaps around quickly, slow means it drifts around lazily. Below
+// MIN_SPEED_FOR_HEADING the travel direction is too noisy to be meaningful
+// (and would jitter via atan2 near zero velocity), so heading just holds
+// still.
+const AIM_EASE_RATE = 10; // rad/s-ish ease rate while actively aiming
+const MIN_SPEED_FOR_HEADING = 4;
+const HEADING_EASE_MIN = 0.6; // rad/s-ish ease rate floor, approached as speed -> 0
+const HEADING_EASE_PER_SPEED = 0.06; // additional ease rate per unit of speed -- x3'd so fast travel snaps the heading around much quicker
 
 function fillCircle(context, x, y, radius, color) {
   context.fillStyle = color;
@@ -375,13 +386,6 @@ function renderWingShape(context, pivotX, pivotY, angle, wingDir) {
   context.restore();
 }
 
-function normalizeAngle(value) {
-  let normalized = value % TAU;
-  if (normalized > Math.PI) normalized -= TAU;
-  if (normalized <= -Math.PI) normalized += TAU;
-  return normalized;
-}
-
 function orbit3d(x, y, z, angle) {
   const cosA = Math.cos(angle);
   const sinA = Math.sin(angle);
@@ -465,21 +469,66 @@ function renderPlayer(context, player, anim) {
   renderWingsAndTail(context, player, angle, anim, true);
 }
 
-function PlayerCharacter(x = 0, y = 0, angle = 0) {
+// Puck-like character properties. `mass`, `radius`, and `bounciness` are
+// the shape/weight of the puck; `viscosity` and `angularViscosity` are
+// multipliers (default 1 = the baseline damping rates in physics.js) on
+// top of that baseline, so tuning a character's "floatiness" only ever
+// means tuning a multiplier.
+function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
   let anim = 0;
+  const {
+    mass = 1,
+    radius = 38,
+    viscosity = 1,
+    angularViscosity = 1,
+    bounciness = 0.55, // < 1: bounces off obstacles lose some energy
+  } = props;
 
   return {
     x,
     y,
     angle,
+    vx: 0,
+    vy: 0,
+    omega: 0,
+    // Driven by DragController while the player is aiming a launch.
+    aiming: false,
+    targetAngle: angle,
+    mass,
+    radius,
+    viscosity,
+    angularViscosity,
+    bounciness,
     tags: [TAG_PLAYER, TAG_PUCK],
+
+    // Consistent puck-like accessor (see CubeObstacle.js and physics.js):
+    // returns the live state itself, so collision resolution mutates the
+    // character directly.
+    puck() {
+      return this;
+    },
 
     update(dt) {
       anim += dt;
-      this.angle = normalizeAngle(this.angle + (
-        (keys.has('ArrowLeft') ? 1 : 0) -
-        (keys.has('ArrowRight') ? 1 : 0)
-      ) * 3 * dt);
+
+      let targetAngle;
+      let easeRate;
+      if (this.aiming) {
+        targetAngle = this.targetAngle;
+        easeRate = AIM_EASE_RATE;
+      } else {
+        const speed = Math.hypot(this.vx, this.vy);
+        if (speed <= MIN_SPEED_FOR_HEADING) return;
+        // Screen/world y points down, but rendering treats a larger angle
+        // as swinging the head upward (see headY above), so the heading
+        // that matches a given velocity needs its y-component negated.
+        targetAngle = Math.atan2(-this.vy, this.vx);
+        easeRate = HEADING_EASE_MIN + HEADING_EASE_PER_SPEED * speed;
+      }
+
+      const ease = 1 - Math.exp(-easeRate * dt);
+      const delta = normalizeAngle(targetAngle - this.angle);
+      this.angle = normalizeAngle(this.angle + delta * ease);
     },
 
     render(context) {
