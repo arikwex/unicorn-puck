@@ -101,9 +101,13 @@ const PAUSE_MAX = 1.6;
 // SPINE_PERSPECTIVE the same way renderTail compresses depth.
 function segmentPosition(grub, index) {
   const along = (1.5 - index) * SEGMENT_SPACING;
+  let motionY = 0;
+  if (grub.target != null) {
+    motionY = (1 - Math.abs(Math.sin(grub.anim * 6.0 + index * 2))) * (8 - index) * 1;
+  }
   return {
     x: grub.x + Math.cos(grub.angle) * along,
-    y: grub.y - Math.sin(grub.angle) * along * SPINE_PERSPECTIVE - SEGMENT_RADII[index] / 2,
+    y: grub.y - Math.sin(grub.angle) * along * SPINE_PERSPECTIVE - SEGMENT_RADII[index] / 2 + motionY,
     radius: SEGMENT_RADII[index],
   };
 }
@@ -158,7 +162,6 @@ function renderGrub(context, grub, flashTimer) {
 function Grub(x, y, room, seed, props = {}) {
   const { bounciness = 0.4 } = props;
   const rng = mulberry32(seed);
-  let target = null;
   let pauseTimer = randRange(rng, PAUSE_MIN, PAUSE_MAX);
   let flashTimer = 0;
   let hitCooldown = 0;
@@ -194,6 +197,8 @@ function Grub(x, y, room, seed, props = {}) {
     x,
     y,
     angle: Math.random() * TAU,
+    anim: Math.random() * 7,
+    target: null,
     hp: MAX_HP,
     order: y,
     tags: [TAG_OBSTACLE, TAG_ENEMY],
@@ -222,15 +227,15 @@ function Grub(x, y, room, seed, props = {}) {
     update(dt) {
       this.order = this.y;
 
-      if (!target) {
+      if (!this.target) {
         pauseTimer -= dt;
-        if (pauseTimer <= 0) target = pickWaypoint();
+        if (pauseTimer <= 0) this.target = pickWaypoint();
       } else {
-        const dx = target.x - this.x;
-        const dy = target.y - this.y;
+        const dx = this.target.x - this.x;
+        const dy = this.target.y - this.y;
         const dist = Math.hypot(dx, dy);
         if (dist < WAYPOINT_ARRIVE_DIST) {
-          target = null;
+          this.target = null;
           pauseTimer = randRange(rng, PAUSE_MIN, PAUSE_MAX);
         } else {
           const step = Math.min(dist, PATROL_SPEED * dt);
@@ -239,6 +244,7 @@ function Grub(x, y, room, seed, props = {}) {
           // Same heading convention PlayerCharacter uses: y points down on
           // screen, but a larger angle swings the head "up", so negate dy.
           // this.angle = Math.atan2(-dy, dx);
+          this.anim += dt;
         }
       }
       this.angle += 0.7 * dt;
