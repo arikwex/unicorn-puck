@@ -1,0 +1,275 @@
+import { getObjectsByTag } from './engine.js';
+import renderHealthBar from './HealthBar.js';
+import { TAG_ENEMY, TAG_OBSTACLE, TAG_PLAYER } from './tags.js';
+
+const TAU = Math.PI * 2;
+
+// mulberry32: the same tiny deterministic PRNG used elsewhere in this
+// project (see donjonDungeon.js) -- each grub gets its own instance seeded
+// off its own spawn seed, so its patrol is reproducible run to run.
+function mulberry32(seed) {
+  let state = seed >>> 0;
+  return function rng() {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function randRange(rng, min, max) {
+  return min + rng() * (max - min);
+}
+
+function fillCircle(context, x, y, radius, color) {
+  context.fillStyle = color;
+  context.beginPath();
+  context.arc(x, y, radius, 0, TAU);
+  context.fill();
+}
+
+// The same perpendicular side-mount projection PlayerCharacter's own
+// ears/eyes use for their faux-3D placement (offset foreshortened by
+// facing, y compressed for depth) -- captured here too so the grub's face
+// reads with the same "rotation" language as the rest of the cast.
+function zPosition(angle, centerX, centerY, offset) {
+  const cameraFacing = Math.cos(angle) * Math.sign(offset);
+  const depthAdjustedOffset = offset * (1 - cameraFacing * 0.2);
+  return [
+    centerX + Math.sin(angle) * depthAdjustedOffset,
+    centerY + Math.cos(angle) * depthAdjustedOffset * 0.35,
+  ];
+}
+
+// -- body -----------------------------------------------------------------
+const SEGMENT_RADII = [22, 18, 14, 10]; // head to tail
+const SEGMENT_SPACING = 15;
+// Matches renderTail's own perspectiveY in PlayerCharacter.js -- the same
+// depth-compression ratio, for a consistent faux-3D feel across the cast.
+const SPINE_PERSPECTIVE = 0.6;
+const OUTLINE_COLOR = '#8b4fe0';
+const OUTLINE_WIDTH = 11; // full stroke width -- see renderGrub, only half stays visible outside the fill
+const BODY_COLORS = ['#332b47', '#241d33']; // alternating segment shade
+const FACE_COLOR = '#7cff6b';
+const FACE_GLOW_COLOR = '#e3ffd9';
+const EYE_RADIUS = 4;
+const MOUTH_RADIUS = 3.5;
+const COLLISION_RADIUS = 26;
+
+// -- combat -----------------------------------------------------------------
+const MAX_HP = 5;
+const MAX_DAMAGE = 3; // at player.charge = 1; always rounds to at least 1
+const CHARGING_THRESHOLD = 0.15; // player.charge above this counts as "charging" for damage purposes
+const HIT_COOLDOWN = 0.6; // seconds between hits even while still touching
+const FLASH_DURATION = 0.25;
+const HEALTH_BAR_SHOW_DURATION = 2;
+const HEALTH_BAR_WIDTH = 60;
+const HEALTH_BAR_HEIGHT = 10;
+const HEALTH_BAR_OFFSET_Y = 46;
+const CALLOUT_DURATION = 0.5;
+const CALLOUT_RISE = 30; // px it drifts upward over its lifetime
+const CALLOUT_START_SCALE = 0.8;
+const CALLOUT_END_SCALE = 1.6;
+
+// -- patrol -----------------------------------------------------------------
+const PATROL_SPEED = 45;
+const PATROL_MARGIN = 30; // world units kept clear of the room's own walls
+const WAYPOINT_ARRIVE_DIST = 8;
+const PAUSE_MIN = 0.4;
+const PAUSE_MAX = 1.6;
+
+// Segment centers run along the facing direction, front (head) to back
+// (tail), using the same cos/sin offset-from-angle convention
+// PlayerCharacter uses for its own head/snout placement -- the "captured"
+// faux-3D concept this game reuses everywhere a body part needs to lead or
+// trail the facing angle, with the y-offset compressed by
+// SPINE_PERSPECTIVE the same way renderTail compresses depth.
+function segmentPosition(grub, index) {
+  const along = (1.5 - index) * SEGMENT_SPACING;
+  return {
+    x: grub.x + Math.cos(grub.angle) * along,
+    y: grub.y - Math.sin(grub.angle) * along * SPINE_PERSPECTIVE,
+    radius: SEGMENT_RADII[index],
+  };
+}
+
+function renderGrub(context, grub, flashTimer) {
+  const segments = SEGMENT_RADII.map((_, i) => segmentPosition(grub, i));
+  const flash = flashTimer > 0 ? Math.sin(Math.min(1, flashTimer / FLASH_DURATION) * Math.PI) : 0;
+
+  // Outline pass: a thick stroke per segment, almost entirely covered by
+  // the fills drawn afterward except where a segment's own edge IS the
+  // union's outer boundary -- the cheap way to get one continuous outline
+  // around a blob of overlapping circles instead of each circle's own ring.
+  context.strokeStyle = OUTLINE_COLOR;
+  context.lineWidth = OUTLINE_WIDTH;
+  segments.forEach((segment) => {
+    context.beginPath();
+    context.arc(segment.x, segment.y, segment.radius, 0, TAU);
+    context.stroke();
+  });
+
+  // Fill pass, tail to head, so the head lands on top.
+  for (let i = segments.length - 1; i >= 0; i--) {
+    fillCircle(context, segments[i].x, segments[i].y, segments[i].radius, BODY_COLORS[i % BODY_COLORS.length]);
+    if (flash > 0) {
+      context.globalAlpha = flash;
+      fillCircle(context, segments[i].x, segments[i].y, segments[i].radius, '#fff');
+      context.globalAlpha = 1;
+    }
+  }
+
+  // Face: two glowing eyes plus a mouth dot, riding off the head the same
+  // way PlayerCharacter's own eyes ride off its facing angle.
+  const head = segments[0];
+  const eyeSpacing = 7;
+  const faceX = head.x + Math.cos(grub.angle) * 4;
+  const faceY = head.y - Math.sin(grub.angle) * 4;
+  [-eyeSpacing, eyeSpacing].forEach((side) => {
+    const [ex, ey] = zPosition(grub.angle, faceX, faceY - 4, side);
+    fillCircle(context, ex, ey, EYE_RADIUS, FACE_GLOW_COLOR);
+    fillCircle(context, ex, ey, EYE_RADIUS * 0.6, FACE_COLOR);
+  });
+  fillCircle(context, faceX, faceY + 5, MOUTH_RADIUS, FACE_GLOW_COLOR);
+  fillCircle(context, faceX, faceY + 5, MOUTH_RADIUS * 0.6, FACE_COLOR);
+}
+
+// "-N hp" floating text: drifts upward, fades, and grows over its
+// CALLOUT_DURATION lifetime.
+function renderCallouts(context, callouts, time) {
+  callouts.forEach((callout) => {
+    const t = Math.min(1, (time - callout.startTime) / CALLOUT_DURATION);
+    const scale = CALLOUT_START_SCALE + (CALLOUT_END_SCALE - CALLOUT_START_SCALE) * t;
+
+    context.save();
+    context.globalAlpha = 1 - t;
+    context.translate(callout.x, callout.y - CALLOUT_RISE * t);
+    context.scale(scale, scale);
+    context.font = 'bold 14px sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.lineWidth = 3 / scale;
+    context.strokeStyle = '#000';
+    context.strokeText(callout.text, 0, 0);
+    context.fillStyle = '#fff';
+    context.fillText(callout.text, 0, 0);
+    context.restore();
+  });
+}
+
+// A purple-outlined, four-segment grub that patrols randomly within its
+// home room and takes damage from a charging player on contact. `room` is
+// that home room in world space -- { x, y, w, h }, center + full size --
+// used to keep patrol waypoints inside it (and PATROL_MARGIN off its
+// walls), which is what keeps the grub "generally within its room" rather
+// than wandering the whole dungeon.
+function Grub(x, y, room, seed, props = {}) {
+  const { bounciness = 0.4 } = props;
+  const rng = mulberry32(seed);
+  let anim = 0;
+  let target = null;
+  let pauseTimer = randRange(rng, PAUSE_MIN, PAUSE_MAX);
+  let flashTimer = 0;
+  let hitCooldown = 0;
+  let healthBarTimer = 0;
+  let callouts = [];
+
+  const minX = room.x - room.w / 2 + PATROL_MARGIN;
+  const maxX = room.x + room.w / 2 - PATROL_MARGIN;
+  const minY = room.y - room.h / 2 + PATROL_MARGIN;
+  const maxY = room.y + room.h / 2 - PATROL_MARGIN;
+
+  function pickWaypoint() {
+    if (minX >= maxX || minY >= maxY) return { x: room.x, y: room.y };
+    return { x: randRange(rng, minX, maxX), y: randRange(rng, minY, maxY) };
+  }
+
+  return {
+    x,
+    y,
+    angle: 0,
+    hp: MAX_HP,
+    order: y,
+    tags: [TAG_OBSTACLE, TAG_ENEMY],
+
+    // Consistent puck-like accessor (see CubeObstacle.js/Pillar.js and
+    // physics.js): a static, circular puck with mass: Infinity, so the
+    // player bounces off it but the grub's own position is only ever
+    // driven by its patrol AI below.
+    puck() {
+      return {
+        x: this.x,
+        y: this.y,
+        radius: COLLISION_RADIUS,
+        shape: 'circle',
+        mass: Infinity,
+        vx: 0,
+        vy: 0,
+        omega: 0,
+        angle: 0,
+        viscosity: 0,
+        angularViscosity: 0,
+        bounciness,
+      };
+    },
+
+    update(dt) {
+      anim += dt;
+      this.order = this.y;
+
+      if (!target) {
+        pauseTimer -= dt;
+        if (pauseTimer <= 0) target = pickWaypoint();
+      } else {
+        const dx = target.x - this.x;
+        const dy = target.y - this.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < WAYPOINT_ARRIVE_DIST) {
+          target = null;
+          pauseTimer = randRange(rng, PAUSE_MIN, PAUSE_MAX);
+        } else {
+          const step = Math.min(dist, PATROL_SPEED * dt);
+          this.x += (dx / dist) * step;
+          this.y += (dy / dist) * step;
+          // Same heading convention PlayerCharacter uses: y points down on
+          // screen, but a larger angle swings the head "up", so negate dy.
+          this.angle = Math.atan2(-dy, dx);
+        }
+      }
+
+      flashTimer = Math.max(0, flashTimer - dt);
+      hitCooldown = Math.max(0, hitCooldown - dt);
+      healthBarTimer = Math.max(0, healthBarTimer - dt);
+      callouts = callouts.filter((callout) => anim - callout.startTime < CALLOUT_DURATION);
+
+      const player = getObjectsByTag(TAG_PLAYER)[0];
+      if (player && this.hp > 0 && hitCooldown <= 0) {
+        const touching = Math.hypot(player.x - this.x, player.y - this.y) < player.radius + COLLISION_RADIUS;
+        if (touching && player.charge > CHARGING_THRESHOLD) {
+          const damage = Math.max(1, Math.round(player.charge * MAX_DAMAGE));
+          this.hp = Math.max(0, this.hp - damage);
+          flashTimer = FLASH_DURATION;
+          healthBarTimer = HEALTH_BAR_SHOW_DURATION;
+          hitCooldown = HIT_COOLDOWN;
+          callouts.push({ text: `-${damage} hp`, x: this.x, y: this.y - 30, startTime: anim });
+        }
+      }
+
+      // Once defeated, stick around only long enough to finish showing the
+      // killing blow's flash and callout, then expire (the engine removes
+      // any object whose update() returns truthy).
+      if (this.hp <= 0 && flashTimer <= 0 && callouts.length === 0) return true;
+      return false;
+    },
+
+    render(context) {
+      renderGrub(context, this, flashTimer);
+      if (healthBarTimer > 0) {
+        renderHealthBar(context, this.x, this.y - HEALTH_BAR_OFFSET_Y, HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT, this.hp, MAX_HP);
+      }
+      renderCallouts(context, callouts, anim);
+    },
+  };
+}
+
+export default Grub;
