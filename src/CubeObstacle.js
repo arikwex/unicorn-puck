@@ -81,6 +81,11 @@ function CubeObstacle(x = 0, y = 0, angle = Math.PI / 4, props = {}) {
     topColor,
     sideColor,
     tags: [TAG_OBSTACLE],
+    // Draw order is keyed off y purely for the painter's-algorithm depth
+    // illusion: a farther-back (smaller y) obstacle draws first, so a
+    // nearer (larger y) one drawn later visually sits in front of it. A
+    // static obstacle never moves, so this only needs setting once.
+    order: y,
 
     // Consistent puck-like accessor (see PlayerCharacter.js and
     // physics.js): a static puck with mass: Infinity, offset into the

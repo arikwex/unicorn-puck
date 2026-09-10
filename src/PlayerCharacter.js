@@ -494,6 +494,10 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     // Driven by DragController while the player is aiming a launch.
     aiming: false,
     targetAngle: angle,
+    // Draw order keyed off y, recomputed every update -- see CubeObstacle.js
+    // for why (same painter's-algorithm depth illusion), but a moving puck
+    // needs it refreshed every frame rather than set once.
+    order: y,
     mass,
     radius,
     viscosity,
@@ -510,6 +514,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
 
     update(dt) {
       anim += dt;
+      this.order = this.y;
 
       let targetAngle;
       let easeRate;
