@@ -1,11 +1,40 @@
+import { add } from './engine.js';
 import { applyCollisionResponse, applyImpulse, normalizeAngle } from './physics.js';
 import orbit3d from './orbit3d.js';
+import SplatEffect from './SplatEffect.js';
 import { TAG_PLAYER, TAG_PROJECTILE, TAG_PUCK } from './tags.js';
 
 const TAU = Math.PI * 2;
 const DAMAGE_FLASH_DURATION = 0.6;
 const PROJECTILE_KNOCKBACK = 120;
 const DAMAGE_CANVAS_SIZE = 320;
+
+// -- damage splats -----------------------------------------------------------
+// Red, orange, yellow, green, blue, violet -- one splat of each, always all
+// six, always this order, flung out in a uniform-random direction apiece.
+const DAMAGE_SPLAT_COLORS = ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#0a84ff', '#af52de'];
+const DAMAGE_SPLAT_SPEED_MAX = 220; // world units per second, before the arc-height scaling below
+const DAMAGE_SPLAT_SIZE_MIN = 10;
+const DAMAGE_SPLAT_SIZE_MAX = 18;
+const DAMAGE_SPLAT_ARC_HEIGHT_TIME_MIN = 0.08;
+const DAMAGE_SPLAT_ARC_HEIGHT_TIME_MAX = 0.28;
+
+// Same disk-sampling shape as Grub's own fireSplats (sqrt(rng()) for uniform
+// area density, not just uniform radius), but plain Math.random() since the
+// player isn't seeded/reproducible the way patrol grubs are.
+function fireDamageSplats(x, y) {
+  DAMAGE_SPLAT_COLORS.forEach((color) => {
+    const angle = Math.random() * TAU;
+    const speed = Math.sqrt(Math.random()) * DAMAGE_SPLAT_SPEED_MAX;
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed;
+    const size = DAMAGE_SPLAT_SIZE_MIN + Math.random() * (DAMAGE_SPLAT_SIZE_MAX - DAMAGE_SPLAT_SIZE_MIN);
+    const arcHeightTime = DAMAGE_SPLAT_ARC_HEIGHT_TIME_MIN
+      + Math.random() * (DAMAGE_SPLAT_ARC_HEIGHT_TIME_MAX - DAMAGE_SPLAT_ARC_HEIGHT_TIME_MIN);
+    const arcHeight = Math.hypot(vx, vy) * arcHeightTime;
+    add(SplatEffect(x, y, vx, vy, color, { size, arcHeight }));
+  });
+}
 
 // While an aim drag is active (see DragController, which drives
 // `aiming`/`targetAngle` directly on the player object), heading eases
@@ -708,6 +737,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
       if (amount <= 0 || this.hp <= 0) return;
       this.hp = Math.max(0, this.hp - Math.max(0, amount));
       damageFlashTimer = DAMAGE_FLASH_DURATION;
+      fireDamageSplats(this.x, this.y);
     },
 
     update(dt) {

@@ -45,11 +45,12 @@ const AIM_SEGMENT_PULLBACK = [12, 16, 2, 0];
 // t=0.5, full max at t=1) so it's barely there early and most pronounced
 // right before the spit fires.
 const AIM_SEGMENT_JITTER = [8, 5, 0, 0];
-// Momentum kick on release: the head and neck whip forward past their idle
-// spot the instant the spit fires, before easing back -- see 'recovering'
-// in segmentPosition.
-const RELEASE_LUNGE_ALONG = [26, 14, 0, 0];
-const RELEASE_LUNGE_PEAK_T = 0.2; // fraction of RECOVER_DURATION spent shooting forward before it eases back
+// Momentum kick on release: the whole spine whips forward past its idle
+// pose the instant the spit fires, before easing back -- see 'recovering'
+// in segmentPosition. Amounts taper tail-ward so the head snaps hardest and
+// the tail least, bowing the S-shaped wind-up pose into a C on release.
+const RELEASE_LUNGE_ALONG = [55, 30, 16, 8];
+const RELEASE_LUNGE_PEAK_T = 0.07; // fraction of RECOVER_DURATION spent shooting forward before it eases back
 // Matches renderTail's own perspectiveY in PlayerCharacter.js -- the same
 // depth-compression ratio, for a consistent faux-3D feel across the cast.
 const SPINE_PERSPECTIVE = 0.6;
@@ -147,9 +148,10 @@ function segmentPosition(grub, index) {
     lift = AIM_SEGMENT_LIFT[index] * settle;
 
     if (RELEASE_LUNGE_ALONG[index] > 0) {
-      // A fast-rise, slow-decay "hump" over elapsed recovery time: the
-      // head/neck shoot forward past idle the instant the spit releases,
-      // showing recoil momentum, then resolve back to idle.
+      // A fast-rise, slow-decay "hump" over elapsed recovery time: each
+      // segment shoots forward past idle the instant the spit releases,
+      // head hardest and tail least, curling the S wind-up into a C --
+      // then all resolve back to idle together.
       const elapsed = 1 - progress;
       let kick;
       if (elapsed < RELEASE_LUNGE_PEAK_T) {
