@@ -4,8 +4,8 @@
 - [x] Drag/release to push self (mobile friendly?) + drawn arrow juice visulizer
 - [x] basic enemy grub (4 sergmented spheres with face, no attack)
 - [x] basic combat instance room (kill all enemies to continue?)
+- [x] tresure chest -> Bump to damage / crack open
 - pinball style dingers
-- tresure chest -> Bump to damage / crack open
 - crystal -> Bump to damage / recharge unicorn power
 - lever + gateway
 - level end mechanics (exit gateway / flag / unicorn key)

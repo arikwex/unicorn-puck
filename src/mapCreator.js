@@ -27,7 +27,7 @@ const GRUB_ROOM_MARGIN = 50;
 // pillar-crowded room just goes without rather than overlapping a wall).
 const CHEST_ROOM_MARGIN = 50;
 const CHEST_MIN_OBSTACLE_GAP = 1; // world units of clearance required off every obstacle
-const CHEST_PLACEMENT_ATTEMPTS = 40;
+const CHEST_PLACEMENT_ATTEMPTS = 30;
 // The raw generator's corridors are a single grid cell wide -- just barely
 // wider than the player puck, which feels awful to actually fly through.
 // Post-inflating by 2x guarantees every corridor and room is at least 2
@@ -138,6 +138,11 @@ function buildDungeon(seed) {
   const pillarSeed = seed + 1;
   const grubSeed = seed + 2;
   const chestSeed = seed + 3;
+  // `dungeon` (and every room/obstacle placement below, including chests)
+  // works entirely off this already-inflated result, never the raw
+  // generateDungeon() output -- so chest placement's own room bounds and
+  // obstacle clearance checks are always in the same post-inflation world
+  // scale as the walls/pillars/grubs actually added to the engine.
   const dungeon = inflateDungeon(generateDungeon(seed), CORRIDOR_WIDTH_FACTOR);
   const toWorld = (x, y) => gridToWorld(x, y, dungeon.gridWidth, dungeon.gridHeight);
 
