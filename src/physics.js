@@ -152,6 +152,63 @@ function applyCollisionResponse(puck, response) {
   puck.omega += response.domega;
 }
 
+// First intersection along a segment with a circle centered at the origin.
+// Times are fractions of this frame's travel, or Infinity for no hit.
+function segmentCircleTime(x, y, dx, dy, radius) {
+  const c = x * x + y * y - radius * radius;
+  if (c <= 0) return 0;
+  const a = dx * dx + dy * dy;
+  if (a === 0) return Infinity;
+  const b = x * dx + y * dy;
+  const discriminant = b * b - a * c;
+  if (discriminant < 0) return Infinity;
+  const time = (-b - Math.sqrt(discriminant)) / a;
+  return time >= 0 && time <= 1 ? time : Infinity;
+}
+
+// Sweep a circular projectile against a moving circle or a static rotated
+// box. Box faces plus rounded corners account for the projectile's radius.
+function sweptCircleHitTime(start, end, body, previousBody = body) {
+  const x = start.x - previousBody.x;
+  const y = start.y - previousBody.y;
+  const dx = end.x - start.x - (body.x - previousBody.x);
+  const dy = end.y - start.y - (body.y - previousBody.y);
+  if (body.shape !== 'box') {
+    return segmentCircleTime(x, y, dx, dy, start.radius + body.radius);
+  }
+
+  const cos = Math.cos(body.angle);
+  const sin = Math.sin(body.angle);
+  const localX = x * cos + y * sin;
+  const localY = -x * sin + y * cos;
+  const localDx = dx * cos + dy * sin;
+  const localDy = -dx * sin + dy * cos;
+  const { halfWidth, halfHeight } = body;
+  const radius = start.radius;
+  const outsideX = Math.max(0, Math.abs(localX) - halfWidth);
+  const outsideY = Math.max(0, Math.abs(localY) - halfHeight);
+  if (outsideX * outsideX + outsideY * outsideY <= radius * radius) return 0;
+
+  let first = Infinity;
+  for (const sign of [-1, 1]) {
+    if (localDx !== 0) {
+      const time = (sign * (halfWidth + radius) - localX) / localDx;
+      if (time >= 0 && time <= 1 && Math.abs(localY + localDy * time) <= halfHeight) first = Math.min(first, time);
+    }
+    if (localDy !== 0) {
+      const time = (sign * (halfHeight + radius) - localY) / localDy;
+      if (time >= 0 && time <= 1 && Math.abs(localX + localDx * time) <= halfWidth) first = Math.min(first, time);
+    }
+    for (const otherSign of [-1, 1]) {
+      first = Math.min(first, segmentCircleTime(
+        localX - sign * halfWidth, localY - otherSign * halfHeight,
+        localDx, localDy, radius,
+      ));
+    }
+  }
+  return first;
+}
+
 export {
   applyCollisionResponse,
   applyDamping,
@@ -161,4 +218,5 @@ export {
   collisionResponses,
   integratePuck,
   normalizeAngle,
+  sweptCircleHitTime,
 };

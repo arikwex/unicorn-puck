@@ -1,5 +1,6 @@
 import DamageCallout from './DamageCallout.js';
-import { add } from './engine.js';
+import { add, getObjectsByTag } from './engine.js';
+import GrubProjectile from './GrubProjectile.js';
 import renderHealthBar from './HealthBar.js';
 import orbit3d from './orbit3d.js';
 import SplatEffect from './SplatEffect.js';
@@ -57,6 +58,11 @@ const HIT_COOLDOWN = 0.6; // seconds between hits even while still touching
 const FLASH_DURATION = 0.25;
 const KNOCKBACK_TRANSFER = 0.6; // fraction of incoming player velocity
 const KNOCKBACK_DECAY = 16; // exponential velocity decay per second
+const AIM_DURATION = 2;
+const ATTACK_DELAY_MIN = 2;
+const ATTACK_DELAY_MAX = 4;
+const ATTACK_RANGE = 600;
+const PROJECTILE_SPEED = 340;
 const HEALTH_BAR_SHOW_DURATION = 2;
 const HEALTH_BAR_WIDTH = 60;
 const HEALTH_BAR_HEIGHT = 15;
@@ -153,9 +159,31 @@ function renderGrubFace(context, grub, head) {
     fillCircle(context, ex, ey, EYE_RADIUS, FACE_GLOW_COLOR);
   });
   if (Math.sin(grub.angle) < 0.22) {
-    const [mouthX, mouthY] = orbit3d(12, 5, 0, grub.angle + sway);
-    fillCircle(context, head.x + mouthX, head.y + mouthY, MOUTH_RADIUS, FACE_GLOW_COLOR);
+    const mouth = mouthPosition(grub, head);
+    fillCircle(context, mouth.x, mouth.y, MOUTH_RADIUS, FACE_GLOW_COLOR);
   }
+}
+
+function mouthPosition(grub, head = segmentPosition(grub, 0)) {
+  const sway = Math.sin(grub.anim * 7) * 0.3;
+  const [x, y] = orbit3d(12, 5, 0, grub.angle + sway);
+  return { x: head.x + x, y: head.y + y };
+}
+
+function renderAttackTell(context, grub) {
+  const mouth = mouthPosition(grub);
+  const progress = grub.aimProgress;
+  const pulse = 0.5 + Math.sin(progress * TAU * 5) * 0.5;
+  context.save();
+  context.globalAlpha = 0.35 + pulse * 0.35;
+  fillCircle(context, mouth.x, mouth.y, 5 + progress * 8 + pulse * 2, SPLAT_GREEN);
+  context.globalAlpha = 1;
+  context.strokeStyle = SPLAT_GREEN;
+  context.lineWidth = 3;
+  context.beginPath();
+  context.arc(mouth.x, mouth.y, 18, -Math.PI / 2, -Math.PI / 2 + TAU * progress);
+  context.stroke();
+  context.restore();
 }
 
 // A purple-outlined, four-segment grub that patrols randomly within its
@@ -172,6 +200,8 @@ function Grub(x, y, room, seed, props = {}) {
   let hitCooldown = 0;
   let healthBarTimer = 0;
   let deathSplatsFired = false;
+  let attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
+  let aimElapsed = 0;
 
   // Sample launch velocity uniformly across a disk, then shift it by a
   // fraction of the player's hit velocity. The seeded rng keeps the
@@ -206,6 +236,8 @@ function Grub(x, y, room, seed, props = {}) {
     angle: Math.random() * TAU,
     anim: Math.random() * 7,
     target: null,
+    state: 'patrol',
+    aimProgress: 0,
     hp: MAX_HP,
     order: y,
     tags: [TAG_OBSTACLE, TAG_ENEMY],
@@ -232,7 +264,42 @@ function Grub(x, y, room, seed, props = {}) {
     },
 
     update(dt) {
-      if (!this.target) {
+      if (this.hp <= 0) return true;
+      attackCooldown = Math.max(0, attackCooldown - dt);
+      const player = getObjectsByTag(TAG_PLAYER)[0];
+      const canAim = player && player.hp > 0
+        && Math.abs(player.x - room.x) <= room.w / 2
+        && Math.abs(player.y - room.y) <= room.h / 2
+        && Math.hypot(player.x - this.x, player.y - this.y) <= ATTACK_RANGE;
+
+      if (this.state === 'aiming') {
+        if (!canAim) {
+          this.state = 'patrol';
+          this.aimProgress = 0;
+          attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
+        } else {
+          this.angle = Math.atan2(this.y - player.y, player.x - this.x);
+          aimElapsed += dt;
+          this.aimProgress = Math.min(1, aimElapsed / AIM_DURATION);
+          if (aimElapsed >= AIM_DURATION) {
+            const mouth = mouthPosition(this);
+            const dx = player.x - mouth.x;
+            const dy = player.y - mouth.y;
+            const distance = Math.hypot(dx, dy) || 1;
+            add(GrubProjectile(mouth.x, mouth.y, dx / distance * PROJECTILE_SPEED, dy / distance * PROJECTILE_SPEED));
+            this.state = 'patrol';
+            this.aimProgress = 0;
+            attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
+          }
+        }
+      } else if (canAim && attackCooldown <= 0) {
+        this.state = 'aiming';
+        this.target = null;
+        this.vx = this.vy = 0;
+        this.angle = Math.atan2(this.y - player.y, player.x - this.x);
+        aimElapsed = 0;
+        this.aimProgress = 0;
+      } else if (!this.target) {
         pauseTimer -= dt;
         if (pauseTimer <= 0) this.target = pickWaypoint();
       } else {
@@ -282,6 +349,10 @@ function Grub(x, y, room, seed, props = {}) {
       flashTimer = FLASH_DURATION;
       healthBarTimer = HEALTH_BAR_SHOW_DURATION;
       hitCooldown = HIT_COOLDOWN;
+      // A charging hit interrupts the tell so knockback can move the grub.
+      this.state = 'patrol';
+      this.aimProgress = 0;
+      attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
       this.vx += player.vx * KNOCKBACK_TRANSFER;
       this.vy += player.vy * KNOCKBACK_TRANSFER;
       // These independent effects survive removal on the killing blow.
@@ -297,6 +368,7 @@ function Grub(x, y, room, seed, props = {}) {
 
     render(context) {
       renderGrub(context, this, flashTimer);
+      if (this.state === 'aiming') renderAttackTell(context, this);
       if (healthBarTimer > 0) {
         renderHealthBar(context, this.x, this.y - HEALTH_BAR_OFFSET_Y, HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT, this.hp, MAX_HP);
       }

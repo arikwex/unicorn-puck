@@ -6,8 +6,9 @@ import {
   circleCircleContact,
   collisionResponses,
   integratePuck,
+  sweptCircleHitTime,
 } from './physics.js';
-import { TAG_OBSTACLE, TAG_PUCK } from './tags.js';
+import { TAG_ENEMY, TAG_OBSTACLE, TAG_PLAYER, TAG_PROJECTILE, TAG_PUCK } from './tags.js';
 
 // Runs in the engine's dedicated physics phase after every ordinary update.
 // Capture all contacts before dispatching any reactions, so a bounce or
@@ -18,14 +19,22 @@ function PhysicsWorld() {
       const pucks = getObjectsByTag(TAG_PUCK);
       const puckSet = new Set(pucks);
       const obstacles = getObjectsByTag(TAG_OBSTACLE).filter((object) => !puckSet.has(object));
+      const projectiles = getObjectsByTag(TAG_PROJECTILE);
+      const participants = [...pucks, ...obstacles, ...projectiles];
+      const previousBodies = new Map(participants.map((object) => [object, { ...object.puck() }]));
 
       pucks.forEach((object) => {
         const puck = object.puck();
         applyDamping(puck, dt);
         integratePuck(puck, dt);
       });
+      projectiles.forEach((projectile) => {
+        projectile.x += projectile.vx * dt;
+        projectile.y += projectile.vy * dt;
+        projectile.order = projectile.y;
+      });
 
-      const bodies = new Map([...pucks, ...obstacles].map((object) => [object, { ...object.puck() }]));
+      const bodies = new Map(participants.map((object) => [object, { ...object.puck() }]));
       const contacts = [];
       function detect(a, b) {
         const bodyA = bodies.get(a);
@@ -65,6 +74,35 @@ function PhysicsWorld() {
           otherBody: bodyA, response: responseB,
         }]);
       });
+
+      // Shots ignore enemies and stop at the first obstruction along their
+      // path, including moving players. They notify both objects without
+      // participating in the solid-body bounce solver.
+      const shotTargets = [...obstacles, ...pucks].filter((object) =>
+        !object.tags.includes(TAG_ENEMY)
+        && (object.tags.includes(TAG_OBSTACLE) || object.tags.includes(TAG_PLAYER)));
+      projectiles.forEach((projectile) => {
+        const start = previousBodies.get(projectile);
+        const end = bodies.get(projectile);
+        let hit;
+        let first = Infinity;
+        shotTargets.forEach((target) => {
+          const time = sweptCircleHitTime(start, end, bodies.get(target), previousBodies.get(target));
+          if (time < first) { first = time; hit = target; }
+        });
+        if (!hit) return;
+        projectile.x = start.x + (end.x - start.x) * first;
+        projectile.y = start.y + (end.y - start.y) * first;
+        const targetBody = bodies.get(hit);
+        const speed = Math.hypot(end.vx, end.vy) || 1;
+        const nx = end.vx / speed;
+        const ny = end.vy / speed;
+        const response = { dx: 0, dy: 0, dvx: 0, dvy: 0, domega: 0 };
+        collisions.push([projectile, hit, { nx, ny, penetration: 0, otherBody: targetBody, response }]);
+        collisions.push([hit, projectile, { nx: -nx, ny: -ny, penetration: 0, otherBody: end, response }]);
+      });
+
+      projectiles.forEach((projectile) => projectile.afterPhysics?.());
 
       // Returning true from onCollision removes the object after both
       // participants have received their reactions, just like update().

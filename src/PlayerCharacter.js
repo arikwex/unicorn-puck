@@ -1,8 +1,11 @@
-import { applyCollisionResponse, normalizeAngle } from './physics.js';
+import { applyCollisionResponse, applyImpulse, normalizeAngle } from './physics.js';
 import orbit3d from './orbit3d.js';
-import { TAG_PLAYER, TAG_PUCK } from './tags.js';
+import { TAG_PLAYER, TAG_PROJECTILE, TAG_PUCK } from './tags.js';
 
 const TAU = Math.PI * 2;
+const DAMAGE_FLASH_DURATION = 0.6;
+const PROJECTILE_KNOCKBACK = 120;
+const DAMAGE_CANVAS_SIZE = 320;
 
 // While an aim drag is active (see DragController, which drives
 // `aiming`/`targetAngle` directly on the player object), heading eases
@@ -636,6 +639,8 @@ function renderPlayer(context, player, anim, charge, trail) {
 // means tuning a multiplier.
 function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
   let anim = 0;
+  let damageFlashTimer = 0;
+  let damageCanvas;
   let trail = []; // recent { x, y, t, charge } samples, for renderTrail -- see update()
   const {
     maxHp = 5,
@@ -681,6 +686,17 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     },
 
     onCollision(other, collision) {
+      if (other.tags?.includes(TAG_PROJECTILE)) {
+        if (this.hp <= 0) return;
+        const projectile = collision.otherBody;
+        this.takeDamage(projectile.damage);
+        const speed = Math.hypot(projectile.vx, projectile.vy);
+        if (speed > 0) {
+          applyImpulse(this, projectile.vx / speed * PROJECTILE_KNOCKBACK,
+            projectile.vy / speed * PROJECTILE_KNOCKBACK, 0);
+        }
+        return;
+      }
       this.bounce(collision.response);
     },
 
@@ -689,11 +705,14 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     },
 
     takeDamage(amount = 1) {
+      if (amount <= 0 || this.hp <= 0) return;
       this.hp = Math.max(0, this.hp - Math.max(0, amount));
+      damageFlashTimer = DAMAGE_FLASH_DURATION;
     },
 
     update(dt) {
       anim += dt;
+      damageFlashTimer = Math.max(0, damageFlashTimer - dt);
       this.order = this.y;
 
       const speed = Math.hypot(this.vx, this.vy);
@@ -727,7 +746,28 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     },
 
     render(context) {
-      renderPlayer(context, this, anim, this.charge, trail);
+      if (damageFlashTimer <= 0) {
+        renderPlayer(context, this, anim, this.charge, trail);
+        return;
+      }
+      // Tint an isolated character silhouette so the red pulse covers all
+      // body parts without coloring the background or the rainbow trail.
+      if (!damageCanvas) {
+        damageCanvas = document.createElement('canvas');
+        damageCanvas.width = damageCanvas.height = DAMAGE_CANVAS_SIZE;
+      }
+      const tintContext = damageCanvas.getContext('2d');
+      const center = DAMAGE_CANVAS_SIZE / 2;
+      renderTrail(context, trail, anim);
+      tintContext.clearRect(0, 0, DAMAGE_CANVAS_SIZE, DAMAGE_CANVAS_SIZE);
+      tintContext.save();
+      renderPlayer(tintContext, { ...this, x: center, y: center }, anim, this.charge, []);
+      tintContext.globalCompositeOperation = 'source-atop';
+      tintContext.globalAlpha = Math.sin(damageFlashTimer / DAMAGE_FLASH_DURATION * Math.PI / 2);
+      tintContext.fillStyle = '#ff2020';
+      tintContext.fillRect(0, 0, DAMAGE_CANVAS_SIZE, DAMAGE_CANVAS_SIZE);
+      tintContext.restore();
+      context.drawImage(damageCanvas, this.x - center, this.y - center);
     },
   };
 }
