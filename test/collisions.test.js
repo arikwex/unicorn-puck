@@ -184,7 +184,7 @@ test('damage thresholds, cooldown and killing-blow removal remain intact', () =>
   const grub = add(grubAt());
   const world = PhysicsWorld();
   function hit(charge) {
-    Object.assign(player, { x: 0, vx: 800, charge });
+    Object.assign(player, { x: grub.x - 60, y: grub.y, vx: 800, charge });
     world.physicsUpdate(0);
   }
   hit(0.1);
@@ -210,6 +210,36 @@ test('damage thresholds, cooldown and killing-blow removal remain intact', () =>
   assert.ok(!getObjects().includes(grub));
   assert.equal(getObjects().filter((object) => !object.tags).length, 23,
     'three callouts, nine hit splats and eleven death splats survive');
+});
+
+test('hits transfer incoming momentum in every direction and it decays while moving', () => {
+  for (const [vx, vy] of [[800, 0], [-800, 0], [0, 800], [0, -800], [480, 640]]) {
+    clear();
+    const player = add(playerAt(-vx / 800 * 60, -vy / 800 * 60));
+    Object.assign(player, { vx, vy });
+    const grub = add(grubAt(0, 0));
+    PhysicsWorld().physicsUpdate(0);
+    const initialVx = grub.vx;
+    const initialVy = grub.vy;
+    assert.ok(initialVx * vx + initialVy * vy > 0, 'push follows incoming velocity');
+    assert.ok(Math.abs(initialVx * vy - initialVy * vx) < 1e-9);
+    assert.equal(grub.puck().vx, initialVx);
+    assert.equal(grub.puck().vy, initialVy);
+    grub.update(0.1);
+    assert.ok(grub.x * vx + grub.y * vy > 0, 'grub moves away from the hit');
+    assert.ok(Math.hypot(grub.vx, grub.vy) < Math.hypot(initialVx, initialVy));
+    assert.equal(grub.order, grub.y);
+  }
+});
+
+test('knockback stays within room bounds and stops at their edges', () => {
+  const grub = Grub(19, -19, { x: 0, y: 0, w: 100, h: 100 }, 123);
+  Object.assign(grub, { vx: 800, vy: -800 });
+  grub.update(0.1);
+  assert.equal(grub.x, 20);
+  assert.equal(grub.y, -20);
+  assert.equal(grub.vx, 0);
+  assert.equal(grub.vy, 0);
 });
 
 test('splats keep the incoming hit direction after the player bounces', (t) => {

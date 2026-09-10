@@ -55,6 +55,8 @@ const HIGH_CHARGE_DAMAGE_THRESHOLD = 0.7;
 const CHARGING_THRESHOLD = 0.15; // player.charge above this counts as "charging" for damage purposes
 const HIT_COOLDOWN = 0.6; // seconds between hits even while still touching
 const FLASH_DURATION = 0.25;
+const KNOCKBACK_TRANSFER = 0.6; // fraction of incoming player velocity
+const KNOCKBACK_DECAY = 16; // exponential velocity decay per second
 const HEALTH_BAR_SHOW_DURATION = 2;
 const HEALTH_BAR_WIDTH = 60;
 const HEALTH_BAR_HEIGHT = 15;
@@ -108,13 +110,18 @@ function renderGrub(context, grub, flashTimer) {
   // the fills drawn afterward except where a segment's own edge IS the
   // union's outer boundary -- the cheap way to get one continuous outline
   // around a blob of overlapping circles instead of each circle's own ring.
-  context.strokeStyle = OUTLINE_COLOR;
   context.lineWidth = OUTLINE_WIDTH;
-  segments.forEach((segment) => {
-    context.beginPath();
-    context.arc(segment.x, segment.y, segment.radius, 0, TAU);
-    context.stroke();
-  });
+  for (const [color, alpha] of [[OUTLINE_COLOR, 1], ['#fff', flash]]) {
+    if (alpha <= 0) continue;
+    context.strokeStyle = color;
+    context.globalAlpha = alpha;
+    segments.forEach((segment) => {
+      context.beginPath();
+      context.arc(segment.x, segment.y, segment.radius, 0, TAU);
+      context.stroke();
+    });
+  }
+  context.globalAlpha = 1;
 
   // Positive sin faces into the page: draw head to tail so the nearer
   // rear segments cover the head. Facing out draws tail to head.
@@ -194,6 +201,8 @@ function Grub(x, y, room, seed, props = {}) {
   return {
     x,
     y,
+    vx: 0,
+    vy: 0,
     angle: Math.random() * TAU,
     anim: Math.random() * 7,
     target: null,
@@ -202,9 +211,9 @@ function Grub(x, y, room, seed, props = {}) {
     tags: [TAG_OBSTACLE, TAG_ENEMY],
 
     // Consistent puck-like accessor (see CubeObstacle.js/Pillar.js and
-    // physics.js): a static, circular puck with mass: Infinity, so the
-    // player bounces off it but the grub's own position is only ever
-    // driven by its patrol AI below.
+    // physics.js): a circular body with mass: Infinity, so the player
+    // bounces off it while patrol and hit momentum drive its position.
+    // Expose hit velocity for relative motion in the collision pass.
     puck() {
       return {
         x: this.x,
@@ -212,8 +221,8 @@ function Grub(x, y, room, seed, props = {}) {
         radius: COLLISION_RADIUS,
         shape: 'circle',
         mass: Infinity,
-        vx: 0,
-        vy: 0,
+        vx: this.vx,
+        vy: this.vy,
         omega: 0,
         angle: 0,
         viscosity: 0,
@@ -223,8 +232,6 @@ function Grub(x, y, room, seed, props = {}) {
     },
 
     update(dt) {
-      this.order = this.y;
-
       if (!this.target) {
         pauseTimer -= dt;
         if (pauseTimer <= 0) this.target = pickWaypoint();
@@ -246,6 +253,18 @@ function Grub(x, y, room, seed, props = {}) {
         }
       }
 
+      // Integrate exponential drag exactly so knockback travel is stable
+      // across frame rates, then stop momentum at the room's inner bounds.
+      const decay = Math.exp(-KNOCKBACK_DECAY * dt);
+      const travelTime = (1 - decay) / KNOCKBACK_DECAY;
+      const nextX = this.x + this.vx * travelTime;
+      const nextY = this.y + this.vy * travelTime;
+      this.x = Math.max(Math.min(minX, room.x), Math.min(Math.max(maxX, room.x), nextX));
+      this.y = Math.max(Math.min(minY, room.y), Math.min(Math.max(maxY, room.y), nextY));
+      this.vx = this.x === nextX ? this.vx * decay : 0;
+      this.vy = this.y === nextY ? this.vy * decay : 0;
+      this.order = this.y;
+
       flashTimer = Math.max(0, flashTimer - dt);
       hitCooldown = Math.max(0, hitCooldown - dt);
       healthBarTimer = Math.max(0, healthBarTimer - dt);
@@ -263,6 +282,8 @@ function Grub(x, y, room, seed, props = {}) {
       flashTimer = FLASH_DURATION;
       healthBarTimer = HEALTH_BAR_SHOW_DURATION;
       hitCooldown = HIT_COOLDOWN;
+      this.vx += player.vx * KNOCKBACK_TRANSFER;
+      this.vy += player.vy * KNOCKBACK_TRANSFER;
       // These independent effects survive removal on the killing blow.
       add(DamageCallout(this.x, this.y - 30, `-${damage} hp`));
       fireSplats(this.x, this.y, HIT_SPLAT_COUNT, SPLAT_GREEN, player.vx, player.vy);
