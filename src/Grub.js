@@ -103,7 +103,7 @@ function segmentPosition(grub, index) {
   const along = (1.5 - index) * SEGMENT_SPACING;
   return {
     x: grub.x + Math.cos(grub.angle) * along,
-    y: grub.y - Math.sin(grub.angle) * along * SPINE_PERSPECTIVE,
+    y: grub.y - Math.sin(grub.angle) * along * SPINE_PERSPECTIVE - SEGMENT_RADII[index] / 2,
     radius: SEGMENT_RADII[index],
   };
 }
@@ -193,7 +193,7 @@ function Grub(x, y, room, seed, props = {}) {
   return {
     x,
     y,
-    angle: 0,
+    angle: Math.random() * TAU,
     hp: MAX_HP,
     order: y,
     tags: [TAG_OBSTACLE, TAG_ENEMY],
@@ -238,9 +238,10 @@ function Grub(x, y, room, seed, props = {}) {
           this.y += (dy / dist) * step;
           // Same heading convention PlayerCharacter uses: y points down on
           // screen, but a larger angle swings the head "up", so negate dy.
-          this.angle = Math.atan2(-dy, dx);
+          // this.angle = Math.atan2(-dy, dx);
         }
       }
+      this.angle += 0.7 * dt;
 
       flashTimer = Math.max(0, flashTimer - dt);
       hitCooldown = Math.max(0, hitCooldown - dt);
