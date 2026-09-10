@@ -86,6 +86,12 @@ function tick(now) {
   [...objects].sort((a, b) => (a.order || 0) - (b.order || 0)).forEach((object) => object.render?.(ctx));
 
   ctx.restore();
+
+  // HUD objects draw last in canvas pixels, independent of camera or depth.
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  [...objects].forEach((object) => object.renderHUD?.(ctx));
+  ctx.restore();
   requestAnimationFrame(tick);
 }
 

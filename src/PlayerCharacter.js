@@ -555,6 +555,19 @@ function renderHead(context, angle, headX, headY, snoutX, snoutY, charge, anim) 
   if (facesCamera) renderHorn(context, angle, headX, headY, charge, anim);
 }
 
+// A fixed, uncharged head pose for the HUD, using the same face, ears,
+// snout and horn as the character in the world.
+function renderPlayerPortrait(context, x, y, scale = 1) {
+  const angle = -Math.PI / 4;
+  const snoutX = Math.cos(angle) * 23;
+  const snoutY = 8 - Math.sin(angle) * 14 + (1 - Math.sin(-0.9));
+  context.save();
+  context.translate(x, y);
+  context.scale(scale, scale);
+  renderHead(context, angle, 0, 0, snoutX, snoutY, 0, 0);
+  context.restore();
+}
+
 // A short-lived ROYGBV ribbon behind the character while charging.
 // `trail` is a list of { x, y, t, charge, angle } samples (oldest first,
 // already pruned to the last TRAIL_DURATION seconds -- see
@@ -625,6 +638,8 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
   let anim = 0;
   let trail = []; // recent { x, y, t, charge } samples, for renderTrail -- see update()
   const {
+    maxHp = 5,
+    hp = maxHp,
     mass = 1,
     radius = 38,
     viscosity = 1,
@@ -639,6 +654,8 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     vx: 0,
     vy: 0,
     omega: 0,
+    hp: Math.max(0, Math.min(maxHp, hp)),
+    maxHp,
     // Driven by DragController while the player is aiming a launch.
     aiming: false,
     targetAngle: angle,
@@ -669,6 +686,10 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
 
     bounce(response) {
       applyCollisionResponse(this, response);
+    },
+
+    takeDamage(amount = 1) {
+      this.hp = Math.max(0, this.hp - Math.max(0, amount));
     },
 
     update(dt) {
@@ -712,3 +733,4 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
 }
 
 export default PlayerCharacter;
+export { renderPlayerPortrait };

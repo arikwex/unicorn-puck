@@ -10,6 +10,7 @@ import PhysicsWorld from './PhysicsWorld.js';
 import Pillar from './Pillar.js';
 import placePillars from './placePillars.js';
 import PlayerCharacter from './PlayerCharacter.js';
+import PlayerHealthHUD from './PlayerHealthHUD.js';
 
 // Fixed for now, so the generated dungeon is reproducible while the
 // generator itself is being tuned.
@@ -138,6 +139,7 @@ function buildDungeon() {
 function createMap() {
   const spawn = buildDungeon();
   const player = add(PlayerCharacter(spawn.x, spawn.y));
+  add(PlayerHealthHUD(player));
   add(Camera().follow(player));
   add(DragController(player));
   add(PhysicsWorld());
