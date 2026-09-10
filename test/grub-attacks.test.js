@@ -80,7 +80,8 @@ test('grub stays still and tracks the player for two seconds before firing once'
   assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 0);
   const tellContext = drawingContext();
   grub.render(tellContext);
-  assert.ok(tellContext.calls.some((call) => call.method === 'arc' && call.args[2] === 18));
+  assert.ok(tellContext.calls.filter((call) => call.method === 'arc')
+    .every((call) => call.args[3] === 0 && call.args[4] === Math.PI * 2), 'tell has no progress arcs');
   grub.update(0.01);
   const shots = getObjectsByTag(TAG_PROJECTILE);
   assert.equal(shots.length, 1);
@@ -90,6 +91,43 @@ test('grub stays still and tracks the player for two seconds before firing once'
   assert.equal(grub.state, 'patrol');
   grub.update(0.5);
   assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 1);
+});
+
+test('aiming raises an S-shaped body and pulls it backward while the tail stays planted', () => {
+  const grub = Grub(0, 0, room, 123);
+  const segments = () => {
+    const context = drawingContext();
+    grub.render(context);
+    return context.calls.filter((call) => call.method === 'arc').slice(0, 4).map((call) => call.args);
+  };
+  for (const angle of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+    grub.angle = angle;
+    grub.state = 'patrol';
+    const resting = segments();
+    grub.state = 'aiming';
+    let previous = resting;
+    for (const progress of [0.25, 0.5, 0.75, 1]) {
+      grub.aimProgress = progress;
+      const pose = segments();
+      assert.ok(pose[0][1] < resting[0][1], 'head rises for every facing direction');
+      assert.deepEqual(pose[3], resting[3], 'tail remains planted');
+      if (Math.abs(Math.cos(angle)) > 0.5) {
+        for (let i = 0; i < 3; i++) {
+          assert.ok((pose[i][0] - previous[i][0]) * Math.cos(angle) < 0, 'pullback follows local -x');
+        }
+      }
+      for (let i = 0; i < 3; i++) {
+        assert.ok(Math.hypot(pose[i][0] - pose[i + 1][0], pose[i][1] - pose[i + 1][1])
+          < pose[i][2] + pose[i + 1][2], 'adjacent body segments stay connected');
+      }
+      previous = pose;
+    }
+    if (angle === 0) {
+      assert.ok(previous[0][0] > previous[1][0]);
+      assert.ok(previous[1][0] < previous[2][0]);
+      assert.ok(previous[2][0] > previous[3][0], 'alternating bends form the S profile');
+    }
+  }
 });
 
 test('losing the player cancels the tell; a charging hit also interrupts it', () => {

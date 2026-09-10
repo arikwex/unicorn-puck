@@ -35,6 +35,11 @@ function fillCircle(context, x, y, radius, color) {
 // -- body -----------------------------------------------------------------
 const SEGMENT_RADII = [22, 18, 14, 10]; // head to tail
 const SEGMENT_SPACING = 15;
+// Local side-view S pose, head to tail. The tail stays planted while the
+// head rises, the neck curls back, and the lower body bends forward.
+const AIM_SEGMENT_ALONG = [0, -14, -10, -1.5 * SEGMENT_SPACING];
+const AIM_SEGMENT_LIFT = [56, 32, 14, 0];
+const AIM_SEGMENT_PULLBACK = [12, 16, 2, 0];
 // Matches renderTail's own perspectiveY in PlayerCharacter.js -- the same
 // depth-compression ratio, for a consistent faux-3D feel across the cast.
 const SPINE_PERSPECTIVE = 0.6;
@@ -96,14 +101,26 @@ const PAUSE_MAX = 1.6;
 // trail the facing angle, with the y-offset compressed by
 // SPINE_PERSPECTIVE the same way renderTail compresses depth.
 function segmentPosition(grub, index) {
-  const along = (1.5 - index) * SEGMENT_SPACING;
+  let along = (1.5 - index) * SEGMENT_SPACING;
+  let lift = 0;
+  if (grub.state === 'aiming') {
+    // Rise smoothly during the first part of the tell, then keep drawing
+    // backward along local -x as the spit winds up. Height is screen-up,
+    // while the bend rotates with the grub's facing direction below.
+    const progress = Math.max(0, Math.min(1, grub.aimProgress));
+    const riseT = Math.min(1, progress / 0.45);
+    const rise = riseT * riseT * (3 - 2 * riseT);
+    along += (AIM_SEGMENT_ALONG[index] - along) * rise
+      - AIM_SEGMENT_PULLBACK[index] * progress * progress;
+    lift = AIM_SEGMENT_LIFT[index] * rise;
+  }
   let motionY = 0;
   if (grub.target != null) {
     motionY = (1 - Math.abs(Math.sin(grub.anim * 6.0 + index * 2))) * (8 - index) * 1;
   }
   return {
     x: grub.x + Math.cos(grub.angle) * along,
-    y: grub.y - Math.sin(grub.angle) * along * SPINE_PERSPECTIVE - SEGMENT_RADII[index] / 2 + motionY,
+    y: grub.y - Math.sin(grub.angle) * along * SPINE_PERSPECTIVE - SEGMENT_RADII[index] / 2 + motionY - lift,
     radius: SEGMENT_RADII[index],
   };
 }
@@ -168,22 +185,6 @@ function mouthPosition(grub, head = segmentPosition(grub, 0)) {
   const sway = Math.sin(grub.anim * 7) * 0.3;
   const [x, y] = orbit3d(12, 5, 0, grub.angle + sway);
   return { x: head.x + x, y: head.y + y };
-}
-
-function renderAttackTell(context, grub) {
-  const mouth = mouthPosition(grub);
-  const progress = grub.aimProgress;
-  const pulse = 0.5 + Math.sin(progress * TAU * 5) * 0.5;
-  context.save();
-  context.globalAlpha = 0.35 + pulse * 0.35;
-  fillCircle(context, mouth.x, mouth.y, 5 + progress * 8 + pulse * 2, SPLAT_GREEN);
-  context.globalAlpha = 1;
-  context.strokeStyle = SPLAT_GREEN;
-  context.lineWidth = 3;
-  context.beginPath();
-  context.arc(mouth.x, mouth.y, 18, -Math.PI / 2, -Math.PI / 2 + TAU * progress);
-  context.stroke();
-  context.restore();
 }
 
 // A purple-outlined, four-segment grub that patrols randomly within its
@@ -368,7 +369,6 @@ function Grub(x, y, room, seed, props = {}) {
 
     render(context) {
       renderGrub(context, this, flashTimer);
-      if (this.state === 'aiming') renderAttackTell(context, this);
       if (healthBarTimer > 0) {
         renderHealthBar(context, this.x, this.y - HEALTH_BAR_OFFSET_Y, HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT, this.hp, MAX_HP);
       }
