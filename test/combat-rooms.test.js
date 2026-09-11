@@ -226,8 +226,8 @@ test('map creation attaches seeded combat rooms to their weighted enemy budget a
   const seed = 42;
   const { player } = createMap(seed);
   const controllers = getObjectsByTag(TAG_COMBAT_ROOM);
-  const types = controllers.map((room) => room.enemies.map((enemy) => enemy.large));
-  assert.ok(types.flat().includes(true), 'the seeded map includes large grubs');
+  const types = controllers.map((room) => room.enemies.map((enemy) => enemy.type));
+  assert.ok(types.flat().includes(1), 'the seeded map includes medium grubs');
   const dungeon = inflateDungeon(generateDungeon(seed), 3);
   assert.equal(controllers.length, Math.round((dungeon.rooms.length - 1) / 2));
   for (const room of controllers) {
@@ -252,9 +252,26 @@ test('map creation attaches seeded combat rooms to their weighted enemy budget a
   assert.ok(grates.every((grate) => !getObjects().includes(grate)));
   clear();
   createMap(seed);
-  assert.deepEqual(getObjectsByTag(TAG_COMBAT_ROOM).map((room) => room.enemies.map((enemy) => enemy.large)), types);
+  assert.deepEqual(getObjectsByTag(TAG_COMBAT_ROOM).map((room) => room.enemies.map((enemy) => enemy.type)), types);
   assert.ok(getObjectsByTag(TAG_COMBAT_ROOM).every((room) => room.state === READY));
   assert.equal(getObjectsByTag(TAG_OBSTACLE).length, unlocked.size, 'a fresh map starts with every gate open');
+});
+
+test('seeded rooms include all three grub types and always spend their exact enemy budget', () => {
+  const types = new Set();
+  for (const seed of [1, 2, 3, 42]) {
+    clear();
+    createMap(seed);
+    for (const room of getObjectsByTag(TAG_COMBAT_ROOM)) {
+      const budget = Math.round((room.bounds.w + room.bounds.h) / (3 * 60 * Math.SQRT2)) - 3;
+      assert.equal(room.enemies.reduce((sum, enemy) => sum + enemy.enemyCost, 0), budget);
+      for (const enemy of room.enemies) {
+        types.add(enemy.type);
+        assert.equal(enemy.enemyCost, enemy.type + 1);
+      }
+    }
+  }
+  assert.deepEqual(types, new Set([0, 1, 2]));
 });
 
 test('generated grates close in the corridors, never on a player who just triggered the lock', () => {

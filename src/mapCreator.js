@@ -8,7 +8,7 @@ import { selectCombatRooms } from './combatRoomLayout.js';
 import CubeObstacle from './CubeObstacle.js';
 import generateDungeon, { mulberry32 } from './donjonDungeon.js';
 import { add } from './engine.js';
-import Grub from './Grub.js';
+import Grub, { SMALL, MEDIUM, LARGE } from './Grub.js';
 import HealthItem from './HealthItem.js';
 import inflateDungeon from './inflateDungeon.js';
 import DragController from './input.js';
@@ -24,7 +24,7 @@ import PlayerHealthHUD from './PlayerHealthHUD.js';
 import TreasureChest, { CHEST_RADIUS } from './TreasureChest.js';
 import ToastSystem, { showToast } from './ToastSystem.js';
 
-// Each room has an enemy budget: small grubs cost one, large grubs two.
+// Each room has an enemy budget: small/medium/large grubs cost 1/2/3.
 // Grubs are scattered to their own spots within the
 // room (buildDungeon's own grubSeed offset by <room index> seeds that
 // scatter) and its own patrol (offset by <room index> * 100 + <grub index>
@@ -39,7 +39,6 @@ import ToastSystem, { showToast } from './ToastSystem.js';
 function roomGrubCount(rawRoom) {
   return rawRoom.w + rawRoom.h - 3;
 }
-const LARGE_GRUB_CHANCE = 0.3;
 const GRUB_ROOM_MARGIN = 50;
 // A hallway only ever gets a grub if it's a straight run of at least this
 // many raw grid cells (see findLongHallways) -- a short jog between two
@@ -354,9 +353,11 @@ function buildDungeon(seed) {
     if (roomIndex !== 0) {
       const budget = roomGrubCount(rawDungeon.rooms[roomIndex]);
       for (let spent = 0; spent < budget;) {
-        const large = budget - spent >= 2 && typeRng() < LARGE_GRUB_CHANCE;
+        const roll = typeRng();
+        // Split the 30% upgraded chance evenly; downgrade to fit remaining slots.
+        const type = Math.min(budget - spent - 1, roll < 0.15 ? LARGE : roll < 0.3 ? MEDIUM : SMALL);
         const spawn = pickGrubSpawn(worldRoom, scatterRng);
-        const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + enemies.length, { large }));
+        const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + enemies.length, type));
         spent += grub.enemyCost;
         enemies.push(grub);
         obstacleCircles.push({ x: spawn.x, y: spawn.y, r: grub.r });

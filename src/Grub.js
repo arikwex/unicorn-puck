@@ -16,6 +16,12 @@ const PATROL = 0;
 const AIMING = 1;
 const RECOVERING = 2;
 
+// Numeric enemy types also index size/HP tables and determine room cost.
+const SMALL = 0;
+const MEDIUM = 1;
+const LARGE = 2;
+const FACE_COLORS = ['#5f5', '#f93', '#f22'];
+
 function randRange(rng, min, max) {
   return min + rng() * (max - min);
 }
@@ -45,17 +51,12 @@ const SPINE_PERSPECTIVE = 0.6;
 const OUTLINE_COLOR = '#85d';
 const OUTLINE_WIDTH = 11; // full stroke width -- see renderGrub, only half stays visible outside the fill
 const BODY_COLORS = ['#334', '#223']; // alternating segment shade
-const FACE_COLOR = '#7f6';
-const FACE_GLOW_COLOR = '#5f5';
 const EYE_RADIUS = 5;
 const MOUTH_RADIUS = 4;
 const COLLISION_RADIUS = 26;
-const LARGE_SCALE = 1.4;
-const LARGE_COLOR = '#f93';
-const LARGE_SPREAD_ANGLE = Math.PI / 12;
+const MEDIUM_SPREAD_ANGLE = Math.PI / 12;
 
 // -- combat -----------------------------------------------------------------
-const MAX_HP = 5;
 // Damage is always 1, except at a genuinely fast (high-charge) hit, where
 // it's 2 -- never more. player.chg (charge) is itself already a function of
 // speed (see PlayerCharacter.js), so gating off it is gating off speed.
@@ -174,7 +175,7 @@ function renderBackSpike(context, segment, size, flash) {
   context.closePath();
   context.lineWidth = 5 * size;
   context.strokeStyle = '#a41';
-  context.fillStyle = LARGE_COLOR;
+  context.fillStyle = FACE_COLORS[MEDIUM];
   context.stroke();
   context.fill();
   if (flash > 0) {
@@ -212,8 +213,14 @@ function renderGrub(context, grub, flashTimer) {
   const facingIntoPage = Math.sin(grub.a) > 0;
   for (let step = 0; step < segments.length; step++) {
     const i = facingIntoPage ? step : segments.length - 1 - step;
-    if (grub.large && i > 0) renderBackSpike(context, segments[i], grub.size, flash);
+    if (grub.type === MEDIUM && i > 0) renderBackSpike(context, segments[i], grub.size, flash);
     fillCircle(context, segments[i].x, segments[i].y, segments[i].r, BODY_COLORS[i % BODY_COLORS.length]);
+    if (grub.type === LARGE && i > 0) {
+      const { x, y, r } = segments[i];
+      for (const side of [-1, 1]) {
+        fillCircle(context, x + side * r * 0.4, y - r * 0.35, r * 0.2, FACE_COLORS[LARGE]);
+      }
+    }
     if (flash > 0) {
       context.globalAlpha = flash;
       fillCircle(context, segments[i].x, segments[i].y, segments[i].r, '#fff');
@@ -228,7 +235,7 @@ function renderGrubFace(context, grub, head) {
   // way PlayerCharacter's own eyes ride off its facing angle. Draw with
   // the head so nearer body segments can cover the face when facing away.
   const sway = Math.sin(grub.anim * 7) * 0.3;
-  const color = grub.large ? LARGE_COLOR : FACE_GLOW_COLOR;
+  const color = FACE_COLORS[grub.type];
   [-1, 1].forEach((side) => {
     if (Math.sin(grub.a - side * 0.6) > 0.22) {
       return;
@@ -256,10 +263,9 @@ function mouthPosition(grub, head = segmentPosition(grub, 0)) {
 // used to keep patrol waypoints inside it (and PATROL_MARGIN off its
 // walls), which is what keeps the grub "generally within its room" rather
 // than wandering the whole dungeon.
-function Grub(x, y, room, seed, props = {}) {
-  const { large = false } = props;
-  const size = large ? LARGE_SCALE : 1;
-  const maxHp = MAX_HP + (large ? 3 : 0);
+function Grub(x, y, room, seed, type = SMALL) {
+  const size = [1, 1.4, 2.1][type];
+  const maxHp = [5, 8, 13][type];
   const rng = mulberry32(seed);
   let pauseTimer = randRange(rng, PAUSE_MIN, PAUSE_MAX);
   let flashTimer = 0;
@@ -282,7 +288,7 @@ function Grub(x, y, room, seed, props = {}) {
   // fraction of the player's hit velocity. The seeded rng keeps the
   // launch pattern reproducible.
   function fireSplats(originX, originY, count, color, impactVx, impactVy) {
-    const splatColor = large ? LARGE_COLOR : color;
+    const splatColor = type ? FACE_COLORS[type] : color;
     for (let i = 0; i < count; i++) {
       const angle = rng() * TAU;
       const speed = Math.sqrt(rng()) * SPLAT_SPEED_MAX;
@@ -307,10 +313,10 @@ function Grub(x, y, room, seed, props = {}) {
   return {
     x,
     y,
-    large,
+    type,
     size,
     maxHp,
-    enemyCost: large ? 2 : 1,
+    enemyCost: type + 1,
     vx: 0,
     vy: 0,
     a: Math.random() * TAU,
@@ -363,10 +369,14 @@ function Grub(x, y, room, seed, props = {}) {
           const dx = targetX - mouth.x;
           const dy = targetY - mouth.y;
           const heading = Math.atan2(dy, dx);
-          const spread = this.large ? [-LARGE_SPREAD_ANGLE, 0, LARGE_SPREAD_ANGLE] : [0];
-          const palette = this.large ? { color: LARGE_COLOR, highlightColor: '#fdb' } : undefined;
-          spread.forEach((offset) => add(GrubProjectile(mouth.x, mouth.y,
-            Math.cos(heading + offset) * PROJECTILE_SPEED, Math.sin(heading + offset) * PROJECTILE_SPEED, palette)));
+          const shots = [1, 3, 8][type];
+          const palette = type ? { color: FACE_COLORS[type], highlightColor: type === LARGE ? '#fbb' : '#fdb' } : undefined;
+          for (let i = 0; i < shots; i++) {
+            // Large volleys use fixed compass directions even while tracking the player.
+            const angle = type === LARGE ? i * TAU / 8 : heading + (i - (shots - 1) / 2) * MEDIUM_SPREAD_ANGLE;
+            add(GrubProjectile(mouth.x, mouth.y,
+              Math.cos(angle) * PROJECTILE_SPEED, Math.sin(angle) * PROJECTILE_SPEED, palette));
+          }
           playOozeShot();
           this.state = RECOVERING;
           recoverElapsed = 0;
@@ -463,3 +473,4 @@ function Grub(x, y, room, seed, props = {}) {
 }
 
 export default Grub;
+export { SMALL, MEDIUM, LARGE };
