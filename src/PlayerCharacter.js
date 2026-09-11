@@ -255,10 +255,12 @@ function renderEar(context, angle, headX, headY, offset) {
   }
 }
 
+// `foreground` is compared loosely (here and in renderWingsAndTail): the
+// build ships boolean literals as 1/0 (see tools/build.js), and 1 !== true.
 function renderEars(context, angle, headX, headY, foreground) {
   const spacing = 10;
   [-spacing, spacing].forEach((offset) => {
-    if (earFacesCamera(angle, offset) === foreground) {
+    if (earFacesCamera(angle, offset) == foreground) {
       renderEar(context, angle, headX, headY, offset);
     }
   });
@@ -477,7 +479,7 @@ function renderWingsAndTail(context, player, angle, anim, foreground, charge) {
   items.push({ depth: tailDepth, draw: () => renderTail(context, player, angle, anim, charge) });
 
   items
-    .filter((item) => (item.depth <= 0) === foreground)
+    .filter((item) => (item.depth <= 0) == foreground)
     .sort((a, b) => b.depth - a.depth) // farthest first, nearest drawn last (on top)
     .forEach((item) => item.draw());
 }
