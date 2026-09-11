@@ -18,19 +18,7 @@ const ARROW_LINE_LENGTH = 16;
 const ARROW_ANGLE = Math.PI / 4; // each arrowhead stroke splays 45deg off the main line's direction
 const SEGMENT_LENGTH = 8; // px per hue-gradient slice along the line
 const HUE_PER_DISTANCE = 0.5; // degrees of hue per px traveled along the line
-// Degrees/sec the hidden hue animator spins at once the drag reaches
-// HUE_LENGTH_REF in length -- negative so it runs the opposite way from the
-// spatial (per-px) gradient. Below that length it spins proportionally
-// slower. Only this *rate* depends on drag length; the animator's own
-// value is always integrated forward from wherever it already was, so
-// changing the drag length changes how fast the hue moves next, not where
-// it suddenly jumps to.
-const HUE_ROTATION_RATE_AT_MAX_LENGTH = -360;
-const HUE_LENGTH_REF = 220;
-
-function normalizeHue(hue) {
-  return ((hue % 360) + 360) % 360;
-}
+const HUE_RATE = -360; // degrees/sec, opposite the spatial gradient
 
 function linearImpulseMagnitude(distance) {
   const t = Math.min(Math.max(distance / IMPULSE_DISTANCE_REF, 0), 1);
@@ -46,10 +34,10 @@ function rotate(x, y, angle) {
 // Renders the drag as a straight, solid-fixed-width line between the supplied
 // screen-space endpoints, capped with a plain two-stroke arrowhead (each
 // stroke 45deg off the line) pointing in the launch direction. Hue is a
-// gradient along the line's length, offset by `hueAnimator` -- a value the
-// caller integrates forward over time at a drag-length-dependent rate, so
-// the color keeps drifting even while the pointer holds still.
-function renderDragIndicator(context, start, end, hueAnimator) {
+// gradient along the line's length, offset by `hue` -- which the caller
+// spins at a fixed rate, so the color drifts even while the pointer holds
+// still. hsl() wraps any angle, so the hue never needs normalizing.
+function renderDragIndicator(context, start, end, hue) {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const length = Math.hypot(dx, dy);
@@ -63,16 +51,14 @@ function renderDragIndicator(context, start, end, hueAnimator) {
   for (let i = 0; i < segments; i++) {
     const t0 = i / segments;
     const t1 = (i + 1) / segments;
-    const hue = normalizeHue(length * ((t0 + t1) / 2) * HUE_PER_DISTANCE + hueAnimator);
-    context.strokeStyle = `hsl(${hue}, 90%, 60%)`;
+    context.strokeStyle = `hsl(${length * ((t0 + t1) / 2) * HUE_PER_DISTANCE + hue}, 90%, 60%)`;
     context.beginPath();
     context.moveTo(start.x + dx * t0, start.y + dy * t0);
     context.lineTo(start.x + dx * t1, start.y + dy * t1);
     context.stroke();
   }
 
-  const tipHue = normalizeHue(length * HUE_PER_DISTANCE + hueAnimator);
-  context.strokeStyle = `hsl(${tipHue}, 90%, 60%)`;
+  context.strokeStyle = `hsl(${length * HUE_PER_DISTANCE + hue}, 90%, 60%)`;
   [ARROW_ANGLE, -ARROW_ANGLE].forEach((angle) => {
     const [backX, backY] = rotate(-ux, -uy, angle);
     context.beginPath();
@@ -87,7 +73,7 @@ function renderDragIndicator(context, start, end, hueAnimator) {
 function DragController(player) {
   let dragging = false;
   let pointerId;
-  let hueAnimator = 0; // hidden animator value driving the indicator's hue; only its rate depends on drag length
+  let hue = 0; // the indicator's animated hue offset -- see renderDragIndicator
   // Screen-space (canvas pixel) points. Deliberately *not* converted to
   // world space as they're captured: the camera keeps easing toward the
   // player between pointer-move samples, so a world-space conversion done
@@ -183,8 +169,7 @@ function DragController(player) {
         // arrow is actually drawn in.
         player.targetAngle = Math.atan2(-dy, dx);
       }
-      const lengthRatio = Math.min(Math.max(length / HUE_LENGTH_REF, 0), 1);
-      hueAnimator += HUE_ROTATION_RATE_AT_MAX_LENGTH * lengthRatio * dt;
+      hue += HUE_RATE * dt;
     },
 
     // A HUD element, not a world-space render: `order` only sorts among
@@ -212,7 +197,7 @@ function DragController(player) {
         x: origin.x + current.x - start.x,
         y: origin.y + current.y - start.y,
       };
-      renderDragIndicator(context, origin, end, hueAnimator);
+      renderDragIndicator(context, origin, end, hue);
     },
   };
 }

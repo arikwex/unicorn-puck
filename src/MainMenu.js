@@ -12,8 +12,6 @@ const TITLE_FONT_RATIO = 0.115; // font size as a fraction of canvas width
 const TITLE_FONT_MIN = 34;
 const TITLE_FONT_MAX = 104;
 const TITLE_LINE_GAP = 1.05; // BLOOD's baseline drop, in title-font-sizes
-const HUE_ROTATION_SPEED = 70; // degrees/sec the rainbow cycles through
-const HUE_STEP_PER_LETTER = 34; // degrees between adjacent letters, so the word spans most of the spectrum at once
 
 const CHARACTER_ANGLE = -Math.PI / 4; // matches renderPlayerPortrait's own flattering 3/4 view
 const CHARACTER_SCALE_RATIO = 0.006; // character scale as a fraction of the shorter canvas dimension
@@ -26,7 +24,7 @@ const PROMPT_PULSE_SPEED = 3; // rad/s
 
 const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-// Large centered idle unicorn, a shifting rainbow "PEGACORN" over a
+// Large centered idle unicorn, a static rainbow "PEGACORN" over a
 // permanently red "BLOOD", and a pulsing "click/tap anywhere" prompt at the
 // bottom -- the whole thing is HUD-space (raw canvas pixels), so it's
 // unaffected by any camera. Calls `onBegin()` on the first pointer press
@@ -89,11 +87,10 @@ function MainMenu(onBegin) {
       // word's own centered left edge.
       context.font = font;
       context.textAlign = 'left';
-      const baseHue = (anim * HUE_ROTATION_SPEED) % 360;
       const widths = [...TITLE_TOP].map((c) => context.measureText(c).width);
       let x = cx - widths.reduce((a, b) => a + b, 0) / 2;
       [...TITLE_TOP].forEach((c, i) => {
-        context.fillStyle = `hsl(${(baseHue + i * HUE_STEP_PER_LETTER) % 360}, 100%, 65%)`;
+        context.fillStyle = `hsl(${i * 34}, 100%, 65%)`;
         context.fillText(c, x, topY);
         x += widths[i];
       });
