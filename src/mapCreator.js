@@ -366,13 +366,17 @@ function buildDungeon(seed) {
       // Grid coordinates name cell centers; the exact floor rectangle
       // starts half a tile before the first center, not at that center.
       const center = toWorld(room.x + (room.w - 1) / 2, room.y + (room.h - 1) / 2);
-      // One small grate per entrance cell instead of a merged door-wide
-      // one -- reuses the same entrance-cell detection chest/chalice
-      // placement already needs (see roomEntrancePoints/findEntranceCells)
-      // rather than a bespoke per-side door-merging scan.
-      const doorways = roomEntrancePoints(room).map((p) => ({
-        x: p.x, y: p.y, w: TILE, h: TILE,
-      }));
+      // One tile-sized grate per corridor cell touching the room from
+      // outside (the ring around it, minus corners), so a closing grate
+      // can never land on -- and push out -- a player who just entered.
+      const doorways = [];
+      for (let i = -1; i <= room.w; i++) {
+        for (let j = -1; j <= room.h; j++) {
+          if ((i < 0 || i === room.w) !== (j < 0 || j === room.h) && floorSet.has(`${room.x + i},${room.y + j}`)) {
+            doorways.push({ ...toWorld(room.x + i, room.y + j), w: TILE, h: TILE });
+          }
+        }
+      }
       add(CombatRoom({ ...center, w: room.w * TILE, h: room.h * TILE }, doorways, enemies));
     }
 

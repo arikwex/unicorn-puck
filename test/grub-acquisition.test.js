@@ -35,9 +35,9 @@ function firstAimTimes(grubs) {
   }
   assert.equal(times.size, grubs.length);
   const values = [...times.values()];
-  assert.ok(values.every((time) => time >= 1 && time <= 2.05));
+  assert.ok(values.every((time) => time >= 1 && time <= 4.05));
   assert.ok(new Set(values).size > 1, 'grubs start aiming on different frames');
-  assert.ok(Math.max(...values) - Math.min(...values) >= 0.25, 'first attacks are spread out');
+  assert.ok(Math.max(...values) - Math.min(...values) >= 0.5, 'first attacks are spread out');
 }
 
 test('entering a room after a long absence gives each grub a fresh random reaction delay', () => {

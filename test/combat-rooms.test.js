@@ -257,6 +257,35 @@ test('map creation attaches seeded combat rooms to their weighted enemy budget a
   assert.equal(getObjectsByTag(TAG_OBSTACLE).length, unlocked.size, 'a fresh map starts with every gate open');
 });
 
+test('generated grates close in the corridors, never on a player who just triggered the lock', () => {
+  for (const seed of [1, 42, 2026]) {
+    clear();
+    const { player } = createMap(seed);
+    for (const room of getObjectsByTag(TAG_COMBAT_ROOM)) {
+      const open = new Set(getObjectsByTag(TAG_OBSTACLE));
+      const { x, y, w, h } = room.bounds;
+      player.x = x; player.y = y;
+      room.update();
+      const grates = getObjectsByTag(TAG_OBSTACLE).filter((object) => !open.has(object));
+      assert.ok(grates.length > 0);
+      for (const grate of grates) {
+        const gapX = Math.abs(grate.x - x) - (w + grate.w) / 2;
+        const gapY = Math.abs(grate.y - y) - (h + grate.h) / 2;
+        assert.ok(Math.max(gapX, gapY) > -1e-6, 'grate lies outside the room');
+        assert.ok(Math.abs(Math.max(gapX, gapY)) < 1e-6, 'grate is flush with the room edge');
+        // Just past the activation line, straight in from this grate.
+        const inset = player.radius + 16 + 1e-3;
+        Object.assign(player, gapX > gapY
+          ? { x: x + Math.sign(grate.x - x) * (w / 2 - inset), y: grate.y }
+          : { x: grate.x, y: y + Math.sign(grate.y - y) * (h / 2 - inset) });
+        assert.ok(grates.every((other) => !contact(player, other)), 'closing grates never overlap the player');
+      }
+      room.enemies.forEach((enemy) => { enemy.hp = 0; });
+      room.update();
+    }
+  }
+});
+
 test('collecting the final chalice cannot win until the active combat room is cleared', () => {
   startGameFlow();
   listeners.get('pointerdown')();
