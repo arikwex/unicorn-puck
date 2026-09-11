@@ -1,6 +1,6 @@
 import { TAG_OBSTACLE } from './tags.js';
 
-const OVERHANG_RATIO = 0.75;
+const OVERHANG_RATIO = 0.25;
 
 function CubeObstacle(x = 0, y = 0, w = 60, h = 60, props = {}) {
   // Dark violet stone, matching the sanctuary reference art's wall/column
