@@ -7,8 +7,12 @@ import { mulberry32 } from './donjonDungeon.js';
 const WALL_MARGIN = 2; // min cells a pillar must sit inset from the room's own walls
 const ENTRANCE_CLEARANCE = 2; // min cells (Manhattan) from any entrance cell -- never blocks a doorway
 const MIN_ROOM_SPAN = 5; // smaller rooms (either axis) get no pillars -- too cramped to matter
+// Rooms currently come in only two footprints, 9 or 15 cells per axis (see
+// donjonDungeon.js's ROOM_MIN/MAX_SIZE post-inflation) -- 12 sits cleanly
+// between them, so this flags exactly the 15-either-axis rooms as "large".
+const LARGE_ROOM_SPAN = 12; // either axis at least this big always gets a pillar, no skipping
 const MIN_PILLAR_SPACING = 2; // min cells between two pillars placed in the same room
-const SKIP_ROOM_CHANCE = 0.08; // even an eligible room sometimes just goes without, for variety -- but rare now
+const SKIP_ROOM_CHANCE = 0.08; // even an eligible small/medium room sometimes just goes without, for variety
 const COLONNADE_COUNT = 3; // pillars per row in a colonnade pattern
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -88,7 +92,8 @@ const PATTERNS = [
 
 function placeInRoom(rng, room, floorSet) {
   if (room.w < MIN_ROOM_SPAN || room.h < MIN_ROOM_SPAN) return [];
-  if (rng() < SKIP_ROOM_CHANCE) return [];
+  const isLarge = room.w >= LARGE_ROOM_SPAN || room.h >= LARGE_ROOM_SPAN;
+  if (!isLarge && rng() < SKIP_ROOM_CHANCE) return [];
 
   const innerX0 = room.x + WALL_MARGIN;
   const innerX1 = room.x + room.w - 1 - WALL_MARGIN;
@@ -112,6 +117,19 @@ function placeInRoom(rng, room, floorSet) {
     if (placed.some((other) => manhattan(other, cell) < MIN_PILLAR_SPACING)) return;
     placed.push(cell);
   });
+
+  // A large room reads as too bare without at least one pillar -- if the
+  // rolled pattern's every candidate got rejected (too close to a doorway
+  // or to each other), fall back to whatever floor cell sits nearest the
+  // room's own center rather than leaving it empty.
+  if (isLarge && placed.length === 0) {
+    const center = {
+      x: Math.round(innerX0 + (innerX1 - innerX0) / 2),
+      y: Math.round(innerY0 + (innerY1 - innerY0) / 2),
+    };
+    const cell = nearestFloorCell(center, floorCells);
+    if (cell) placed.push(cell);
+  }
 
   return placed;
 }
