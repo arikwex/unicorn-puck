@@ -265,6 +265,7 @@ test('generated grates close in the corridors, never on a player who just trigge
       const open = new Set(getObjectsByTag(TAG_OBSTACLE));
       const { x, y, w, h } = room.bounds;
       player.x = x; player.y = y;
+      room.enemies.forEach((enemy) => Object.assign(enemy, { x, y })); // clear of every doorway
       room.update();
       const grates = getObjectsByTag(TAG_OBSTACLE).filter((object) => !open.has(object));
       assert.ok(grates.length > 0);
@@ -275,10 +276,13 @@ test('generated grates close in the corridors, never on a player who just trigge
         assert.ok(Math.abs(Math.max(gapX, gapY)) < 1e-6, 'grate is flush with the room edge');
         // Just past the activation line, straight in from this grate.
         const inset = player.radius + 16 + 1e-3;
-        Object.assign(player, gapX > gapY
-          ? { x: x + Math.sign(grate.x - x) * (w / 2 - inset), y: grate.y }
-          : { x: grate.x, y: y + Math.sign(grate.y - y) * (h / 2 - inset) });
+        const [nx, ny] = gapX > gapY ? [Math.sign(grate.x - x), 0] : [0, Math.sign(grate.y - y)];
+        Object.assign(player, { x: nx ? x + nx * (w / 2 - inset) : grate.x, y: ny ? y + ny * (h / 2 - inset) : grate.y });
         assert.ok(grates.every((other) => !contact(player, other)), 'closing grates never overlap the player');
+        // Backing straight out at full launch speed (30 fps) still bounces back in.
+        Object.assign(player, { vx: nx * 1800, vy: ny * 1800 });
+        for (let i = 0; i < 20; i++) player.update(1 / 30);
+        assert.ok(Math.abs(player.x - x) < w / 2 && Math.abs(player.y - y) < h / 2, 'no escaping a locked room');
       }
       room.enemies.forEach((enemy) => { enemy.hp = 0; });
       room.update();
