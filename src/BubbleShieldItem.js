@@ -1,8 +1,8 @@
-import { emit } from './bus.js';
 import { renderBubbleShield, SHIELD_COLOR } from './bubbleShield.js';
 import DamageCallout from './DamageCallout.js';
 import { add, getObjectsByTag } from './engine.js';
 import { TAG_PLAYER } from './tags.js';
+import { showItemCollectedToast } from './ToastSystem.js';
 
 const SPAWN_PROTECTION = 0.3;
 const PICKUP_RADIUS = 40;
@@ -24,7 +24,7 @@ function BubbleShieldItem(x, y) {
       collected = true;
       player.addBubbleShield();
       add(DamageCallout(this.x, this.y - 20, '+1 shield', SHIELD_COLOR));
-      emit('item-collected', { name: 'Bubble Shield' });
+      showItemCollectedToast('Bubble Shield');
       return true;
     },
     render(context) {

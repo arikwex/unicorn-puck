@@ -1,4 +1,3 @@
-import { on } from './bus.js';
 import { canvas } from './canvas.js';
 import { playItemCollected } from './sounds.js';
 
@@ -8,32 +7,31 @@ const FADE_OUT = 0.25;
 const HEIGHT = 44;
 const MARGIN = 24;
 
-function ToastSystem() {
-  let message;
-  let elapsed = 0;
-  let unsubscribe = [];
+// Module-singleton message state (like chaliceProgress.js's own pattern) --
+// whichever caller wants a toast shown just calls showToast()/
+// showItemCollectedToast() directly, read here every frame by the one
+// ToastSystem HUD instance. Replaces the old event-bus emit('toast', ...)/
+// on('toast', ...) pair, which only ever had this one subscriber.
+let message;
+let elapsed = 0;
 
-  function show(text, itemCollected = false) {
-    message = text;
-    elapsed = 0;
-    if (itemCollected) playItemCollected();
-  }
+function showToast(text) {
+  message = text;
+  elapsed = 0;
+}
+
+function showItemCollectedToast(name) {
+  showToast(`${name} Collected`);
+  playItemCollected();
+}
+
+function ToastSystem() {
+  message = undefined;
+  elapsed = 0;
 
   return {
     hudAnchor: [0.5, 1],
     order: 1e6,
-
-    start() {
-      unsubscribe = [
-        on('item-collected', ({ name }) => show(`${name} Collected`, true)),
-        on('toast', ({ message }) => show(message)),
-      ];
-    },
-
-    destroy() {
-      unsubscribe.forEach((off) => off());
-      message = undefined;
-    },
 
     update(dt) {
       if (!message) return;
@@ -69,3 +67,4 @@ function ToastSystem() {
 }
 
 export default ToastSystem;
+export { showItemCollectedToast, showToast };

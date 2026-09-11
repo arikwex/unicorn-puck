@@ -3,9 +3,9 @@
 // get grabbed by the same swing that dropped it (see TreasureChest.js).
 
 import DamageCallout from './DamageCallout.js';
-import { emit } from './bus.js';
 import { add, getObjectsByTag } from './engine.js';
 import { TAG_PLAYER } from './tags.js';
+import { showItemCollectedToast } from './ToastSystem.js';
 
 const TAU = Math.PI * 2;
 const HEAL_AMOUNT = 2;
@@ -71,7 +71,7 @@ function HealthItem(x, y) {
       collected = true;
       const healed = player.heal(HEAL_AMOUNT);
       add(DamageCallout(this.x, this.y - 20, `+${healed} hp`, HEAL_TEXT_COLOR));
-      emit('item-collected', { name: 'Health Potion' });
+      showItemCollectedToast('Health Potion');
       return true;
     },
 

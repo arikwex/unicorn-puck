@@ -5,12 +5,12 @@
 // participation, just a proximity check), incrementing the shared
 // chaliceProgress counter GameFlow.js watches for the win condition.
 
-import { emit } from './bus.js';
 import { fillEllipse } from './canvasShapes.js';
 import { getObjectsByTag } from './engine.js';
 import { collectChalice } from './chaliceProgress.js';
 import { fireSplatBurst } from './SplatEffect.js';
 import { TAG_PLAYER } from './tags.js';
+import { showItemCollectedToast } from './ToastSystem.js';
 
 const TAU = Math.PI * 2;
 const WORLD_SCALE = 1.5; // the in-scene chalice, 50% larger than the base icon size
@@ -84,7 +84,7 @@ function Chalice(x, y) {
       collected = true;
       collectChalice();
       fireSplatBurst(this.x, this.y, COLLECT_SPLAT_COUNT, COLLECT_SPLAT_COLORS, COLLECT_SPLAT_SPEED_MAX, COLLECT_SPLAT_SIZE_MIN, COLLECT_SPLAT_SIZE_MAX);
-      emit('item-collected', { name: 'Pegacorn Blood Chalice' });
+      showItemCollectedToast('Pegacorn Blood Chalice');
       return true;
     },
 

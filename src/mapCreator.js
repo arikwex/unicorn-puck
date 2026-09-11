@@ -1,5 +1,4 @@
 import BubbleShieldItem from './BubbleShieldItem.js';
-import { emit } from './bus.js';
 import Camera from './camera.js';
 import Chalice from './Chalice.js';
 import { resetChalices } from './chaliceProgress.js';
@@ -24,7 +23,7 @@ import placePillars, { findEntranceCells } from './placePillars.js';
 import PlayerCharacter from './PlayerCharacter.js';
 import PlayerHealthHUD from './PlayerHealthHUD.js';
 import TreasureChest, { CHEST_RADIUS } from './TreasureChest.js';
-import ToastSystem from './ToastSystem.js';
+import ToastSystem, { showToast } from './ToastSystem.js';
 
 // Each room has an enemy budget: small grubs cost one, large grubs two.
 // Grubs are scattered to their own spots within the
@@ -512,7 +511,7 @@ function createMap(seed) {
   add(ToastSystem());
   // Shown instantly (not after any delay) since it's establishing the
   // whole game's premise, not reacting to something the player just did.
-  emit('toast', { message: 'Collect all Pegacorn Blood Chalices to win!' });
+  showToast('Collect all Pegacorn Blood Chalices to win!');
   add(Camera().follow(player));
   const dragController = add(DragController(player));
   add(PhysicsWorld());

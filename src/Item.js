@@ -1,14 +1,14 @@
 // A dropped item ability -- one of ItemAbility.js's catalog, bobbing gently
 // in the world until the player walks over it. Collected the same way as
 // Chalice.js (no physics, just a proximity check), granting its effect
-// immediately and announcing itself via the same 'item-collected' toast
-// event Chalice.js already uses.
+// immediately and announcing itself via the same item-collected toast
+// Chalice.js already uses.
 
-import { emit } from './bus.js';
 import { getObjectsByTag } from './engine.js';
 import { collectItemAbility, ITEM_ABILITY_CATALOG } from './ItemAbility.js';
 import { fireSplatBurst } from './SplatEffect.js';
 import { TAG_PLAYER } from './tags.js';
+import { showItemCollectedToast } from './ToastSystem.js';
 
 const TAU = Math.PI * 2;
 const PICKUP_RADIUS = 26;
@@ -44,7 +44,7 @@ function Item(x, y, abilityId) {
       collected = true;
       collectItemAbility(abilityId, player);
       fireSplatBurst(this.x, this.y, COLLECT_SPLAT_COUNT, COLLECT_SPLAT_COLORS, COLLECT_SPLAT_SPEED_MAX, COLLECT_SPLAT_SIZE_MIN, COLLECT_SPLAT_SIZE_MAX);
-      emit('item-collected', { name: ability.name });
+      showItemCollectedToast(ability.name);
       return true;
     },
 

@@ -1,9 +1,9 @@
-import { emit } from './bus.js';
 import { add, getObjectsByTag, remove } from './engine.js';
 import MetalGrate from './MetalGrate.js';
 import { playCombatImpact } from './sounds.js';
 import SplatEffect from './SplatEffect.js';
 import { TAG_COMBAT_ROOM, TAG_PLAYER } from './tags.js';
+import { showToast } from './ToastSystem.js';
 
 const ACTIVATION_PADDING = 16; // extra clearance beyond the player's collision radius
 
@@ -59,7 +59,7 @@ function CombatRoom(bounds, doorways, enemies) {
         grates = doorways.map((door) => add(MetalGrate(door)));
         doorways.forEach(splash);
         playCombatImpact();
-        emit('toast', { message: 'Defeat all enemies to exit room' });
+        showToast('Defeat all enemies to exit room');
       }
     },
 

@@ -23,6 +23,9 @@ Item abilities (All very simple solid color with 6px thick outline shapes. Hiero
 Items show up as a stack of: icon + name/description (description under name saying what the buff is in 3-5 words)
 Items stacked in order they are found (under the chalice part of the hud, equidistance as collected).
 
+Mobile hud:
+- the minimap should be bottom left of the screen always (desktop too) and the player placement dot should be WHITE not red.
+- All HUD contents on mobile mode must be x0.5 size size they're occupying way too much of the screen
 
 
 Game Mechanics:
