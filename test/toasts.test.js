@@ -38,7 +38,7 @@ afterEach(() => {
 function draw(toasts) {
   const result = { text: [], panels: [] };
   const saved = [];
-  toasts.renderHUD({
+  toasts.hud({
     globalAlpha: 1,
     save() { saved.push(this.globalAlpha); },
     restore() { this.globalAlpha = saved.pop(); },
@@ -55,14 +55,14 @@ test('an item toast shows bottom-center for 3.5 seconds with one chime', () => {
   assert.equal(draw(toasts).text.length, 0);
   showItemCollectedToast('Health Potion');
   assert.equal(soundStarts, 1);
-  toasts.update(0.2);
+  toasts.tick(0.2);
   assert.deepEqual(draw(toasts).text, [
     { text: 'Health Potion Collected', x: 400, y: 554, alpha: 1 },
   ]);
-  toasts.update(3.2);
+  toasts.tick(3.2);
   assert.equal(draw(toasts).text.length, 1);
   assert.equal(soundStarts, 1);
-  toasts.update(0.11);
+  toasts.tick(0.11);
   assert.equal(draw(toasts).text.length, 0);
   assert.equal(soundStarts, 1);
 });
@@ -72,16 +72,16 @@ test('new pickups immediately replace the toast and restart its duration with on
   showItemCollectedToast('Health Potion');
   assert.equal(soundStarts, 1);
   assert.equal(draw(toasts).text[0].text, 'Health Potion Collected');
-  toasts.update(3);
+  toasts.tick(3);
   showItemCollectedToast('Pegacorn Blood Chalice');
   assert.equal(soundStarts, 2);
   assert.equal(draw(toasts).text[0].text, 'Pegacorn Blood Chalice Collected');
-  toasts.update(3.4);
+  toasts.tick(3.4);
   assert.equal(draw(toasts).text.length, 1);
-  toasts.update(0.11);
+  toasts.tick(0.11);
   assert.equal(draw(toasts).text.length, 0);
   assert.equal(soundStarts, 2);
-  toasts.update(10);
+  toasts.tick(10);
   assert.equal(draw(toasts).text.length, 0, 'replaced toasts never reappear');
 });
 
@@ -100,7 +100,7 @@ test('long item names fit inside a narrow screen', () => {
   canvas.width = 320;
   const toasts = add(ToastSystem());
   showItemCollectedToast('Pegacorn Blood Chalice');
-  toasts.update(0.2);
+  toasts.tick(0.2);
   const result = draw(toasts);
   assert.deepEqual(result.panels, [[24, 532, 272, 44]]);
   assert.equal(result.text[0].x, 160);
@@ -109,7 +109,7 @@ test('long item names fit inside a narrow screen', () => {
 test('health pickup toasts once after spawn protection, including at full health', () => {
   const toasts = add(ToastSystem());
   const player = add({
-    x: 0, y: 0, radius: 20, hp: 3, tags: [TAG_PLAYER],
+    x: 0, y: 0, r: 20, hp: 3, tags: [TAG_PLAYER],
     heal(amount) {
       const healed = Math.min(amount, 5 - this.hp);
       this.hp += healed;
@@ -117,23 +117,23 @@ test('health pickup toasts once after spawn protection, including at full health
     },
   });
   const item = HealthItem(0, 0);
-  assert.equal(item.update(0.1), false);
+  assert.equal(item.tick(0.1), false);
   assert.equal(draw(toasts).text.length, 0);
-  assert.equal(item.update(0.21), true);
+  assert.equal(item.tick(0.21), true);
   assert.equal(player.hp, 5);
   assert.equal(draw(toasts).text[0].text, 'Health Potion Collected');
   assert.equal(soundStarts, 1);
-  assert.equal(HealthItem(0, 0).update(0.31), true);
+  assert.equal(HealthItem(0, 0).tick(0.31), true);
   assert.equal(player.hp, 5);
   assert.equal(soundStarts, 2);
 });
 
 test('chalice pickup toasts once and uses only the toast chime', () => {
   const toasts = add(ToastSystem());
-  add({ x: 0, y: 0, radius: 20, tags: [TAG_PLAYER] });
+  add({ x: 0, y: 0, r: 20, tags: [TAG_PLAYER] });
   resetChalices(2);
   const item = Chalice(0, 0);
-  assert.equal(item.update(0.1), true);
+  assert.equal(item.tick(0.1), true);
   assert.equal(draw(toasts).text[0].text, 'Pegacorn Blood Chalice Collected');
   assert.equal(chaliceProgress().collected, 1);
   assert.equal(soundStarts, 1);
@@ -149,6 +149,6 @@ test('generic and pickup toasts replace each other immediately without replaying
   showItemCollectedToast('Bubble Shield');
   assert.equal(draw(toasts).text[0].text, 'Bubble Shield Collected');
   assert.equal(soundStarts, 3);
-  toasts.update(3.5);
+  toasts.tick(3.5);
   assert.equal(draw(toasts).text.length, 0);
 });

@@ -11,14 +11,14 @@ function BubbleShieldItem(x, y) {
   let anim = 0;
   let protection = SPAWN_PROTECTION;
   return {
-    x, y, order: y,
-    update(dt) {
+    x, y, z: y,
+    tick(dt) {
       anim += dt;
       protection = Math.max(0, protection - dt);
       if (protection > 0) return false;
       const player = getObjectsByTag(TAG_PLAYER)[0];
       if (!player || player.hp <= 0
-        || Math.hypot(player.x - this.x, player.y - this.y) > PICKUP_RADIUS + player.radius) return false;
+        || Math.hypot(player.x - this.x, player.y - this.y) > PICKUP_RADIUS + player.r) return false;
       player.addBubbleShield();
       add(DamageCallout(this.x, this.y - 20, '+1 shield', SHIELD_COLOR));
       showItemCollectedToast('Bubble Shield');

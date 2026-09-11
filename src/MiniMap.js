@@ -25,7 +25,7 @@ function MiniMap(player, worldSpan, worldMin) {
 
   return {
     hudAnchor: [0, 1],
-    renderHUD(context) {
+    hud(context) {
       if (!player.oracleEyes) return;
       const toMap = (wx, wy) => [
         (wx - worldMin) * scale,

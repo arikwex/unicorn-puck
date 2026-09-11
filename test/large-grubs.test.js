@@ -48,7 +48,7 @@ test('large type has 40% larger collision geometry, three extra HP, and costs tw
   const large = make('large');
   assert.equal(large.hp, small.hp + 3);
   assert.equal(large.maxHp, 8);
-  assert.equal(large.radius, small.radius * 1.4);
+  assert.equal(large.r, small.r * 1.4);
   assert.equal(small.enemyCost, 1);
   assert.equal(large.enemyCost, 2);
   assert.equal(Grub(0, 0, room, 1).large, false);
@@ -58,7 +58,7 @@ test('body, face, tell, and recovery scale together; large grubs add orange eyes
   const small = make('small'); const large = make('large');
   for (const angle of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
     for (const state of [PATROL, AIMING, RECOVERING]) {
-      for (const grub of [small, large]) Object.assign(grub, { angle, anim: 0, state, aimProgress: 0.75 });
+      for (const grub of [small, large]) Object.assign(grub, { a: angle, anim: 0, state, aimT: 0.75 });
       const smallCalls = draw(small); const largeCalls = draw(large);
       const arcs = (calls) => calls.filter(({ method }) => method === 'arc').map(({ args }) => args);
       const a = arcs(smallCalls); const b = arcs(largeCalls);
@@ -83,14 +83,14 @@ test('large grubs fire a symmetric three-shot forward fan from their enlarged mo
     clear(); soundStarts = 0;
     const player = add(PlayerCharacter(200, 0));
     const grub = add(make(type));
-    for (let frame = 0; frame < 100 && grub.state !== AIMING; frame++) grub.update(0.05);
+    for (let frame = 0; frame < 100 && grub.state !== AIMING; frame++) grub.tick(0.05);
     assert.equal(grub.state, AIMING);
     const position = [grub.x, grub.y];
-    grub.update(1.99);
+    grub.tick(1.99);
     assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 0);
-    grub.aimProgress = 1;
+    grub.aimT = 1;
     const mouth = draw(grub).filter(({ method, args }) => method === 'arc' && args[2] === 4 * grub.size).at(-1).args;
-    grub.update(0.01);
+    grub.tick(0.01);
     const shots = getObjectsByTag(TAG_PROJECTILE);
     assert.equal(shots.length, type === 'large' ? 3 : 1);
     assert.equal(soundStarts, 1, 'one shot sound per volley');
@@ -105,16 +105,16 @@ test('large grubs fire a symmetric three-shot forward fan from their enlarged mo
         type === 'large' ? ['#f93', '#fdb'] : ['#4f5', '#dfd']);
     });
     assert.equal(grub.state, RECOVERING);
-    grub.update(0.1);
+    grub.tick(0.1);
     assert.equal(getObjectsByTag(TAG_PROJECTILE).length, shots.length);
     const before = new Set(getObjects());
-    shots[0].update(100 / 340);
+    shots[0].tick(100 / 340);
     const splats = getObjects().filter((object) => !before.has(object));
     assert.ok(splats.length > 0);
     for (const splat of splats) {
       const color = type === 'large' ? '#f93' : '#4f5';
       assert.ok(draw(splat).some((call) => call.method === 'stroke' && call.stroke === color));
-      splat.update(1);
+      splat.tick(1);
       assert.ok(draw(splat).some((call) => call.method === 'fill' && call.color === color));
     }
   }
@@ -125,8 +125,8 @@ test('large grub hit and death splashes are orange while small grub colors are u
     clear();
     const grub = make(type);
     const player = PlayerCharacter();
-    player.charge = 1;
-    player.impactDamageBonus = 100;
+    player.chg = 1;
+    player.horn = 100;
     assert.equal(grub.hit(player), true);
     const colors = getObjects().flatMap((effect) => draw(effect)
       .filter(({ method }) => method === 'stroke').map(({ stroke }) => stroke));
@@ -138,12 +138,12 @@ test('large grub hit and death splashes are orange while small grub colors are u
 test('large grubs retain hit cooldown, white outline flash and an eight-slot health bar', () => {
   const grub = make('large');
   const player = PlayerCharacter();
-  player.charge = 0.5;
+  player.chg = 0.5;
   grub.hit(player);
   assert.equal(grub.hp, 7);
   grub.hit(player);
   assert.equal(grub.hp, 7, 'same-hit cooldown still applies');
-  grub.update(0.1);
+  grub.tick(0.1);
   const calls = draw(grub);
   const healthTicks = calls.filter(({ method, color }) => method === 'fillRect' && color === '#4c5');
   assert.equal(healthTicks.length, 7);
@@ -155,14 +155,14 @@ test('a large grub keeps combat locked until it dies, then clears once despite i
   add(PlayerCharacter());
   const small = make('small'); const large = make('large');
   const encounter = add(CombatRoom(room, [{ x: -550, y: 0, w: 100, h: 200 }], [small, large]));
-  encounter.update();
+  encounter.tick();
   assert.equal(encounter.state, ACTIVE);
   small.hp = 0;
   large.hp = 1;
-  encounter.update();
+  encounter.tick();
   assert.equal(encounter.state, ACTIVE);
   large.hp = 0;
-  encounter.update();
+  encounter.tick();
   assert.equal(encounter.state, CLEARED);
   assert.equal(soundStarts, 2, 'one start cue and one clear cue');
 });

@@ -30,7 +30,7 @@ function render(menu) {
       });
     },
   });
-  menu.renderHUD(context);
+  menu.hud(context);
   return calls;
 }
 
@@ -57,7 +57,7 @@ test('menu reuses wall, pillar and chalice art without adding gameplay objects',
 test('menu scenery animates without starting gameplay', () => {
   const menu = MainMenu(() => assert.fail('animation must not start the game'));
   const before = render(menu);
-  menu.update(0.2);
+  menu.tick(0.2);
   const after = render(menu);
   const flamePaths = (calls) => calls.filter(({ method }) => method === 'quadraticCurveTo');
   assert.notDeepEqual(flamePaths(before), flamePaths(after));

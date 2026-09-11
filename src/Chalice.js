@@ -66,15 +66,15 @@ function Chalice(x, y) {
   return {
     x,
     y,
-    order: y,
+    z: y,
 
-    update(dt) {
+    tick(dt) {
       anim += dt;
 
       const player = getObjectsByTag(TAG_PLAYER)[0];
       if (!player) return false;
       const distance = Math.hypot(player.x - this.x, player.y - this.y);
-      if (distance > PICKUP_RADIUS + player.radius) return false;
+      if (distance > PICKUP_RADIUS + player.r) return false;
 
       collectChalice();
       fireSplatBurst(this.x, this.y, COLLECT_SPLAT_COUNT, COLLECT_SPLAT_COLORS, COLLECT_SPLAT_SPEED_MAX, COLLECT_SPLAT_SIZE_MIN, COLLECT_SPLAT_SIZE_MAX);

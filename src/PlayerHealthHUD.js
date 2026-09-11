@@ -13,9 +13,9 @@ const BAR_HEIGHT = 30;
 function PlayerHealthHUD(player) {
   return {
     hudAnchor: [0, 0],
-    renderHUD(context) {
+    hud(context) {
       renderPlayerPortrait(context, PORTRAIT_X, PORTRAIT_Y, PORTRAIT_SCALE);
-      const shields = player.bubbleShields;
+      const shields = player.shields;
       const slots = Math.max(player.maxHp, player.hp + shields);
       // Preserve ordinary tick size when adding overflow slots, but fit
       // the screen for large stacks. Actual maxHp is never modified.

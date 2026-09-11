@@ -57,10 +57,10 @@ const LARGE_SPREAD_ANGLE = Math.PI / 12;
 // -- combat -----------------------------------------------------------------
 const MAX_HP = 5;
 // Damage is always 1, except at a genuinely fast (high-charge) hit, where
-// it's 2 -- never more. player.charge is itself already a function of
+// it's 2 -- never more. player.chg (charge) is itself already a function of
 // speed (see PlayerCharacter.js), so gating off it is gating off speed.
 const HIGH_CHARGE_DAMAGE_THRESHOLD = 0.7;
-const CHARGING_THRESHOLD = 0.15; // player.charge above this counts as "charging" for damage purposes
+const CHARGING_THRESHOLD = 0.15; // player.chg above this counts as "charging" for damage purposes
 const HIT_COOLDOWN = 0.6; // seconds between hits even while still touching
 const FLASH_DURATION = 0.25;
 const KNOCKBACK_TRANSFER = 0.6; // fraction of incoming player velocity
@@ -68,7 +68,7 @@ const KNOCKBACK_DECAY = 16; // exponential velocity decay per second
 const AIM_DURATION = 2;
 // After firing, the body eases back to its idle pose over this long instead
 // of snapping -- reuses the aim pose's own rise/pullback curve, played in
-// reverse via aimProgress counting back down to 0.
+// reverse via aimT counting back down to 0.
 const RECOVER_DURATION = 0.35;
 const ATTACK_DELAY_MIN = 1;
 const ATTACK_DELAY_MAX = 4;
@@ -114,7 +114,7 @@ function segmentPosition(grub, index) {
     // Rise smoothly during the first part of the tell, then keep drawing
     // backward along local -x as the spit winds up. Height is screen-up,
     // while the bend rotates with the grub's facing direction below.
-    const progress = Math.max(0, Math.min(1, grub.aimProgress));
+    const progress = Math.max(0, Math.min(1, grub.aimT));
     const riseT = Math.min(1, progress / 0.45);
     const rise = riseT * riseT * (3 - 2 * riseT);
     along += (AIM_SEGMENT_ALONG[index] - along) * rise
@@ -129,11 +129,11 @@ function segmentPosition(grub, index) {
       jitterX = shake / 1.5 * AIM_SEGMENT_JITTER[index] * progress * progress;
     }
   } else if (grub.state === RECOVERING) {
-    // aimProgress counts back down from 1 (the instant of firing, still in
+    // aimT counts back down from 1 (the instant of firing, still in
     // the fully pulled-back pose) to 0 (idle). Smoothstep it directly --
     // no plateau this time -- so the body eases toward idle across the
     // whole recovery instead of snapping.
-    const progress = Math.max(0, Math.min(1, grub.aimProgress));
+    const progress = Math.max(0, Math.min(1, grub.aimT));
     const settle = progress * progress * (3 - 2 * progress);
     along += (AIM_SEGMENT_ALONG[index] - along) * settle;
     lift = AIM_SEGMENT_LIFT[index] * settle;
@@ -160,17 +160,17 @@ function segmentPosition(grub, index) {
     motionY = (1 - Math.abs(Math.sin(grub.anim * 6.0 + index * 2))) * (8 - index) * 1;
   }
   return {
-    x: grub.x + (Math.cos(grub.angle) * along + jitterX) * grub.size,
-    y: grub.y + (-Math.sin(grub.angle) * along * SPINE_PERSPECTIVE - SEGMENT_RADII[index] / 2 + motionY - lift) * grub.size,
-    radius: SEGMENT_RADII[index] * grub.size,
+    x: grub.x + (Math.cos(grub.a) * along + jitterX) * grub.size,
+    y: grub.y + (-Math.sin(grub.a) * along * SPINE_PERSPECTIVE - SEGMENT_RADII[index] / 2 + motionY - lift) * grub.size,
+    r: SEGMENT_RADII[index] * grub.size,
   };
 }
 
 function renderBackSpike(context, segment, size, flash) {
   context.beginPath();
-  context.moveTo(segment.x - segment.radius * 0.45, segment.y - segment.radius * 0.6);
-  context.lineTo(segment.x, segment.y - segment.radius * 1.9);
-  context.lineTo(segment.x + segment.radius * 0.45, segment.y - segment.radius * 0.6);
+  context.moveTo(segment.x - segment.r * 0.45, segment.y - segment.r * 0.6);
+  context.lineTo(segment.x, segment.y - segment.r * 1.9);
+  context.lineTo(segment.x + segment.r * 0.45, segment.y - segment.r * 0.6);
   context.closePath();
   context.lineWidth = 5 * size;
   context.strokeStyle = '#a41';
@@ -201,7 +201,7 @@ function renderGrub(context, grub, flashTimer) {
     context.globalAlpha = alpha;
     segments.forEach((segment) => {
       context.beginPath();
-      context.arc(segment.x, segment.y, segment.radius, 0, TAU);
+      context.arc(segment.x, segment.y, segment.r, 0, TAU);
       context.stroke();
     });
   }
@@ -209,14 +209,14 @@ function renderGrub(context, grub, flashTimer) {
 
   // Positive sin faces into the page: draw head to tail so the nearer
   // rear segments cover the head. Facing out draws tail to head.
-  const facingIntoPage = Math.sin(grub.angle) > 0;
+  const facingIntoPage = Math.sin(grub.a) > 0;
   for (let step = 0; step < segments.length; step++) {
     const i = facingIntoPage ? step : segments.length - 1 - step;
     if (grub.large && i > 0) renderBackSpike(context, segments[i], grub.size, flash);
-    fillCircle(context, segments[i].x, segments[i].y, segments[i].radius, BODY_COLORS[i % BODY_COLORS.length]);
+    fillCircle(context, segments[i].x, segments[i].y, segments[i].r, BODY_COLORS[i % BODY_COLORS.length]);
     if (flash > 0) {
       context.globalAlpha = flash;
-      fillCircle(context, segments[i].x, segments[i].y, segments[i].radius, '#fff');
+      fillCircle(context, segments[i].x, segments[i].y, segments[i].r, '#fff');
       context.globalAlpha = 1;
     }
     if (i === 0) renderGrubFace(context, grub, segments[i]);
@@ -230,15 +230,15 @@ function renderGrubFace(context, grub, head) {
   const sway = Math.sin(grub.anim * 7) * 0.3;
   const color = grub.large ? LARGE_COLOR : FACE_GLOW_COLOR;
   [-1, 1].forEach((side) => {
-    if (Math.sin(grub.angle - side * 0.6) > 0.22) {
+    if (Math.sin(grub.a - side * 0.6) > 0.22) {
       return;
     }
-    const [x, y] = orbit3d(9, -4, -side * 12, grub.angle + sway);
+    const [x, y] = orbit3d(9, -4, -side * 12, grub.a + sway);
     const ex = head.x + x * grub.size;
     const ey = head.y + y * grub.size;
     fillCircle(context, ex, ey, EYE_RADIUS * grub.size, color);
   });
-  if (Math.sin(grub.angle) < 0.22) {
+  if (Math.sin(grub.a) < 0.22) {
     const mouth = mouthPosition(grub, head);
     fillCircle(context, mouth.x, mouth.y, MOUTH_RADIUS * grub.size, color);
   }
@@ -246,7 +246,7 @@ function renderGrubFace(context, grub, head) {
 
 function mouthPosition(grub, head = segmentPosition(grub, 0)) {
   const sway = Math.sin(grub.anim * 7) * 0.3;
-  const [x, y] = orbit3d(12, 5, 0, grub.angle + sway);
+  const [x, y] = orbit3d(12, 5, 0, grub.a + sway);
   return { x: head.x + x * grub.size, y: head.y + y * grub.size };
 }
 
@@ -313,19 +313,19 @@ function Grub(x, y, room, seed, props = {}) {
     enemyCost: large ? 2 : 1,
     vx: 0,
     vy: 0,
-    angle: Math.random() * TAU,
+    a: Math.random() * TAU,
     anim: Math.random() * 7,
     target: null,
     state: PATROL,
-    aimProgress: 0,
+    aimT: 0, // 0..1 through the aim tell (and back down while recovering)
     hp: maxHp,
-    order: y,
+    z: y,
     // A static circle the player bounces off (see physics.js); patrol and
     // hit momentum drive its position.
-    radius: COLLISION_RADIUS * size,
+    r: COLLISION_RADIUS * size,
     tags: [TAG_OBSTACLE, TAG_ENEMY],
 
-    update(dt) {
+    tick(dt) {
       if (this.hp <= 0) return true;
       const player = getObjectsByTag(TAG_PLAYER)[0];
       const canAim = player && player.hp > 0
@@ -341,13 +341,13 @@ function Grub(x, y, room, seed, props = {}) {
       hadAimTarget = Boolean(canAim);
 
       if (this.state === RECOVERING) {
-        // Ease aimProgress back down to 0 instead of zeroing it outright --
+        // Ease aimT back down to 0 instead of zeroing it outright --
         // segmentPosition plays the aim pose's own curve in reverse off it.
         recoverElapsed += dt;
-        this.aimProgress = Math.max(0, 1 - recoverElapsed / RECOVER_DURATION);
+        this.aimT = Math.max(0, 1 - recoverElapsed / RECOVER_DURATION);
         if (recoverElapsed >= RECOVER_DURATION) {
           this.state = PATROL;
-          this.aimProgress = 0;
+          this.aimT = 0;
         }
       } else if (this.state === AIMING) {
         // Once wound up, a shot is never canceled by losing range/sight --
@@ -355,9 +355,9 @@ function Grub(x, y, room, seed, props = {}) {
         // tracking the player live while actually reachable; otherwise
         // keep aiming at wherever it last had them.
         if (canAim) { targetX = player.x; targetY = player.y; }
-        this.angle = Math.atan2(this.y - targetY, targetX - this.x);
+        this.a = Math.atan2(this.y - targetY, targetX - this.x);
         aimElapsed += dt;
-        this.aimProgress = Math.min(1, aimElapsed / AIM_DURATION);
+        this.aimT = Math.min(1, aimElapsed / AIM_DURATION);
         if (aimElapsed >= AIM_DURATION) {
           const mouth = mouthPosition(this);
           const dx = targetX - mouth.x;
@@ -378,9 +378,9 @@ function Grub(x, y, room, seed, props = {}) {
         this.vx = this.vy = 0;
         targetX = player.x;
         targetY = player.y;
-        this.angle = Math.atan2(this.y - player.y, player.x - this.x);
+        this.a = Math.atan2(this.y - player.y, player.x - this.x);
         aimElapsed = 0;
-        this.aimProgress = 0;
+        this.aimT = 0;
       } else if (!this.target) {
         pauseTimer -= dt;
         if (pauseTimer <= 0) this.target = pickWaypoint();
@@ -397,7 +397,7 @@ function Grub(x, y, room, seed, props = {}) {
           this.y += (dy / dist) * step;
           // Same heading convention PlayerCharacter uses: y points down on
           // screen, but a larger angle swings the head "up", so negate dy.
-          this.angle = Math.atan2(-dy, dx);
+          this.a = Math.atan2(-dy, dx);
           this.anim += dt;
         }
       }
@@ -407,7 +407,7 @@ function Grub(x, y, room, seed, props = {}) {
       this.y = clamp(this.y + this.vy * dt, minY + q, maxY - q);
       this.vx -= this.vx * 4.5 * dt;
       this.vy -= this.vy * 4.5 * dt;
-      this.order = this.y;
+      this.z = this.y;
 
       flashTimer = Math.max(0, flashTimer - dt);
       hitCooldown = Math.max(0, hitCooldown - dt);
@@ -418,10 +418,10 @@ function Grub(x, y, room, seed, props = {}) {
 
     // Called by the player on contact, with its pre-bounce state.
     hit(player) {
-      if (this.hp <= 0 || hitCooldown > 0 || player.charge <= CHARGING_THRESHOLD) return;
+      if (this.hp <= 0 || hitCooldown > 0 || player.chg <= CHARGING_THRESHOLD) return;
 
       // Mithril Horn adds a flat bonus on top of the usual charge-based roll.
-      const damage = (player.charge >= HIGH_CHARGE_DAMAGE_THRESHOLD ? 2 : 1) + player.impactDamageBonus;
+      const damage = (player.chg >= HIGH_CHARGE_DAMAGE_THRESHOLD ? 2 : 1) + player.horn;
       this.hp = Math.max(0, this.hp - damage);
       playEnemyHit(damage);
       flashTimer = FLASH_DURATION;
@@ -433,10 +433,10 @@ function Grub(x, y, room, seed, props = {}) {
         // but never push it sooner (Math.min only ever pulls it earlier
         // in time, i.e. rewinds, never fast-forwards).
         aimElapsed = Math.min(aimElapsed, Math.max(0, AIM_DURATION - 1));
-        this.aimProgress = Math.min(1, aimElapsed / AIM_DURATION);
+        this.aimT = Math.min(1, aimElapsed / AIM_DURATION);
       } else {
         this.state = PATROL;
-        this.aimProgress = 0;
+        this.aimT = 0;
       }
       attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
       this.vx += player.vx * KNOCKBACK_TRANSFER;

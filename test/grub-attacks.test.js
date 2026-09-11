@@ -51,7 +51,7 @@ const room = { x: 0, y: 0, w: 1000, h: 1000 };
 function startAiming() {
   const player = add(PlayerCharacter(200, 0));
   const grub = add(Grub(0, 0, room, 123));
-  for (let i = 0; i < 100 && grub.state !== 1; i++) grub.update(0.05);
+  for (let i = 0; i < 100 && grub.state !== 1; i++) grub.tick(0.05);
   assert.equal(grub.state, 1);
   return { player, grub };
 }
@@ -59,37 +59,37 @@ function startAiming() {
 function wall(x, shape = 'box') {
   return shape === 'box'
     ? { tags: [TAG_OBSTACLE], x, y: 0, w: 2, h: 200 }
-    : { tags: [TAG_OBSTACLE], x, y: 0, radius: 20 };
+    : { tags: [TAG_OBSTACLE], x, y: 0, r: 20 };
 }
 
 // One engine update phase over just `objects` still in play (default: all).
 function step(dt, objects = getObjects()) {
-  remove(objects.filter((object) => getObjects().includes(object) && object.update?.(dt)));
+  remove(objects.filter((object) => getObjects().includes(object) && object.tick?.(dt)));
 }
 
 test('grub stays still and tracks the player for two seconds before firing once', () => {
   const { player, grub } = startAiming();
   const position = [grub.x, grub.y];
-  grub.update(1);
+  grub.tick(1);
   player.y = 100;
-  grub.update(0.99);
+  grub.tick(0.99);
   assert.deepEqual([grub.x, grub.y], position);
   assert.equal(grub.vx, 0);
   assert.equal(grub.vy, 0);
-  assert.equal(grub.angle, Math.atan2(grub.y - player.y, player.x - grub.x));
+  assert.equal(grub.a, Math.atan2(grub.y - player.y, player.x - grub.x));
   assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 0);
   const tellContext = drawingContext();
   grub.render(tellContext);
   assert.ok(tellContext.calls.filter((call) => call.method === 'arc')
     .every((call) => call.args[3] === 0 && call.args[4] === Math.PI * 2), 'tell has no progress arcs');
-  grub.update(0.01);
+  grub.tick(0.01);
   const shots = getObjectsByTag(TAG_PROJECTILE);
   assert.equal(shots.length, 1);
   const shot = shots[0];
   assert.ok(Math.abs(shot.vx * (player.y - shot.y) - shot.vy * (player.x - shot.x)) < 1e-8);
   assert.ok(Math.abs(Math.hypot(shot.vx, shot.vy) - 340) < 1e-9);
   assert.equal(grub.state, 2); // Recovery follows firing.
-  grub.update(0.5);
+  grub.tick(0.5);
   assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 1);
 });
 
@@ -101,13 +101,13 @@ test('aiming raises an S-shaped body and pulls it backward while the tail stays 
     return context.calls.filter((call) => call.method === 'arc').slice(0, 4).map((call) => call.args);
   };
   for (const angle of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
-    grub.angle = angle;
+    grub.a = angle;
     grub.state = 0; // PATROL
     const resting = segments();
     grub.state = 1; // AIMING
     let previous = resting;
     for (const progress of [0.25, 0.5, 0.75, 1]) {
-      grub.aimProgress = progress;
+      grub.aimT = progress;
       const pose = segments();
       assert.ok(pose[0][1] < resting[0][1], 'head rises for every facing direction');
       assert.deepEqual(pose[3], resting[3], 'tail remains planted');
@@ -135,21 +135,21 @@ test('aiming raises an S-shaped body and pulls it backward while the tail stays 
 test('losing the player never cancels a tell; a charging hit only delays it', () => {
   const { player, grub } = startAiming();
   player.x = 2000;
-  grub.update(2);
+  grub.tick(2);
   assert.equal(grub.state, 2, 'fired and recovering');
   const [shot] = getObjectsByTag(TAG_PROJECTILE);
   assert.ok(shot.vx > 0 && Math.abs(shot.vy) < shot.vx, 'aimed at the last known position');
   clear();
   const next = startAiming();
-  next.grub.update(1.5);
-  Object.assign(next.player, { x: next.grub.x - 60, y: next.grub.y, vx: 800, charge: 1 });
-  next.player.update(0);
+  next.grub.tick(1.5);
+  Object.assign(next.player, { x: next.grub.x - 60, y: next.grub.y, vx: 800, chg: 1 });
+  next.player.tick(0);
   assert.equal(next.grub.state, 1, 'still aiming');
-  assert.equal(next.grub.aimProgress, 0.5, 'rewound to a full second before firing');
+  assert.equal(next.grub.aimT, 0.5, 'rewound to a full second before firing');
   assert.ok(next.grub.vx > 0);
-  next.grub.update(0.9);
+  next.grub.tick(0.9);
   assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 0);
-  next.grub.update(0.2);
+  next.grub.tick(0.2);
   assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 1);
 });
 
@@ -214,11 +214,11 @@ test('overlap checks hit a moving player at 60 fps', () => {
 
 test('a miss keeps moving, and unused projectiles expire', () => {
   const shot = add(GrubProjectile(0, 0, 340, 0));
-  assert.equal(shot.update(0.1), false);
+  assert.equal(shot.tick(0.1), false);
   assert.equal(shot.x, 34);
   assert.ok(getObjects().includes(shot));
-  assert.equal(shot.update(5), false);
-  assert.equal(shot.update(1), true);
+  assert.equal(shot.tick(5), false);
+  assert.equal(shot.tick(1), true);
 });
 
 function slimeSamples() {
@@ -226,7 +226,7 @@ function slimeSamples() {
     const context = drawingContext();
     effect.render(context);
     const origin = context.calls.find((call) => call.method === 'moveTo')?.args;
-    effect.update(0.55);
+    effect.tick(0.55);
     effect.render(context);
     return context.calls.filter((call) => call.method === 'ellipse').map((call) => ({ origin, landing: call.args }));
   });
@@ -243,11 +243,11 @@ test('larger trail splats scatter randomly with 30–70 unit spacing independent
     clear();
     seed = 123;
     const shot = add(GrubProjectile(0, 0, 1000, 0));
-    assert.equal(shot.radius, 17.5);
+    assert.equal(shot.r, 17.5);
     const context = drawingContext();
     shot.render(context);
     assert.equal(context.calls.find((call) => call.method === 'arc').args[2], 17.5);
-    steps.forEach((dt) => shot.update(dt));
+    steps.forEach((dt) => shot.tick(dt));
     const splats = slimeSamples().sort((a, b) => a.origin[0] - b.origin[0]);
     const gaps = splats.map(({ origin: [x, y] }, i) => {
       assert.equal(y, 0);
@@ -290,11 +290,11 @@ test('damage produces a bright red silhouette pulse that ends after 0.6 seconds'
   assert.equal(tintPasses().at(-1).alpha, 1);
   assert.equal(tintPasses().at(-1).composite, 'source-atop');
   assert.ok(screenContext.calls.some((call) => call.method === 'drawImage'));
-  player.update(0.3);
+  player.tick(0.3);
   player.render(screenContext);
   assert.ok(tintPasses().at(-1).alpha > 0 && tintPasses().at(-1).alpha < 1);
   assert.equal(tintContexts.length, 1, 'reuse the tint canvas');
-  player.update(0.3);
+  player.tick(0.3);
   screenContext.calls.length = 0;
   player.render(screenContext);
   assert.ok(!screenContext.calls.some((call) => call.method === 'drawImage'));

@@ -11,15 +11,15 @@ function hudScale() {
 }
 
 function renderScreenHUD(object, context) {
-  if (!object.renderHUD) return;
+  if (!object.hud) return;
   const scale = object.hudAnchor ? hudScale() : 1;
   const [ax, ay] = object.hudAnchor || [0, 0];
   context.save();
   // Scale around the declared screen anchor, not the world/camera origin.
-  // Unmarked renderHUD users (aim indicator and menu) remain full-size.
+  // Unmarked hud() users (aim indicator and menu) remain full-size.
   context.setTransform(scale, 0, 0, scale,
     canvas.width * ax * (1 - scale), canvas.height * ay * (1 - scale));
-  object.renderHUD(context);
+  object.hud(context);
   context.restore();
 }
 

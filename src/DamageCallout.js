@@ -13,9 +13,9 @@ function DamageCallout(x, y, text, color = '#fff') {
   let elapsed = 0;
 
   return {
-    order: y,
+    z: y,
 
-    update(dt) {
+    tick(dt) {
       elapsed += dt;
       return elapsed >= CALLOUT_DURATION;
     },

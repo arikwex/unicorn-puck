@@ -50,18 +50,18 @@ afterEach(() => {
 
 test('each shield absorbs exactly one whole damaging hit, then is permanently consumed', () => {
   const player = PlayerCharacter();
-  assert.equal(player.bubbleShields, 0);
+  assert.equal(player.shields, 0);
   player.addBubbleShield(); player.addBubbleShield();
   player.takeDamage(0); player.takeDamage(-1);
-  assert.equal(player.bubbleShields, 2);
+  assert.equal(player.shields, 2);
   player.takeDamage(100);
-  assert.equal(player.bubbleShields, 1);
+  assert.equal(player.shields, 1);
   assert.equal(player.hp, 5);
   player.takeDamage();
-  assert.equal(player.bubbleShields, 0);
+  assert.equal(player.shields, 0);
   assert.equal(player.hp, 5);
-  player.update(100); player.heal(100);
-  assert.equal(player.bubbleShields, 0, 'time and healing do not regenerate shields');
+  player.tick(100); player.heal(100);
+  assert.equal(player.shields, 0, 'time and healing do not regenerate shields');
   player.takeDamage(2);
   assert.equal(player.hp, 3);
   assert.equal(player.maxHp, 5);
@@ -71,40 +71,40 @@ test('pickup respects spawn protection and distance, stacks at full HP, and toas
   const player = add(PlayerCharacter());
   const toasts = add(ToastSystem());
   let toast;
-  toasts.update(0);
-  const renderToast = () => toasts.renderHUD(new Proxy({ measureText: () => ({ width: 1 }) }, {
+  toasts.tick(0);
+  const renderToast = () => toasts.hud(new Proxy({ measureText: () => ({ width: 1 }) }, {
     get: (target, key) => target[key] ?? (key === 'fillText' ? (text) => { toast = text; } : () => {}),
   }));
   const pickup = BubbleShieldItem(0, 0);
-  assert.equal(pickup.update(0.1), false);
+  assert.equal(pickup.tick(0.1), false);
   player.x = 300;
-  assert.equal(pickup.update(0.21), false);
+  assert.equal(pickup.tick(0.21), false);
   player.x = 0;
-  assert.equal(pickup.update(0), true, 'collected (the engine then removes it)');
-  assert.equal(player.bubbleShields, 1);
+  assert.equal(pickup.tick(0), true, 'collected (the engine then removes it)');
+  assert.equal(player.shields, 1);
   assert.equal(player.hp, 5);
   renderToast();
   assert.equal(toast, 'Bubble Shield Collected');
   assert.equal(sounds, 1, 'one pickup chime for the toast');
-  assert.equal(BubbleShieldItem(0, 0).update(0.31), true);
-  assert.equal(player.bubbleShields, 2);
+  assert.equal(BubbleShieldItem(0, 0).tick(0.31), true);
+  assert.equal(player.shields, 2);
 });
 
 test('shields stack without a gameplay cap and cannot revive a dead player', () => {
   const player = add(PlayerCharacter());
   for (let i = 0; i < 1000; i++) player.addBubbleShield();
-  assert.equal(player.bubbleShields, 1000);
+  assert.equal(player.shields, 1000);
   player.hp = 0;
   player.addBubbleShield(); player.takeDamage();
-  assert.equal(player.bubbleShields, 1000);
-  assert.equal(BubbleShieldItem(0, 0).update(1), false);
-  assert.equal(PlayerCharacter().bubbleShields, 0, 'new runs start without old shields');
+  assert.equal(player.shields, 1000);
+  assert.equal(BubbleShieldItem(0, 0).tick(1), false);
+  assert.equal(PlayerCharacter().shields, 0, 'new runs start without old shields');
 });
 
 test('exactly one translucent bubble is rendered regardless of stack size, disappearing at zero', () => {
   const player = PlayerCharacter();
   for (const count of [0, 1, 7, 100, 0]) {
-    player.bubbleShields = count;
+    player.shields = count;
     draws = [];
     player.render(context);
     const bubbles = draws.filter(({ method, color }) => method === 'fill' && color === SHIELD_COLOR);
@@ -120,8 +120,8 @@ test('blue HUD ticks use empty health slots before expanding, without changing m
   const player = PlayerCharacter();
   const hud = PlayerHealthHUD(player);
   for (const [hp, shields, width, color] of [[2, 2, 180, '#e93'], [5, 3, 288, '#4c5'], [5, 0, 180, '#4c5']]) {
-    player.hp = hp; player.bubbleShields = shields; draws = [];
-    hud.renderHUD(context);
+    player.hp = hp; player.shields = shields; draws = [];
+    hud.hud(context);
     const ticks = draws.filter(({ method }) => method === 'fillRect').slice(1);
     assert.deepEqual(ticks.map(({ color: tickColor }) => tickColor), [
       ...Array(hp).fill(color), ...Array(shields).fill(SHIELD_COLOR),
@@ -136,8 +136,8 @@ test('blue HUD ticks use empty health slots before expanding, without changing m
 
 test('large stacks fit a mobile screen with positive-width blue ticks and padded white outline', () => {
   canvas.width = 320;
-  const player = Object.assign(PlayerCharacter(), { bubbleShields: 1000 });
-  PlayerHealthHUD(player).renderHUD(context);
+  const player = Object.assign(PlayerCharacter(), { shields: 1000 });
+  PlayerHealthHUD(player).hud(context);
   const ticks = draws.filter(({ method, color }) => method === 'fillRect' && color === SHIELD_COLOR);
   const outline = draws.find(({ method }) => method === 'strokeRect');
   assert.equal(ticks.length, 1000);
@@ -148,24 +148,24 @@ test('large stacks fit a mobile screen with positive-width blue ticks and padded
 });
 
 test('projectiles consume one shield once, still knock back, and damage HP only after charges run out', () => {
-  const player = add(Object.assign(PlayerCharacter(), { bubbleShields: 1 }));
+  const player = add(Object.assign(PlayerCharacter(), { shields: 1 }));
   const shot = add(GrubProjectile(-100, 0, 1000, 0));
-  if (shot.update(0.1)) remove(shot);
-  assert.equal(player.bubbleShields, 0);
+  if (shot.tick(0.1)) remove(shot);
+  assert.equal(player.shields, 0);
   assert.equal(player.hp, 5);
   assert.ok(player.vx > 0);
   assert.ok(!getObjects().includes(shot));
   const second = add(GrubProjectile(player.x - 100, player.y, 1000, 0));
-  if (second.update(0.1)) remove(second);
+  if (second.tick(0.1)) remove(second);
   assert.equal(player.hp, 4);
 });
 
 test('battle armor and healing preserve shield charges without making them permanent max health', () => {
-  const player = Object.assign(PlayerCharacter(), { hp: 2, bubbleShields: 3 });
+  const player = Object.assign(PlayerCharacter(), { hp: 2, shields: 3 });
   collectItemAbility(0, player); // BATTLE ARMOR
   assert.equal(player.hp, 4); assert.equal(player.maxHp, 7);
   player.heal(100);
-  assert.equal(player.hp, 7); assert.equal(player.bubbleShields, 3);
+  assert.equal(player.hp, 7); assert.equal(player.shields, 3);
   for (let i = 0; i < 3; i++) player.takeDamage();
   assert.equal(player.maxHp, 7); assert.equal(player.hp, 7);
 });
@@ -174,15 +174,15 @@ test('chests drop their assigned bubble shield or health pickup when they break'
   for (const contents of [BubbleShieldItem, HealthItem]) {
     clear();
     const player = add(Object.assign(PlayerCharacter(), { hp: 1 }));
-    player.charge = 1;
+    player.chg = 1;
     const chest = TreasureChest(0, 0, contents);
     chest.hit(player);
-    chest.update(0.7);
+    chest.tick(0.7);
     assert.equal(chest.hit(player), true);
     const pickup = getObjects().find((object) => object !== player && object.x === 0 && object.y === 0);
     assert.ok(pickup);
-    assert.equal(pickup.update(0.31), true);
-    assert.equal(player.bubbleShields, contents === BubbleShieldItem ? 1 : 0);
+    assert.equal(pickup.tick(0.31), true);
+    assert.equal(player.shields, contents === BubbleShieldItem ? 1 : 0);
     assert.equal(player.hp, contents === BubbleShieldItem ? 1 : 3);
   }
 });

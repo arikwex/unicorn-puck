@@ -18,7 +18,7 @@ const TEXT_COLOR = '#fff';
 function ChaliceHUD() {
   return {
     hudAnchor: [0, 0],
-    renderHUD(context) {
+    hud(context) {
       renderChaliceIcon(context, ICON_X, ICON_Y, ICON_SCALE);
 
       const { collected, required } = chaliceProgress();

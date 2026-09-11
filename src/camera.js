@@ -22,10 +22,10 @@ function Camera() {
     x: player.x,
     y: player.y,
     zoom: computeZoom(),
-    order: -1e4,
+    z: -1e4,
     tags: [TAG_CAMERA],
 
-    update(dt) {
+    tick(dt) {
       // Recomputed every frame (cheap: two comparisons and a divide) so a
       // resize/orientation change takes effect immediately, not just on
       // the next Camera() construction.

@@ -27,7 +27,7 @@ function StatusCard(onDone, props = {}) {
 
   return {
     hudAnchor: [0.5, 0.5],
-    update(dt) {
+    tick(dt) {
       elapsed += dt;
       if (elapsed >= DURATION) {
         onDone();
@@ -35,7 +35,7 @@ function StatusCard(onDone, props = {}) {
       }
     },
 
-    renderHUD(context) {
+    hud(context) {
       let alpha = 1;
       if (elapsed < FADE_IN) alpha = elapsed / FADE_IN;
       else if (elapsed > DURATION - FADE_OUT) alpha = Math.max(0, (DURATION - elapsed) / FADE_OUT);

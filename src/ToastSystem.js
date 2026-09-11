@@ -32,15 +32,15 @@ function ToastSystem() {
 
   return {
     hudAnchor: [0.5, 1],
-    order: 1e6,
+    z: 1e6,
 
-    update(dt) {
+    tick(dt) {
       if (!message) return;
       elapsed += dt;
       if (elapsed >= DURATION) message = undefined;
     },
 
-    renderHUD(context) {
+    hud(context) {
       if (!message) return;
       const enter = Math.min(1, elapsed / FADE_IN);
       const maxWidth = canvas.width - MARGIN * 2;

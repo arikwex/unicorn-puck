@@ -157,7 +157,7 @@ function DragController(player) {
       removeEventListener('pointercancel', onPointerUp);
     },
 
-    update(dt) {
+    tick(dt) {
       if (!dragging) return;
       const dx = current.x - start.x;
       const dy = current.y - start.y;
@@ -172,17 +172,17 @@ function DragController(player) {
       hue += HUE_RATE * dt;
     },
 
-    // A HUD element, not a world-space render: `order` only sorts among
+    // A HUD element, not a world-space render: `z` (draw order) only sorts among
     // other world objects, and this scene's dungeons commonly have world-y
-    // (and therefore `.order`) values well past 1000, so drawing this in
+    // (and therefore `.z`) values well past 1000, so drawing this in
     // the ordinary render pass could still land underneath something. The
-    // renderHUD pass always runs after every world object is drawn, so
+    // hud() pass always runs after every world object is drawn, so
     // this is guaranteed on top instead of merely "probably high enough".
-    renderHUD(context) {
+    hud(context) {
       if (!dragging) return;
       // Anchor to the player's current screen position, while the gesture
       // stays relative to the original click, independent of camera motion.
-      // renderHUD runs with an identity transform, so the camera's own
+      // hud() runs with an identity transform, so the camera's own
       // translate/scale/translate (see Camera.set()) is replicated by hand
       // instead of reading it off the context.
       const camera = getObjectsByTag(TAG_CAMERA)[0];

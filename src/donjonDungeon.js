@@ -97,7 +97,7 @@ function Grid() {
   const index = (x, y) => y * GRID_WIDTH + x;
   return {
     regionAt: (x, y) => region[index(x, y)],
-    isCarved: (x, y) => region[index(x, y)] >= 0,
+    open: (x, y) => region[index(x, y)] >= 0,
     isRoom: (x, y) => room[index(x, y)] === 1,
     carve(x, y, regionId, isRoom) {
       region[index(x, y)] = regionId;
@@ -158,7 +158,7 @@ function canCarve(grid, x, y, dir) {
   const midY = y + dir[1];
   const nextX = x + dir[0] * 2;
   const nextY = y + dir[1] * 2;
-  return inBounds(nextX, nextY) && !grid.isCarved(midX, midY) && !grid.isCarved(nextX, nextY);
+  return inBounds(nextX, nextY) && !grid.open(midX, midY) && !grid.open(nextX, nextY);
 }
 
 // Randomized-recursive-backtracker maze carve, biased by
@@ -196,7 +196,7 @@ function fillMaze(grid, rng, firstRegionId) {
   let regionId = firstRegionId;
   for (let x = 1; x < GRID_WIDTH; x += 2) {
     for (let y = 1; y < GRID_HEIGHT; y += 2) {
-      if (!grid.isCarved(x, y)) {
+      if (!grid.open(x, y)) {
         growMaze(grid, rng, x, y, regionId);
         regionId++;
       }
@@ -220,11 +220,11 @@ function findConnectors(grid) {
   const connectors = [];
   for (let x = 1; x < GRID_WIDTH - 1; x++) {
     for (let y = 1; y < GRID_HEIGHT - 1; y++) {
-      if (grid.isCarved(x, y)) continue;
+      if (grid.open(x, y)) continue;
       const neighbors = wallNeighbors(x, y);
       if (!neighbors) continue;
       const [[ax, ay], [bx, by]] = neighbors;
-      if (!grid.isCarved(ax, ay) || !grid.isCarved(bx, by)) continue;
+      if (!grid.open(ax, ay) || !grid.open(bx, by)) continue;
       const a = grid.regionAt(ax, ay);
       const b = grid.regionAt(bx, by);
       if (a !== b) connectors.push({ x, y, a, b });
@@ -290,8 +290,8 @@ function removeDeadEnds(grid, isRoomAdjacent) {
     removedAny = false;
     for (let x = 0; x < GRID_WIDTH; x++) {
       for (let y = 0; y < GRID_HEIGHT; y++) {
-        if (!grid.isCarved(x, y) || grid.isRoom(x, y) || isRoomAdjacent(x, y)) continue;
-        const openNeighbors = DIRS.filter(([dx, dy]) => inBounds(x + dx, y + dy) && grid.isCarved(x + dx, y + dy));
+        if (!grid.open(x, y) || grid.isRoom(x, y) || isRoomAdjacent(x, y)) continue;
+        const openNeighbors = DIRS.filter(([dx, dy]) => inBounds(x + dx, y + dy) && grid.open(x + dx, y + dy));
         if (openNeighbors.length <= 1) {
           grid.clear(x, y);
           removedAny = true;
@@ -313,7 +313,7 @@ function computeWalls(grid) {
   const walls = [];
   for (let x = 0; x < GRID_WIDTH; x++) {
     for (let y = 0; y < GRID_HEIGHT; y++) {
-      if (!grid.isCarved(x, y)) walls.push({ x, y });
+      if (!grid.open(x, y)) walls.push({ x, y });
     }
   }
   return walls;
@@ -323,7 +323,7 @@ function carvedCells(grid) {
   const cells = [];
   for (let x = 0; x < GRID_WIDTH; x++) {
     for (let y = 0; y < GRID_HEIGHT; y++) {
-      if (grid.isCarved(x, y)) cells.push({ x, y });
+      if (grid.open(x, y)) cells.push({ x, y });
     }
   }
   return cells;
@@ -349,7 +349,7 @@ function generateDonjonDungeon(seed) {
     floor: carvedCells(grid),
     walls: computeWalls(grid),
     gridWidth: GRID_WIDTH,
-    gridHeight: GRID_HEIGHT,
+    gh: GRID_HEIGHT,
   };
 }
 

@@ -45,12 +45,12 @@ function MainMenu(onBegin) {
   canvas.addEventListener('pointerdown', onBegin, { once: true });
 
   return {
-    update(dt) {
+    tick(dt) {
       anim += dt;
-      candelabra.update(dt);
+      candelabra.tick(dt);
     },
 
-    renderHUD(context) {
+    hud(context) {
       const cx = canvas.width / 2;
       const sceneryScale = Math.min(canvas.width / 800, canvas.height / 600, 1.5);
       // Keep the props legible on phones without enlarging desktop art
@@ -104,14 +104,14 @@ function MainMenu(onBegin) {
       context.save();
       context.translate(cx, canvas.height * 0.58);
       context.scale(scale, scale);
-      renderPlayer(context, { x: 0, y: 0, angle: CHARACTER_ANGLE }, anim, 0, []);
+      renderPlayer(context, { x: 0, y: 0, a: CHARACTER_ANGLE }, anim, 0, []);
       context.restore();
 
       const promptText = `[${IS_TOUCH ? 'Tap' : 'Click'} Anywhere to Begin]`;
       context.font = `bold ${PROMPT_FONT_SIZE}px sans-serif`;
       context.fillStyle = '#fff';
       // No need to reset globalAlpha back to 1 after -- hud.js's own
-      // renderScreenHUD already wraps every renderHUD call in save/restore.
+      // renderScreenHUD already wraps every hud() call in save/restore.
       context.globalAlpha = 0.6 + 0.4 * Math.sin(anim * PROMPT_PULSE_SPEED);
       context.fillText(promptText, cx, canvas.height - PROMPT_BOTTOM_MARGIN);
     },

@@ -96,7 +96,7 @@ const VALKYRIE_BOOST_MULTIPLIER = 1.3; // +30% to the whole launch-power curve, 
 const ITEM_ABILITY_CATALOG = [
   {
     name: 'BATTLE ARMOR',
-    description: '+2 max health',
+    desc: '+2 max health',
     draw: drawBattleArmor,
     apply(player) {
       player.maxHp += 2;
@@ -105,7 +105,7 @@ const ITEM_ABILITY_CATALOG = [
   },
   {
     name: 'VALKYRIE WINGS',
-    description: 'higher max boost speed',
+    desc: 'higher max boost speed',
     draw: drawValkyrieWings,
     apply(player) {
       player.boostPower *= VALKYRIE_BOOST_MULTIPLIER;
@@ -113,23 +113,23 @@ const ITEM_ABILITY_CATALOG = [
   },
   {
     name: 'MITHRIL HORN',
-    description: '+1 impact damage',
+    desc: '+1 impact damage',
     draw: drawMithrilHorn,
     apply(player) {
-      player.impactDamageBonus += 1;
+      player.horn += 1;
     },
   },
   {
     name: 'CHROMATIC HOOF',
-    description: 'bounces reboost momentum',
+    desc: 'bounces reboost momentum',
     draw: drawChromaticHoof,
     apply(player) {
-      player.pinballMomentum = true;
+      player.hoof = true;
     },
   },
   {
     name: 'ORACLE EYES',
-    description: 'reveals the minimap',
+    desc: 'reveals the minimap',
     draw: drawOracleEyes,
     apply(player) {
       player.oracleEyes = true;

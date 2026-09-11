@@ -1,7 +1,7 @@
 // A one-shot hit-splash VFX: a thick line arcs outward from (x, y) along a
 // parabola, then "lands" and leaves behind a temporary oval puddle that
 // fades to opacity 0 while its scale grows linearly, over PUDDLE_DURATION.
-// Self-expiring, like Grub's own defeat -- update() returns true once the
+// Self-expiring, like Grub's own defeat -- tick() returns true once the
 // puddle has fully faded, and the engine removes it.
 
 import { fillEllipse } from './canvasShapes.js';
@@ -46,9 +46,9 @@ function SplatEffect(x, y, vx, vy, color, size, arcHeight) {
   }
 
   return {
-    order: landY, // depth-sorts with everything else near where it lands
+    z: landY, // depth-sorts with everything else near where it lands
 
-    update(dt) {
+    tick(dt) {
       if (!landed) {
         elapsed += dt;
         if (elapsed >= flightDuration) landed = true;

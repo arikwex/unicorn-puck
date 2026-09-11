@@ -22,17 +22,17 @@ function CombatRoom(bounds, doorways, enemies) {
   return {
     // Decide before pickups and the victory watcher, then let the normal
     // collision pass handle any newly closed doorway contacts.
-    order: -1e6,
+    z: -1e6,
     tags: [TAG_COMBAT_ROOM],
     state: READY,
     bounds,
     enemies,
 
-    update() {
+    tick() {
       if (this.state === CLEARED) return;
       const player = getObjectsByTag(TAG_PLAYER)[0];
       if (!player || player.hp <= 0) return;
-      const inset = player.radius + ACTIVATION_PADDING;
+      const inset = player.r + ACTIVATION_PADDING;
       const alive = enemies.some((enemy) => enemy.hp > 0);
       if (this.state === ACTIVE) {
         if (alive) return;

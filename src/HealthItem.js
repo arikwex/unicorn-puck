@@ -50,9 +50,9 @@ function HealthItem(x, y) {
   return {
     x,
     y,
-    order: y,
+    z: y,
 
-    update(dt) {
+    tick(dt) {
       anim += dt;
       protection = Math.max(0, protection - dt);
       if (protection > 0) return false;
@@ -60,7 +60,7 @@ function HealthItem(x, y) {
       const player = getObjectsByTag(TAG_PLAYER)[0];
       if (!player) return false;
       const distance = Math.hypot(player.x - this.x, player.y - this.y);
-      if (distance > PICKUP_RADIUS + player.radius) return false;
+      if (distance > PICKUP_RADIUS + player.r) return false;
 
       // Collectible even at maxHp -- heal() itself clamps, so this just
       // shows "+0 hp" rather than leaving the item sitting there uncollected.

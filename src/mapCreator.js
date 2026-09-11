@@ -146,7 +146,7 @@ function circleBoxGap(cx, cy, cr, box) {
 }
 
 function circleCircleGap(cx, cy, cr, other) {
-  return Math.hypot(cx - other.x, cy - other.y) - cr - other.radius;
+  return Math.hypot(cx - other.x, cy - other.y) - cr - other.r;
 }
 
 // True once a candidate of the given radius clears every wall (box) and
@@ -235,8 +235,8 @@ function findLongHallways(rawDungeon) {
       }
     }
   }
-  scan(rawDungeon.gridHeight, rawDungeon.gridWidth, true);
-  scan(rawDungeon.gridWidth, rawDungeon.gridHeight, false);
+  scan(rawDungeon.gh, rawDungeon.gridWidth, true);
+  scan(rawDungeon.gridWidth, rawDungeon.gh, false);
 
   return hallways;
 }
@@ -262,14 +262,14 @@ function buildDungeon(seed) {
   const rawDungeon = generateDungeon(seed);
   const dungeon = inflateDungeon(rawDungeon, CORRIDOR_WIDTH_FACTOR);
   const combatRoomIndices = selectCombatRooms(dungeon.rooms.length, seed + 6);
-  const toWorld = (x, y) => gridToWorld(x, y, dungeon.gridWidth, dungeon.gridHeight);
+  const toWorld = (x, y) => gridToWorld(x, y, dungeon.gridWidth, dungeon.gh);
   const floorSet = new Set(dungeon.floor.map(({ x, y }) => `${x},${y}`));
   const nonSpawnRoomIndices = dungeon.rooms.map((_, i) => i).filter((i) => i !== 0);
   // A room's entrance cells (grid) as world-space points, radius 0 -- fed
   // into findClearSpot/isClearSpot's "circles" clearance check.
   const roomEntrancePoints = (room) => findEntranceCells(room, floorSet).map((cell) => {
     const world = toWorld(cell.x, cell.y);
-    return { x: world.x, y: world.y, radius: 0 };
+    return { x: world.x, y: world.y, r: 0 };
   });
 
   // Every chest's contents are decided right here, all at once -- not
@@ -333,7 +333,7 @@ function buildDungeon(seed) {
   placePillars(dungeon, pillarSeed).forEach(({ x, y, variant }) => {
     const world = toWorld(x, y);
     const pillar = add(Pillar(world.x, world.y, { variant }));
-    obstacleCircles.push({ x: world.x, y: world.y, radius: pillar.radius });
+    obstacleCircles.push({ x: world.x, y: world.y, r: pillar.r });
   });
 
   const spawnRoomGrid = dungeon.rooms[0];
@@ -359,7 +359,7 @@ function buildDungeon(seed) {
         const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + enemies.length, { large }));
         spent += grub.enemyCost;
         enemies.push(grub);
-        obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.radius });
+        obstacleCircles.push({ x: spawn.x, y: spawn.y, r: grub.r });
       }
     }
     if (combatRoomIndices.has(roomIndex)) {
@@ -392,7 +392,7 @@ function buildDungeon(seed) {
     if (chestSpawn) {
       add(TreasureChest(chestSpawn.x, chestSpawn.y, chestContentsFor(roomIndex)));
       // So a chalice placed afterward (see below) won't land on top of it.
-      obstacleCircles.push({ x: chestSpawn.x, y: chestSpawn.y, radius: CHEST_RADIUS });
+      obstacleCircles.push({ x: chestSpawn.x, y: chestSpawn.y, r: CHEST_RADIUS });
     }
   });
 
@@ -417,7 +417,7 @@ function buildDungeon(seed) {
     for (let i = 0; i < grubCount; i++) {
       const spawn = pickGrubSpawn(worldHallway, hallwayRng);
       const grub = add(Grub(spawn.x, spawn.y, worldHallway, hallwayGrubSeed + hallwayIndex * 100 + i));
-      obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.radius });
+      obstacleCircles.push({ x: spawn.x, y: spawn.y, r: grub.r });
     }
   });
 

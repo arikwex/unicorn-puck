@@ -10,7 +10,7 @@ let startedAt = 0;
 
 function add(object) {
   objects.push(object);
-  objects.sort((a, b) => (a.order || 0) - (b.order || 0));
+  objects.sort((a, b) => (a.z || 0) - (b.z || 0));
   object.tags?.forEach((objectTag) => index(object, objectTag));
   object.start?.();
   return object;
@@ -71,17 +71,17 @@ function tick(now) {
   // Callbacks may add effects and re-sort objects. Iterate a snapshot so
   // every object present at the start of the phase updates exactly once.
   [...objects].map((object) => {
-    if (object.update?.(dt)) expired.push(object);
+    if (object.tick?.(dt)) expired.push(object);
   });
   if (expired.length) remove(expired);
 
   const camera = getObjectsByTag(TAG_CAMERA)[0];
   camera?.set(ctx);
   // Re-sorted fresh every frame (rather than reusing the add-time order
-  // used for updates) so an object whose `order` it recomputes each update
+  // used for updates) so an object whose draw order (`z`) it recomputes each tick
   // -- e.g. the player keying it off its own y, for depth sorting -- is drawn
   // in its current order immediately, not just after its next add().
-  [...objects].sort((a, b) => (a.order || 0) - (b.order || 0)).map((object) => object.render?.(ctx));
+  [...objects].sort((a, b) => (a.z || 0) - (b.z || 0)).map((object) => object.render?.(ctx));
 
   ctx.restore();
 

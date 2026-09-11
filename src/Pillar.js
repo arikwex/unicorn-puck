@@ -31,7 +31,7 @@ function renderShaft(context, x, topY, bottomY, radius, color, shadeColor) {
 // square capital.
 function renderClassicPillar(context, obstacle) {
   const {
-    x, y, radius, baseHalfSize, baseHeight, shaftHeight, capHalfSize, capHeight, stoneColor, shadeColor,
+    x, y, r: radius, baseHalfSize, baseHeight, shaftHeight, capHalfSize, capHeight, stoneColor, shadeColor,
   } = obstacle;
   const shaftTopY = y - shaftHeight;
   const capTopY = shaftTopY - capHeight;
@@ -217,12 +217,12 @@ function renderCandelabra(context, obstacle, anim) {
 */
 
 // Simplified down to the one classic-Roman-column look (see VARIANT_COUNT
-// above) -- still the exact same static circle of `radius` the retired
+// above) -- still the exact same static circle of radius `r` the retired
 // variants were (see physics.js), so this never changes how the player
 // bounces off it.
 function Pillar(x = 0, y = 0, props = {}) {
   const {
-    radius = 26,
+    r: radius = 26,
     baseHalfSize = radius + 6,
     baseHeight = 8,
     shaftHeight = 110, // 2.5x its original 44, so the column actually reads as tall next to the small base/capital
@@ -241,7 +241,7 @@ function Pillar(x = 0, y = 0, props = {}) {
   return {
     x,
     y,
-    radius,
+    r: radius,
     baseHalfSize,
     baseHeight,
     shaftHeight,
@@ -252,10 +252,10 @@ function Pillar(x = 0, y = 0, props = {}) {
     variant,
     tags: [TAG_OBSTACLE],
     // Same painter's-algorithm depth sort as CubeObstacle -- see its
-    // `order` comment.
-    order: y,
+    // `z` comment.
+    z: y,
 
-    update(dt) {
+    tick(dt) {
       anim += dt;
     },
 

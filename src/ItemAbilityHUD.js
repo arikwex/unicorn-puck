@@ -28,7 +28,7 @@ function renderText(context, text, x, y, font, color) {
 function ItemAbilityHUD() {
   return {
     hudAnchor: [0, 0],
-    renderHUD(context) {
+    hud(context) {
       collectedItemAbilities().forEach((ability, i) => {
         const rowY = START_Y + i * ROW_HEIGHT;
 
@@ -39,7 +39,7 @@ function ItemAbilityHUD() {
         context.restore();
 
         renderText(context, ability.name, TEXT_X, rowY + NAME_OFFSET_Y, NAME_FONT, NAME_COLOR);
-        renderText(context, ability.description, TEXT_X, rowY + DESCRIPTION_OFFSET_Y, DESCRIPTION_FONT, DESCRIPTION_COLOR);
+        renderText(context, ability.desc, TEXT_X, rowY + DESCRIPTION_OFFSET_Y, DESCRIPTION_FONT, DESCRIPTION_COLOR);
       });
     },
   };

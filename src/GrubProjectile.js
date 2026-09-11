@@ -25,16 +25,16 @@ function GrubProjectile(x, y, vx, vy, props = {}) {
   const knockback = KNOCKBACK / Math.hypot(vx, vy);
   return {
     x, y, vx, vy,
-    radius: RADIUS,
-    order: y,
+    r: RADIUS,
+    z: y,
     tags: [TAG_PROJECTILE],
 
-    update(dt) {
+    tick(dt) {
       remaining -= dt;
       if (remaining <= 0) return true;
       this.x += this.vx * dt;
       this.y += this.vy * dt;
-      this.order = this.y;
+      this.z = this.y;
 
       // Sample travel once per frame; spacing is independent of frame
       // rate and emission ends on the frame the shot hits.

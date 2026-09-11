@@ -116,15 +116,15 @@ function Decoration(x, y, type, facing) {
   return {
     x,
     y,
-    // A wall's own `order` is its merged rect's *bottom* edge (see
+    // A wall's own `z` (draw order) is its merged rect's *bottom* edge (see
     // CubeObstacle), which for a wall cell anywhere but that exact edge
     // sits well south of this cell -- so a naive y-based order here would
     // often lose to (draw behind/under) the very wall it's mounted on.
     // Always drawing last among world objects fixes that; it's safe
     // because a decoration sits right in a wall's own footprint, a spot
     // nothing else (player, grubs) can ever physically stand in.
-    order: Infinity,
-    update(dt) {
+    z: Infinity,
+    tick(dt) {
       anim += dt;
     },
     render(context) {

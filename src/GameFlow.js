@@ -34,7 +34,7 @@ let musicStarted = false;
 // where the run ended). Self-removes once fired.
 function GameWatcher(player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap) {
   return {
-    update() {
+    tick() {
       const won = chalicesComplete()
         && !getObjectsByTag(TAG_COMBAT_ROOM).some((room) => room.state === COMBAT_ROOM_ACTIVE);
       const lost = player.hp <= 0;

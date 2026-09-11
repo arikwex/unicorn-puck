@@ -81,11 +81,11 @@ function TreasureChest(x, y, contents) {
   return {
     x,
     y,
-    order: y,
-    radius: CHEST_RADIUS, // a static circle -- see physics.js
+    z: y,
+    r: CHEST_RADIUS, // a static circle -- see physics.js
     tags: [TAG_OBSTACLE],
 
-    update(dt) {
+    tick(dt) {
       flashTimer = Math.max(0, flashTimer - dt);
       hitCooldown = Math.max(0, hitCooldown - dt);
       hitAnimElapsed += dt;
@@ -93,7 +93,7 @@ function TreasureChest(x, y, contents) {
 
     // Called by the player on contact, with its pre-bounce state.
     hit(player) {
-      if (hitCooldown > 0 || player.charge <= CHARGING_THRESHOLD) return;
+      if (hitCooldown > 0 || player.chg <= CHARGING_THRESHOLD) return;
 
       hitCooldown = HIT_COOLDOWN;
       flashTimer = FLASH_DURATION;

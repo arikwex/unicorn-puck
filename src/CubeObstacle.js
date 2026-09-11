@@ -12,7 +12,7 @@ function CubeObstacle(x = 0, y = 0, w = 60, h = 60, props = {}) {
     // x/y center plus w/h is also its static collision box (see physics.js).
     x, y, w, h, height, topColor, sideColor,
     tags: [TAG_OBSTACLE],
-    order: y + h / 2,
+    z: y + h / 2,
 
     render(context) {
       // Snap shared edges in screen space so fractional zoom/panning cannot

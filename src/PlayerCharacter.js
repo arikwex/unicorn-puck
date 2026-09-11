@@ -16,7 +16,7 @@ const PLAYER_RADIUS = 38;
 const WALL_BOUNCE_SOUND_MIN_SPEED = 30; // world units/s of velocity change -- below this, a resting/sliding contact stays silent
 const DAMAGE_CANVAS_SIZE = 320;
 const PINBALL_BOOST_FACTOR = 1.08; // Chromatic Hoof: fraction of pre-bounce speed an enemy bounce reboosts back up to (and past)
-// Velocity decay rates (1/s) below/above CHARGE_MIN_SPEED -- see update().
+// Velocity decay rates (1/s) below/above CHARGE_MIN_SPEED -- see tick().
 const DRAG = 0.6;
 const CHARGING_DRAG = 3;
 const RESTITUTION = 0.4; // < 1: bounces off obstacles lose some energy
@@ -72,7 +72,7 @@ const HEADING_EASE_PER_SPEED = 0.06; // additional ease rate per unit of speed -
 // See renderPlayer's head/torso draw-order comment.
 const HEAD_BEHIND_BUFFER = (20 * Math.PI) / 180;
 
-// `charge` is a smoothed 0..1 read of how fast the player is currently
+// `chg` (charge) is a smoothed 0..1 read of how fast the player is currently
 // moving, driving every "charging forward" render tweak below (squish,
 // head/horn lean, wing sweep, trail). It stays 0 below
 // CHARGE_MIN_SPEED (no pose change at a crawl), ramps linearly up to
@@ -523,7 +523,7 @@ function renderPlayerPortrait(context, x, y, scale = 1) {
 // A short-lived ROYGBV ribbon behind the character while charging.
 // `trail` is a list of { x, y, t, charge, angle } samples (oldest first,
 // already pruned to the last TRAIL_DURATION seconds -- see
-// PlayerCharacter's update()); `time` is the current animation clock. Each
+// PlayerCharacter's tick()); `time` is the current animation clock. Each
 // sample keeps the charge level and heading it was recorded at: charge so
 // the trail fades in and out smoothly along with charge itself (not just
 // age), heading so each stripe's sideways offset (via zPosition) matches
@@ -538,14 +538,14 @@ function renderTrail(context, trail, time) {
     const a = trail[i - 1];
     const b = trail[i];
     const age = time - b.t;
-    const alpha = Math.max(0, 1 - age / TRAIL_DURATION) * b.charge;
+    const alpha = Math.max(0, 1 - age / TRAIL_DURATION) * b.chg;
     if (alpha <= 0.01) continue;
 
     context.globalAlpha = opacity * alpha;
     TRAIL_STRIPE_COLORS.forEach((color, stripeIndex) => {
       const offset = (stripeIndex - (TRAIL_STRIPE_COLORS.length - 1) / 2) * TRAIL_STRIPE_SPACING;
-      const [ax, ay] = zPosition(a.angle, a.x, a.y, offset);
-      const [bx, by] = zPosition(b.angle, b.x, b.y, offset);
+      const [ax, ay] = zPosition(a.a, a.x, a.y, offset);
+      const [bx, by] = zPosition(b.a, b.x, b.y, offset);
       context.strokeStyle = color;
       context.beginPath();
       context.moveTo(ax, ay);
@@ -559,7 +559,7 @@ function renderTrail(context, trail, time) {
 function renderPlayer(context, player, anim, charge, trail) {
   renderTrail(context, trail, anim);
 
-  const angle = player.angle;
+  const angle = player.a;
   const headForward = 21 + HEAD_LEAN_FORWARD * charge;
   const headX = player.x + Math.cos(angle) * headForward;
   const headY = player.y - 14 + HEAD_DROP * charge - Math.sin(angle) * 5
@@ -588,46 +588,46 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
   let anim = 0;
   let damageFlashTimer = 0;
   let damageCanvas;
-  let trail = []; // recent { x, y, t, charge } samples, for renderTrail -- see update()
+  let trail = []; // recent { x, y, t, chg, a } samples, for renderTrail -- see tick()
 
   return {
     x,
     y,
-    angle,
+    a: angle, // heading, radians
     vx: 0,
     vy: 0,
     hp: 5,
     maxHp: 5,
-    bubbleShields: 0,
+    shields: 0, // bubble shield charges
     // Driven by DragController while the player is aiming a launch.
     aiming: false,
     targetAngle: angle,
-    // Smoothed 0..1 "how fast am I currently going" -- see the
+    // Charge: smoothed 0..1 "how fast am I currently going" -- see the
     // CHARGE_SPEED_REF/CHARGE_EASE_RATE comment above.
-    charge: 0,
+    chg: 0,
     // Item-ability stats -- see ItemAbility.js for what grants each of
     // these. Plain defaults so every reader (input.js, Grub.js, this
-    // file's own update) can use the field directly, no `|| default`
+    // file's own tick) can use the field directly, no `|| default`
     // fallback needed anywhere.
     boostPower: 1, // multiplies a drag-launch's impulse magnitude (Valkyrie Wings)
-    impactDamageBonus: 0, // added to every charging-hit damage roll (Mithril Horn)
-    pinballMomentum: false, // enemy bounces reboost speed instead of losing it (Chromatic Hoof)
+    horn: 0, // added to every charging-hit damage roll (Mithril Horn)
+    hoof: false, // enemy bounces reboost speed instead of losing it (Chromatic Hoof)
     oracleEyes: false, // reveals MiniMap.js's HUD (Oracle Eyes)
-    // Draw order keyed off y, recomputed every update -- see CubeObstacle.js
+    // Draw order keyed off y, recomputed every tick -- see CubeObstacle.js
     // for why (same painter's-algorithm depth illusion), but a moving puck
     // needs it refreshed every frame rather than set once.
-    order: y,
-    radius: PLAYER_RADIUS,
+    z: y,
+    r: PLAYER_RADIUS, // collision radius
     tags: [TAG_PLAYER],
 
     // A bubble shield absorbs the hit instead of hp (see addBubbleShield),
     // but otherwise takes it exactly like a normal hit -- same flash, same
-    // splats, same sound. Stacking (bubbleShields--) and the protective
+    // splats, same sound. Stacking (shields--) and the protective
     // bubble's own render() are the only things that make a shielded hit
     // different from an ordinary one.
     takeDamage(amount = 1) {
       if (amount <= 0 || this.hp <= 0) return;
-      if (this.bubbleShields > 0) this.bubbleShields--;
+      if (this.shields > 0) this.shields--;
       else this.hp = Math.max(0, this.hp - amount);
       damageFlashTimer = DAMAGE_FLASH_DURATION;
       fireDamageSplats(this.x, this.y);
@@ -635,7 +635,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
     },
 
     addBubbleShield() {
-      if (this.hp > 0) this.bubbleShields++;
+      if (this.hp > 0) this.shields++;
     },
 
     // Returns the actual amount healed (0 if already dead or already at
@@ -648,24 +648,24 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
       return healed;
     },
 
-    update(dt) {
+    tick(dt) {
       anim += dt;
       damageFlashTimer = Math.max(0, damageFlashTimer - dt);
 
       const speed = Math.hypot(this.vx, this.vy);
 
       const targetCharge = Math.min(Math.max((speed - CHARGE_MIN_SPEED) / (CHARGE_MAX_SPEED - CHARGE_MIN_SPEED), 0), 1);
-      this.charge += (targetCharge - this.charge) * (1 - Math.exp(-CHARGE_EASE_RATE * dt));
+      this.chg += (targetCharge - this.chg) * (1 - Math.exp(-CHARGE_EASE_RATE * dt));
 
       trail.push({
-        x: this.x, y: this.y, t: anim, charge: this.charge, angle: this.angle,
+        x: this.x, y: this.y, t: anim, chg: this.chg, a: this.a,
       });
       while (trail.length && anim - trail[0].t > TRAIL_DURATION) trail.shift();
 
       if (this.aiming) {
         const ease = 1 - Math.exp(-AIM_EASE_RATE * dt);
-        const delta = normalizeAngle(this.targetAngle - this.angle);
-        this.angle = normalizeAngle(this.angle + delta * ease);
+        const delta = normalizeAngle(this.targetAngle - this.a);
+        this.a = normalizeAngle(this.a + delta * ease);
       } else if (speed > MIN_SPEED_FOR_HEADING) {
         // Screen/world y points down, but rendering treats a larger angle
         // as swinging the head upward (see headY above), so the heading
@@ -673,8 +673,8 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
         const targetAngle = Math.atan2(-this.vy, this.vx);
         const easeRate = HEADING_EASE_MIN + HEADING_EASE_PER_SPEED * speed;
         const ease = 1 - Math.exp(-easeRate * dt);
-        const delta = normalizeAngle(targetAngle - this.angle);
-        this.angle = normalizeAngle(this.angle + delta * ease);
+        const delta = normalizeAngle(targetAngle - this.a);
+        this.a = normalizeAngle(this.a + delta * ease);
       }
 
       // Above the same speed that starts the charging pose, drag
@@ -706,7 +706,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
           // Grub.js plays its own hit sound, so a plain enemy bump stays
           // silent rather than doubling up on the wall-bounce sound.
           if (impact >= WALL_BOUNCE_SOUND_MIN_SPEED) playWallBounce(impact);
-        } else if (this.pinballMomentum) {
+        } else if (this.hoof) {
           // Chromatic Hoof: reboost past the pre-bounce speed,
           // pinball-bumper style, instead of letting restitution decay it.
           const postSpeed = Math.hypot(this.vx, this.vy);
@@ -716,13 +716,13 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
           }
         }
       });
-      this.order = this.y;
+      this.z = this.y;
     },
 
     render(context) {
       if (damageFlashTimer <= 0) {
-        renderPlayer(context, this, anim, this.charge, trail);
-        if (this.bubbleShields > 0) renderBubbleShield(context, this.x, this.y - 12, this.radius * 1.65);
+        renderPlayer(context, this, anim, this.chg, trail);
+        if (this.shields > 0) renderBubbleShield(context, this.x, this.y - 12, this.r * 1.65);
         return;
       }
       // Tint an isolated character silhouette so the red pulse covers all
@@ -738,14 +738,14 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
       renderTrail(context, trail, anim);
       tintContext.clearRect(0, 0, DAMAGE_CANVAS_SIZE, DAMAGE_CANVAS_SIZE);
       tintContext.save();
-      renderPlayer(tintContext, { ...this, x: center, y: center }, anim, this.charge, []);
+      renderPlayer(tintContext, { ...this, x: center, y: center }, anim, this.chg, []);
       tintContext.globalCompositeOperation = 'source-atop';
       tintContext.globalAlpha = Math.sin(damageFlashTimer / DAMAGE_FLASH_DURATION * Math.PI / 2);
       tintContext.fillStyle = '#f22';
       tintContext.fillRect(0, 0, DAMAGE_CANVAS_SIZE, DAMAGE_CANVAS_SIZE);
       tintContext.restore();
       context.drawImage(damageCanvas, this.x - center, this.y - center);
-      if (this.bubbleShields > 0) renderBubbleShield(context, this.x, this.y - 12, this.radius * 1.65);
+      if (this.shields > 0) renderBubbleShield(context, this.x, this.y - 12, this.r * 1.65);
     },
   };
 }

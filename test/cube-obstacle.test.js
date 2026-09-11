@@ -32,12 +32,12 @@ test('walls keep their full height with a 25% upward overhang and unchanged coll
   assert.deepEqual(top.bounds, [-30, -46, 60, 60]);
   assert.equal(top.bounds[1], Math.round(cube.y - cube.h / 2 - cube.height * 0.25));
   assert.equal(front.bounds[1] + front.bounds[3], Math.round(cube.y + cube.h / 2 + cube.height * 0.75));
-  assert.equal(cube.order, cube.y + cube.h / 2, 'depth stays anchored to the ground');
+  assert.equal(cube.z, cube.y + cube.h / 2, 'depth stays anchored to the ground');
   assert.equal(cube.h / 2, 30, 'visual overhang does not enlarge collisions');
   const behindY = -40;
   assert.ok(behindY < -cube.h / 2);
   assert.ok(behindY >= top.bounds[1] && behindY < top.bounds[1] + top.bounds[3]);
-  assert.ok(behindY < cube.order, 'objects behind the wall draw before its overhanging top');
+  assert.ok(behindY < cube.z, 'objects behind the wall draw before its overhanging top');
 });
 
 test('adjacent cubes share exact pixel edges at fractional camera zooms and positions', () => {
@@ -58,7 +58,7 @@ test('adjacent cubes share exact pixel edges at fractional camera zooms and posi
       }
       assert.equal(a[1].bounds[1] + a[1].bounds[3], c[1].bounds[1]);
       assert.equal(a[1].bounds[1] + a[1].bounds[3], a[0].bounds[1]);
-      assert.ok(left.order < below.order, 'nearer tops cover internal front faces');
+      assert.ok(left.z < below.z, 'nearer tops cover internal front faces');
     }
   }
 });
@@ -77,26 +77,26 @@ test('cube dimensions stay exact for physics and props follow width/height', () 
 test('axis-aligned contacts handle faces, corners, tangency and misses', () => {
   const box = CubeObstacle(0, 0, 20, 20);
   for (const [x, y, nx, ny] of [[14, 0, -1, 0], [-14, 0, 1, 0], [0, 14, 0, -1], [0, -14, 0, 1]]) {
-    assert.deepEqual(contact({ x, y, radius: 5 }, box), [nx, ny, 1]);
+    assert.deepEqual(contact({ x, y, r: 5 }, box), [nx, ny, 1]);
   }
-  const [cornerX, cornerY] = contact({ x: 13, y: 13, radius: 5 }, box);
+  const [cornerX, cornerY] = contact({ x: 13, y: 13, r: 5 }, box);
   assert.ok(Math.abs(cornerX + Math.SQRT1_2) < 1e-9);
   assert.ok(Math.abs(cornerY + Math.SQRT1_2) < 1e-9);
-  assert.ok(!contact({ x: 15, y: 0, radius: 5 }, box));
-  assert.ok(!contact({ x: 14, y: 14, radius: 5 }, box));
+  assert.ok(!contact({ x: 15, y: 0, r: 5 }, box));
+  assert.ok(!contact({ x: 14, y: 14, r: 5 }, box));
 });
 
 test('circle obstacles contact along the line between centers', () => {
-  const [nx, ny, penetration] = contact({ x: 0, y: 0, radius: 5 }, { x: 6, y: 8, radius: 7 });
+  const [nx, ny, penetration] = contact({ x: 0, y: 0, r: 5 }, { x: 6, y: 8, r: 7 });
   assert.ok(Math.abs(nx - 0.6) < 1e-9 && Math.abs(ny - 0.8) < 1e-9);
   assert.equal(penetration, 2);
-  assert.ok(!contact({ x: 0, y: 0, radius: 5 }, { x: 6, y: 8, radius: 5 }));
+  assert.ok(!contact({ x: 0, y: 0, r: 5 }, { x: 6, y: 8, r: 5 }));
 });
 
 test('embedded circles resolve through the nearest face', () => {
   const box = CubeObstacle(0, 0, 20, 20);
   for (const [x, y, expectedX, expectedY] of [[9, 0, 15, 0], [-9, 0, -15, 0], [0, 9, 0, 15], [0, -9, 0, -15]]) {
-    const circle = { x, y, radius: 5 };
+    const circle = { x, y, r: 5 };
     const [nx, ny, penetration] = contact(circle, box);
     circle.x -= nx * penetration;
     circle.y -= ny * penetration;

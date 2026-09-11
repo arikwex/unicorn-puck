@@ -29,7 +29,7 @@ function firstAimTimes(grubs) {
   for (let frame = 0; frame <= 82; frame++) {
     for (const grub of grubs) {
       if (times.has(grub)) continue; // Observe acquisition without firing.
-      grub.update(0.05);
+      grub.tick(0.05);
       if (grub.state === AIMING) times.set(grub, frame * 0.05);
     }
   }
@@ -42,7 +42,7 @@ function firstAimTimes(grubs) {
 
 test('entering a room after a long absence gives each grub a fresh random reaction delay', () => {
   const { player, grubs } = encounter();
-  for (let frame = 0; frame < 400; frame++) grubs.forEach((grub) => grub.update(0.05));
+  for (let frame = 0; frame < 400; frame++) grubs.forEach((grub) => grub.tick(0.05));
   assert.ok(grubs.every((grub) => grub.state === PATROL));
   player.x = 0;
   firstAimTimes(grubs);
@@ -59,7 +59,7 @@ test('leaving and re-entering restarts reaction delays instead of synchronizing 
   player.x = 0;
   firstAimTimes(grubs);
   player.x = 2000;
-  for (let frame = 0; frame < 400; frame++) grubs.forEach((grub) => grub.update(0.05));
+  for (let frame = 0; frame < 400; frame++) grubs.forEach((grub) => grub.tick(0.05));
   player.x = 0;
   firstAimTimes(grubs);
 });

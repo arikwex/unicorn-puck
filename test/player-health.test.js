@@ -46,7 +46,7 @@ test('HUD reflects live HP with shared colors, white outline and padded segments
   for (const [hp, color] of [[5, '#4c5'], [4, '#4c5'], [3, '#ed4'], [2, '#e93'], [1, '#d33'], [0, '#d33']]) {
     player.hp = hp;
     calls = [];
-    hud.renderHUD(context);
+    hud.hud(context);
     const rectangles = calls.filter((call) => call.method === 'fillRect');
     const outline = calls.find((call) => call.method === 'strokeRect');
     assert.equal(rectangles.length, hp + 1);
@@ -64,11 +64,11 @@ test('portrait stays fixed when the player moves, turns or charges', () => {
   const player = PlayerCharacter();
   const hud = PlayerHealthHUD(player);
   const geometry = () => calls.map(({ method, args }) => [method, args]);
-  hud.renderHUD(context);
+  hud.hud(context);
   const initial = geometry();
-  Object.assign(player, { x: 1000, y: -400, angle: Math.PI, charge: 1 });
+  Object.assign(player, { x: 1000, y: -400, a: Math.PI, chg: 1 });
   calls = [];
-  hud.renderHUD(context);
+  hud.hud(context);
   assert.deepEqual(geometry(), initial);
   assert.ok(calls.some((call) => call.method === 'arc'), 'portrait draws the head');
   assert.ok(calls.some((call) => call.method === 'clip'), 'portrait draws the horn stripes');
@@ -76,14 +76,14 @@ test('portrait stays fixed when the player moves, turns or charges', () => {
 
 test('HUD runs after world rendering with the screen transform restored', () => {
   let hudCalled = false;
-  add({ order: -1000, renderHUD(ctx) {
+  add({ z: -1000, hud(ctx) {
     hudCalled = true;
     const lastTransform = calls.filter((call) => call.method === 'setTransform').at(-1);
     assert.deepEqual(lastTransform.args, [1, 0, 0, 1, 0, 0]);
     assert.ok(calls.some((call) => call.method === 'world'));
-    PlayerHealthHUD(PlayerCharacter()).renderHUD(ctx);
+    PlayerHealthHUD(PlayerCharacter()).hud(ctx);
   } });
-  add({ order: 1e6, render(ctx) {
+  add({ z: 1e6, render(ctx) {
     ctx.setTransform(3, 0, 0, 3, -200, 100);
     calls.push({ method: 'world' });
   } });

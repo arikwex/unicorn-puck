@@ -88,9 +88,9 @@ test('health, counter, abilities, toasts and status cards all opt into anchored 
   ];
   showToast('Defeat all enemies to exit room');
   for (const hud of huds) {
-    const original = hud.renderHUD;
+    const original = hud.hud;
     let observed;
-    hud.renderHUD = function (ctx) {
+    hud.hud = function (ctx) {
       observed = [...ctx.transform];
       original.call(this, ctx);
     };
@@ -110,9 +110,9 @@ test('engine applies scaling only to anchored UI, leaving aim overlays and world
   let worldTransform; let hudTransform; let aimTransform;
   add({
     render(ctx) { worldTransform = [...ctx.transform]; },
-    renderHUD(ctx) { aimTransform = [...ctx.transform]; },
+    hud(ctx) { aimTransform = [...ctx.transform]; },
   });
-  add({ hudAnchor: [0, 0], renderHUD(ctx) { hudTransform = [...ctx.transform]; } });
+  add({ hudAnchor: [0, 0], hud(ctx) { hudTransform = [...ctx.transform]; } });
   start();
   nextFrame(performance.now());
   stop();
