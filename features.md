@@ -27,6 +27,10 @@ Mobile hud:
 - the minimap should be bottom left of the screen always (desktop too) and the player placement dot should be WHITE not red.
 - All HUD contents on mobile mode must be x0.5 size size they're occupying way too much of the screen
 
+BYTE GOLF:
+- 700 bytes if the entire physicsworld core code is removed. Can we simplify all this? ultimately only the player is puck-like. Should be able to reduce a huge amount of code given that.
+- 
+
 
 Game Mechanics:
 - The main character should be treated like a hockey puck. To control it, the player should click+drag to set the trajectory/impulse to impart on the unicorn main character. The actual controls should be distance from click start to click finish = magnitude of impulse in the target direction. The line integral of the 2d curl should be the imparted angular impulse (e.g. a perfectly straight line = no angular impulse, but many revolutions = high angular impulse). The character has a natural friction/viscosity for both angular velocity and linear velocity (make these obvious constant baselines with multipliers that are character properties that default to 1).

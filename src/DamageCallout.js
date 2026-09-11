@@ -31,10 +31,10 @@ function DamageCallout(x, y, text, color = '#fff') {
       context.scale(scale, scale);
       context.font = 'bold 14px sans-serif';
       context.textAlign = 'center';
-      context.textBaseline = 'middle';
-      context.lineWidth = 3 / scale;
-      context.strokeStyle = '#000';
-      context.strokeText(text, 0, 0);
+      // context.textBaseline = 'middle';
+      // context.lineWidth = 3 / scale;
+      // context.strokeStyle = '#000';
+      // context.strokeText(text, 0, 0);
       context.fillStyle = color;
       context.fillText(text, 0, 0);
       context.restore();
