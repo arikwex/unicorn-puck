@@ -24,6 +24,22 @@ function rectangles(cube, transform) {
   return draws;
 }
 
+test('walls keep their full height with 25% less upward overhang and unchanged collisions', () => {
+  const cube = CubeObstacle(0, 0);
+  const [front, top] = rectangles(cube, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+  assert.equal(cube.height, 26 * 2.5);
+  assert.deepEqual(front.bounds, [-30, -19, 60, 65]);
+  assert.deepEqual(top.bounds, [-30, -79, 60, 60]);
+  assert.equal(top.bounds[1], Math.round(cube.y - cube.h / 2 - cube.height * 0.75));
+  assert.equal(front.bounds[1] + front.bounds[3], Math.round(cube.y + cube.h / 2 + cube.height * 0.25));
+  assert.equal(cube.order, cube.y + cube.h / 2, 'depth stays anchored to the ground');
+  assert.equal(cube.puck().halfHeight, 30, 'visual overhang does not enlarge collisions');
+  const behindY = -40;
+  assert.ok(behindY < -cube.puck().halfHeight);
+  assert.ok(behindY >= top.bounds[1] && behindY < top.bounds[1] + top.bounds[3]);
+  assert.ok(behindY < cube.order, 'objects behind the wall draw before its overhanging top');
+});
+
 test('adjacent cubes share exact pixel edges at fractional camera zooms and positions', () => {
   const tile = 60 * Math.SQRT2;
   const left = CubeObstacle(0, 0, tile, tile);

@@ -15,8 +15,19 @@ const MIN_PILLAR_SPACING = 2; // min cells between two pillars placed in the sam
 const SKIP_ROOM_CHANCE = 0.08; // even an eligible small/medium room sometimes just goes without, for variety
 const COLONNADE_COUNT = 3; // pillars per row in a colonnade pattern
 const PILLAR_VARIANT_COUNT = 4; // see Pillar.js -- classic column, crystal, flame square, candelabra
+const ROOM_TWO_VARIANT_CHANCE = 0.5; // otherwise the room's pillars are all one variant
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+// A room's pillars draw from either one variant or, half the time, an even
+// mix of two -- never 3+ different looks scattered through the same room.
+function pickRoomVariantPool(rng) {
+  const first = Math.floor(rng() * PILLAR_VARIANT_COUNT);
+  if (rng() >= ROOM_TWO_VARIANT_CHANCE) return [first];
+  let second = Math.floor(rng() * (PILLAR_VARIANT_COUNT - 1));
+  if (second >= first) second += 1; // skip over `first` so the two are always distinct
+  return [first, second];
+}
 
 function key(x, y) {
   return `${x},${y}`;
@@ -105,6 +116,10 @@ function placeInRoom(rng, room, floorSet) {
   const floorCells = roomFloorCells(room, floorSet);
   const entrances = findEntranceCells(room, floorSet);
   const pattern = PATTERNS[Math.floor(rng() * PATTERNS.length)];
+  // Every pillar in this room draws from the same 1-or-2-variant pool,
+  // rather than each independently rolling among all four.
+  const variantPool = pickRoomVariantPool(rng);
+  const pickVariant = () => variantPool[Math.floor(rng() * variantPool.length)];
 
   const placed = [];
   pattern.forEach(([fx, fy]) => {
@@ -116,7 +131,7 @@ function placeInRoom(rng, room, floorSet) {
     if (!cell) return;
     if (entrances.some((entrance) => manhattan(entrance, cell) < ENTRANCE_CLEARANCE)) return;
     if (placed.some((other) => manhattan(other, cell) < MIN_PILLAR_SPACING)) return;
-    placed.push({ ...cell, variant: Math.floor(rng() * PILLAR_VARIANT_COUNT) });
+    placed.push({ ...cell, variant: pickVariant() });
   });
 
   // A large room reads as too bare without at least one pillar -- if the
@@ -129,7 +144,7 @@ function placeInRoom(rng, room, floorSet) {
       y: Math.round(innerY0 + (innerY1 - innerY0) / 2),
     };
     const cell = nearestFloorCell(center, floorCells);
-    if (cell) placed.push({ ...cell, variant: Math.floor(rng() * PILLAR_VARIANT_COUNT) });
+    if (cell) placed.push({ ...cell, variant: pickVariant() });
   }
 
   return placed;

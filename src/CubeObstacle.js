@@ -1,10 +1,12 @@
 import { TAG_OBSTACLE } from './tags.js';
 
+const OVERHANG_RATIO = 0.75;
+
 function CubeObstacle(x = 0, y = 0, w = 60, h = 60, props = {}) {
   // Dark violet stone, matching the sanctuary reference art's wall/column
   // blocks rather than the previous mossy green.
   const {
-    height = 26, bounciness = 0.4, topColor = '#7c6865', sideColor = '#453f5d',
+    height = 65, bounciness = 0.4, topColor = '#7c6865', sideColor = '#453f5d',
   } = props;
   return {
     x, y, w, h, height, bounciness, topColor, sideColor,
@@ -29,9 +31,12 @@ function CubeObstacle(x = 0, y = 0, w = 60, h = 60, props = {}) {
       const sy = (value) => Math.round(value * d + f);
       const left = sx(this.x - this.w / 2);
       const right = sx(this.x + this.w / 2);
-      const top = sy(this.y - this.h / 2);
-      const bottom = sy(this.y + this.h / 2);
-      const front = sy(this.y + this.h / 2 + this.height);
+      // Put 75% of the wall height above its footprint, preserving the
+      // full front-face height while reducing occlusion behind the wall.
+      const overhang = this.height * OVERHANG_RATIO;
+      const top = sy(this.y - this.h / 2 - overhang);
+      const bottom = sy(this.y + this.h / 2 - overhang);
+      const front = sy(this.y + this.h / 2 - overhang + this.height);
       context.save();
       context.setTransform(1, 0, 0, 1, 0, 0);
       context.fillStyle = this.sideColor;

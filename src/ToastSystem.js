@@ -2,7 +2,7 @@ import { on } from './bus.js';
 import { canvas } from './canvas.js';
 import { playItemCollected } from './sounds.js';
 
-const DURATION = 2;
+const DURATION = 3.5;
 const FADE_IN = 0.15;
 const FADE_OUT = 0.25;
 const HEIGHT = 44;
