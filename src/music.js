@@ -154,8 +154,7 @@ let themeBuffer;
 // Lazily builds the buffer on first call (needs a live AudioContext for its
 // sample rate) and hands it to audio.js's looping music() player.
 function playDungeonTheme() {
-  const context = init();
-  if (!themeBuffer) themeBuffer = buildTheme(context);
+  if (!themeBuffer) themeBuffer = buildTheme(init());
   music(themeBuffer, 1.5);
 }
 
