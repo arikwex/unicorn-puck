@@ -14,6 +14,7 @@ const LARGE_ROOM_SPAN = 12; // either axis at least this big always gets a pilla
 const MIN_PILLAR_SPACING = 2; // min cells between two pillars placed in the same room
 const SKIP_ROOM_CHANCE = 0.08; // even an eligible small/medium room sometimes just goes without, for variety
 const COLONNADE_COUNT = 3; // pillars per row in a colonnade pattern
+const PILLAR_VARIANT_COUNT = 4; // see Pillar.js -- classic column, crystal, flame square, candelabra
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
@@ -115,7 +116,7 @@ function placeInRoom(rng, room, floorSet) {
     if (!cell) return;
     if (entrances.some((entrance) => manhattan(entrance, cell) < ENTRANCE_CLEARANCE)) return;
     if (placed.some((other) => manhattan(other, cell) < MIN_PILLAR_SPACING)) return;
-    placed.push(cell);
+    placed.push({ ...cell, variant: Math.floor(rng() * PILLAR_VARIANT_COUNT) });
   });
 
   // A large room reads as too bare without at least one pillar -- if the
@@ -128,13 +129,14 @@ function placeInRoom(rng, room, floorSet) {
       y: Math.round(innerY0 + (innerY1 - innerY0) / 2),
     };
     const cell = nearestFloorCell(center, floorCells);
-    if (cell) placed.push(cell);
+    if (cell) placed.push({ ...cell, variant: Math.floor(rng() * PILLAR_VARIANT_COUNT) });
   }
 
   return placed;
 }
 
-// Returns every pillar position (grid cells) across the whole dungeon.
+// Returns every pillar's { x, y, variant } (grid cells, variant an index
+// into Pillar.js's four render variants) across the whole dungeon.
 // Deterministic for a given seed, independent of whatever seed the
 // dungeon layout itself used.
 function placePillars(dungeon, seed) {
