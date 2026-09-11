@@ -22,7 +22,7 @@ const HEART_OUTLINE_WIDTH = 3;
 const PULSE_SPEED = 4.5; // rad/s
 const PULSE_AMOUNT = 0.16; // +/- fraction of HEART_RADIUS
 
-// Two lobes (bezier curves) meeting at a bottom point -- the classic
+// Two lobes (Bézier curves) meeting at a bottom point -- the classic
 // canvas heart shape, drawn centered on (x, y). `radius` sets the
 // horizontal spread; every vertical offset is additionally scaled by
 // `heightScale`, so the shape can be stretched tall independent of width.
@@ -31,10 +31,8 @@ function renderHeart(context, x, y, radius, heightScale, fillColor, outlineColor
   const top = y - v(0.5);
   context.beginPath();
   context.moveTo(x, top + v(0.3));
-  context.bezierCurveTo(x, top, x - radius, top, x - radius, top + v(0.3));
-  context.bezierCurveTo(x - radius, top + v(0.75), x, top + v(0.85), x, top + v(1.3));
-  context.bezierCurveTo(x, top + v(0.85), x + radius, top + v(0.75), x + radius, top + v(0.3));
-  context.bezierCurveTo(x + radius, top, x, top, x, top + v(0.3));
+  context.bezierCurveTo(x - radius * 1.2, top - v(0.05), x - radius * 1.2, top + v(0.8), x, top + v(1.3));
+  context.bezierCurveTo(x + radius * 1.2, top + v(0.8), x + radius * 1.2, top - v(0.05), x, top + v(0.3));
   context.closePath();
   context.fillStyle = fillColor;
   context.fill();
