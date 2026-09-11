@@ -12,7 +12,8 @@ function trailSpacing() {
   return TRAIL_SPACING_MIN + Math.random() * (TRAIL_SPACING_MAX - TRAIL_SPACING_MIN);
 }
 
-function GrubProjectile(x, y, vx, vy) {
+function GrubProjectile(x, y, vx, vy, props = {}) {
+  const { color = '#3dff5c', highlightColor = '#d9ffde' } = props;
   let remaining = LIFETIME;
   let lastX = x;
   let lastY = y;
@@ -44,7 +45,7 @@ function GrubProjectile(x, y, vx, vy) {
         const angle = Math.random() * Math.PI * 2;
         const speed = 20 + Math.random() * 50;
         add(SplatEffect(lastX + dx * t, lastY + dy * t,
-          Math.cos(angle) * speed, Math.sin(angle) * speed, '#3dff5c', {
+          Math.cos(angle) * speed, Math.sin(angle) * speed, color, {
           size: 6 + Math.random() * 3,
           arcHeight: 6 + Math.random() * 6,
         }));
@@ -59,11 +60,11 @@ function GrubProjectile(x, y, vx, vy) {
     onCollision() { return true; },
 
     render(context) {
-      context.fillStyle = '#3dff5c';
+      context.fillStyle = color;
       context.beginPath();
       context.arc(this.x, this.y, RADIUS, 0, Math.PI * 2);
       context.fill();
-      context.fillStyle = '#d9ffde';
+      context.fillStyle = highlightColor;
       context.beginPath();
       context.arc(this.x - 2 * SCALE, this.y - 2 * SCALE, 2.5 * SCALE, 0, Math.PI * 2);
       context.fill();

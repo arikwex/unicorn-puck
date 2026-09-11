@@ -63,6 +63,9 @@ const FACE_GLOW_COLOR = '#5f5';
 const EYE_RADIUS = 5;
 const MOUTH_RADIUS = 4;
 const COLLISION_RADIUS = 26;
+const LARGE_SCALE = 1.4;
+const LARGE_COLOR = '#ff9a32';
+const LARGE_SPREAD_ANGLE = Math.PI / 12;
 
 // -- combat -----------------------------------------------------------------
 const MAX_HP = 5;
@@ -170,10 +173,30 @@ function segmentPosition(grub, index) {
     motionY = (1 - Math.abs(Math.sin(grub.anim * 6.0 + index * 2))) * (8 - index) * 1;
   }
   return {
-    x: grub.x + Math.cos(grub.angle) * along + jitterX,
-    y: grub.y - Math.sin(grub.angle) * along * SPINE_PERSPECTIVE - SEGMENT_RADII[index] / 2 + motionY - lift,
-    radius: SEGMENT_RADII[index],
+    x: grub.x + (Math.cos(grub.angle) * along + jitterX) * grub.size,
+    y: grub.y + (-Math.sin(grub.angle) * along * SPINE_PERSPECTIVE - SEGMENT_RADII[index] / 2 + motionY - lift) * grub.size,
+    radius: SEGMENT_RADII[index] * grub.size,
   };
+}
+
+function renderBackSpike(context, segment, size, flash) {
+  context.beginPath();
+  context.moveTo(segment.x - segment.radius * 0.45, segment.y - segment.radius * 0.6);
+  context.lineTo(segment.x, segment.y - segment.radius * 1.9);
+  context.lineTo(segment.x + segment.radius * 0.45, segment.y - segment.radius * 0.6);
+  context.closePath();
+  context.lineWidth = 5 * size;
+  context.strokeStyle = '#a84c14';
+  context.fillStyle = LARGE_COLOR;
+  context.stroke();
+  context.fill();
+  if (flash > 0) {
+    context.globalAlpha = flash;
+    context.strokeStyle = context.fillStyle = '#fff';
+    context.stroke();
+    context.fill();
+    context.globalAlpha = 1;
+  }
 }
 
 function renderGrub(context, grub, flashTimer) {
@@ -184,7 +207,7 @@ function renderGrub(context, grub, flashTimer) {
   // the fills drawn afterward except where a segment's own edge IS the
   // union's outer boundary -- the cheap way to get one continuous outline
   // around a blob of overlapping circles instead of each circle's own ring.
-  context.lineWidth = OUTLINE_WIDTH;
+  context.lineWidth = OUTLINE_WIDTH * grub.size;
   for (const [color, alpha] of [[OUTLINE_COLOR, 1], ['#fff', flash]]) {
     if (alpha <= 0) continue;
     context.strokeStyle = color;
@@ -202,6 +225,7 @@ function renderGrub(context, grub, flashTimer) {
   const facingIntoPage = Math.sin(grub.angle) > 0;
   for (let step = 0; step < segments.length; step++) {
     const i = facingIntoPage ? step : segments.length - 1 - step;
+    if (grub.type === 'large' && i > 0) renderBackSpike(context, segments[i], grub.size, flash);
     fillCircle(context, segments[i].x, segments[i].y, segments[i].radius, BODY_COLORS[i % BODY_COLORS.length]);
     if (flash > 0) {
       context.globalAlpha = flash;
@@ -217,25 +241,26 @@ function renderGrubFace(context, grub, head) {
   // way PlayerCharacter's own eyes ride off its facing angle. Draw with
   // the head so nearer body segments can cover the face when facing away.
   const sway = Math.sin(grub.anim * 7) * 0.3;
+  const color = grub.type === 'large' ? LARGE_COLOR : FACE_GLOW_COLOR;
   [-1, 1].forEach((side) => {
     if (Math.sin(grub.angle - side * 0.6) > 0.22) {
       return;
     }
     const [x, y] = orbit3d(9, -4, -side * 12, grub.angle + sway);
-    const ex = head.x + x;
-    const ey = head.y + y;
-    fillCircle(context, ex, ey, EYE_RADIUS, FACE_GLOW_COLOR);
+    const ex = head.x + x * grub.size;
+    const ey = head.y + y * grub.size;
+    fillCircle(context, ex, ey, EYE_RADIUS * grub.size, color);
   });
   if (Math.sin(grub.angle) < 0.22) {
     const mouth = mouthPosition(grub, head);
-    fillCircle(context, mouth.x, mouth.y, MOUTH_RADIUS, FACE_GLOW_COLOR);
+    fillCircle(context, mouth.x, mouth.y, MOUTH_RADIUS * grub.size, color);
   }
 }
 
 function mouthPosition(grub, head = segmentPosition(grub, 0)) {
   const sway = Math.sin(grub.anim * 7) * 0.3;
   const [x, y] = orbit3d(12, 5, 0, grub.angle + sway);
-  return { x: head.x + x, y: head.y + y };
+  return { x: head.x + x * grub.size, y: head.y + y * grub.size };
 }
 
 // A purple-outlined, four-segment grub that patrols randomly within its
@@ -245,7 +270,9 @@ function mouthPosition(grub, head = segmentPosition(grub, 0)) {
 // walls), which is what keeps the grub "generally within its room" rather
 // than wandering the whole dungeon.
 function Grub(x, y, room, seed, props = {}) {
-  const { bounciness = 0.4 } = props;
+  const { bounciness = 0.4, type = 'small' } = props;
+  const size = type === 'large' ? LARGE_SCALE : 1;
+  const maxHp = MAX_HP + (type === 'large' ? 3 : 0);
   const rng = mulberry32(seed);
   let pauseTimer = randRange(rng, PAUSE_MIN, PAUSE_MAX);
   let flashTimer = 0;
@@ -261,6 +288,7 @@ function Grub(x, y, room, seed, props = {}) {
   // fraction of the player's hit velocity. The seeded rng keeps the
   // launch pattern reproducible.
   function fireSplats(originX, originY, count, color, impactVx, impactVy) {
+    const splatColor = type === 'large' ? LARGE_COLOR : color;
     for (let i = 0; i < count; i++) {
       const angle = rng() * TAU;
       const speed = Math.sqrt(rng()) * SPLAT_SPEED_MAX;
@@ -268,14 +296,14 @@ function Grub(x, y, room, seed, props = {}) {
       const vy = Math.sin(angle) * speed + impactVy * SPLAT_IMPACT_TRANSFER;
       const splatSize = randRange(rng, SPLAT_SIZE_MIN, SPLAT_SIZE_MAX);
       const splatArcHeight = Math.hypot(vx, vy) * randRange(rng, SPLAT_ARC_HEIGHT_TIME_MIN, SPLAT_ARC_HEIGHT_TIME_MAX);
-      add(SplatEffect(originX, originY, vx, vy, color, { size: splatSize, arcHeight: splatArcHeight }));
+      add(SplatEffect(originX, originY, vx, vy, splatColor, { size: splatSize, arcHeight: splatArcHeight }));
     }
   }
 
-  const minX = room.x - room.w / 2 + PATROL_MARGIN;
-  const maxX = room.x + room.w / 2 - PATROL_MARGIN;
-  const minY = room.y - room.h / 2 + PATROL_MARGIN;
-  const maxY = room.y + room.h / 2 - PATROL_MARGIN;
+  const minX = room.x - room.w / 2 + PATROL_MARGIN * size;
+  const maxX = room.x + room.w / 2 - PATROL_MARGIN * size;
+  const minY = room.y - room.h / 2 + PATROL_MARGIN * size;
+  const maxY = room.y + room.h / 2 - PATROL_MARGIN * size;
 
   function pickWaypoint() {
     if (minX >= maxX || minY >= maxY) return { x: room.x, y: room.y };
@@ -285,6 +313,10 @@ function Grub(x, y, room, seed, props = {}) {
   return {
     x,
     y,
+    type,
+    size,
+    maxHp,
+    enemyCost: type === 'large' ? 2 : 1,
     vx: 0,
     vy: 0,
     angle: Math.random() * TAU,
@@ -292,7 +324,7 @@ function Grub(x, y, room, seed, props = {}) {
     target: null,
     state: 'patrol',
     aimProgress: 0,
-    hp: MAX_HP,
+    hp: maxHp,
     order: y,
     tags: [TAG_OBSTACLE, TAG_ENEMY],
 
@@ -304,7 +336,7 @@ function Grub(x, y, room, seed, props = {}) {
       return {
         x: this.x,
         y: this.y,
-        radius: COLLISION_RADIUS,
+        radius: COLLISION_RADIUS * size,
         shape: 'circle',
         mass: Infinity,
         vx: this.vx,
@@ -356,8 +388,11 @@ function Grub(x, y, room, seed, props = {}) {
             const mouth = mouthPosition(this);
             const dx = player.x - mouth.x;
             const dy = player.y - mouth.y;
-            const distance = Math.hypot(dx, dy) || 1;
-            add(GrubProjectile(mouth.x, mouth.y, dx / distance * PROJECTILE_SPEED, dy / distance * PROJECTILE_SPEED));
+            const heading = Math.atan2(dy, dx);
+            const spread = this.type === 'large' ? [-LARGE_SPREAD_ANGLE, 0, LARGE_SPREAD_ANGLE] : [0];
+            const palette = this.type === 'large' ? { color: LARGE_COLOR, highlightColor: '#ffe1b3' } : undefined;
+            spread.forEach((offset) => add(GrubProjectile(mouth.x, mouth.y,
+              Math.cos(heading + offset) * PROJECTILE_SPEED, Math.sin(heading + offset) * PROJECTILE_SPEED, palette)));
             playOozeShot();
             this.state = 'recovering';
             recoverElapsed = 0;
@@ -443,7 +478,8 @@ function Grub(x, y, room, seed, props = {}) {
     render(context) {
       renderGrub(context, this, flashTimer);
       if (healthBarTimer > 0) {
-        renderHealthBar(context, this.x, this.y - HEALTH_BAR_OFFSET_Y, HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT, this.hp, MAX_HP);
+        renderHealthBar(context, this.x, this.y - HEALTH_BAR_OFFSET_Y * size,
+          HEALTH_BAR_WIDTH * size, HEALTH_BAR_HEIGHT * size, this.hp, this.maxHp);
       }
     },
   };

@@ -247,14 +247,17 @@ test('combat cue has a strong onset, a long decaying tail, and finite unclipped 
   assert.ok(rms(2000, 2500) > 0.001, 'bass tail still rings after two seconds');
 });
 
-test('map creation attaches seeded combat rooms to their own six enemies and excludes spawn', () => {
+test('map creation attaches seeded combat rooms to their weighted enemy budget and excludes spawn', () => {
   const seed = 42;
   const { player } = createMap(seed);
   const controllers = getObjectsByTag(TAG_COMBAT_ROOM);
+  const types = controllers.map((room) => room.enemies.map((enemy) => enemy.type));
+  assert.ok(types.flat().includes('large'), 'the seeded map includes large grubs');
   const dungeon = inflateDungeon(generateDungeon(seed), 3);
   assert.equal(controllers.length, Math.round((dungeon.rooms.length - 1) / 2));
   for (const room of controllers) {
-    assert.equal(room.enemies.length, 6);
+    const budget = Math.round((room.bounds.w + room.bounds.h) / (3 * 60 * Math.SQRT2)) - 3;
+    assert.equal(room.enemies.reduce((sum, enemy) => sum + enemy.enemyCost, 0), budget);
     assert.ok(room.enemies.every((enemy) => getObjects().includes(enemy)));
     assert.ok(Math.abs(player.x - room.bounds.x) >= room.bounds.w / 2
       || Math.abs(player.y - room.bounds.y) >= room.bounds.h / 2);
@@ -273,6 +276,7 @@ test('map creation attaches seeded combat rooms to their own six enemies and exc
   assert.ok(grates.every((grate) => !getObjects().includes(grate)));
   clear();
   createMap(seed);
+  assert.deepEqual(getObjectsByTag(TAG_COMBAT_ROOM).map((room) => room.enemies.map((enemy) => enemy.type)), types);
   assert.ok(getObjectsByTag(TAG_COMBAT_ROOM).every((room) => room.state === 'ready'));
   assert.equal(getObjectsByTag(TAG_OBSTACLE).filter((object) => object.blocksSweptMotion).length, 0);
 });

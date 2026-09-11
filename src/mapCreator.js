@@ -27,21 +27,23 @@ import PlayerHealthHUD from './PlayerHealthHUD.js';
 import TreasureChest, { CHEST_RADIUS } from './TreasureChest.js';
 import ToastSystem from './ToastSystem.js';
 
-// GRUBS_PER_ROOM grubs per room, each scattered to its own spot within the
+// Each room has an enemy budget: small grubs cost one, large grubs two.
+// Grubs are scattered to their own spots within the
 // room (buildDungeon's own grubSeed offset by <room index> seeds that
 // scatter) and its own patrol (offset by <room index> * 100 + <grub index>
 // seeds that), kept at least GRUB_MIN_PLAYER_DISTANCE from wherever the player spawns
 // and GRUB_ROOM_MARGIN off its room's own walls where the room is big
 // enough to allow both.
-// A room's own grub count scales with its (raw, pre-inflation) size: a
-// square room's width+height minus 3 gives exactly 3/5/7 grubs for a
+// A room's enemy budget scales with its (raw, pre-inflation) size: a
+// square room's width+height minus 3 gives exactly 3/5/7 slots for a
 // 3x3/4x4/5x5 room -- and since donjonDungeon.js only ever generates 3- or
 // 5-cell room dimensions (see its own ROOM_MIN_SIZE/ROOM_MAX_SIZE), a
 // non-square 3x5 (or 5x3) room -- "size 4" on average -- lands on the same
-// formula's 5 grubs too, rather than needing a separate lookup table.
+// formula's 5 slots too, rather than needing a separate lookup table.
 function roomGrubCount(rawRoom) {
   return rawRoom.w + rawRoom.h - 3;
 }
+const LARGE_GRUB_CHANCE = 0.3;
 const GRUB_MIN_PLAYER_DISTANCE = 200;
 const GRUB_ROOM_MARGIN = 50;
 // A hallway only ever gets a grub if it's a straight run of at least this
@@ -389,7 +391,7 @@ function buildDungeon(seed) {
   const spawnRoomGrid = dungeon.rooms[0];
   const playerSpawn = toWorld(spawnRoomGrid.x + spawnRoomGrid.w / 2, spawnRoomGrid.y + spawnRoomGrid.h / 2);
 
-  // roomGrubCount(room) grubs per room -- except the player's own spawn
+  // roomGrubCount(room) enemy slots per room -- except the player's own spawn
   // room, which stays enemy-free so the run always opens on calm ground --
   // each scattered to its own spot and with its own seeded patrol, so
   // behavior stays reproducible run to run, and never within
@@ -400,11 +402,15 @@ function buildDungeon(seed) {
       x: roomCenter.x, y: roomCenter.y, w: room.w * TILE, h: room.h * TILE,
     };
     const scatterRng = mulberry32(grubSeed + roomIndex);
+    const typeRng = mulberry32(seed + 9 + roomIndex * 100);
     const enemies = [];
     if (roomIndex !== 0) {
-      for (let i = 0; i < roomGrubCount(rawDungeon.rooms[roomIndex]); i++) {
+      const budget = roomGrubCount(rawDungeon.rooms[roomIndex]);
+      for (let spent = 0; spent < budget;) {
+        const type = budget - spent >= 2 && typeRng() < LARGE_GRUB_CHANCE ? 'large' : 'small';
         const spawn = pickGrubSpawn(worldRoom, playerSpawn, scatterRng);
-        const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + i));
+        const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + enemies.length, { type }));
+        spent += grub.enemyCost;
         enemies.push(grub);
         obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.puck().radius });
       }
