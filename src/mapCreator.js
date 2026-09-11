@@ -300,10 +300,11 @@ function buildDungeon(seed) {
   const spawnRoomGrid = dungeon.rooms[0];
   const playerSpawn = toWorld(spawnRoomGrid.x + spawnRoomGrid.w / 2, spawnRoomGrid.y + spawnRoomGrid.h / 2);
 
-  // GRUBS_PER_ROOM grubs per room -- including the player's own spawn
-  // room -- each scattered to its own spot and with its own seeded
-  // patrol, so behavior stays reproducible run to run, and never within
-  // GRUB_MIN_PLAYER_DISTANCE of the player's spawn.
+  // GRUBS_PER_ROOM grubs per room -- except the player's own spawn room,
+  // which stays enemy-free so the run always opens on calm ground -- each
+  // scattered to its own spot and with its own seeded patrol, so behavior
+  // stays reproducible run to run, and never within GRUB_MIN_PLAYER_DISTANCE
+  // of the player's spawn.
   dungeon.rooms.forEach((room, roomIndex) => {
     const roomCenter = toWorld(room.x + room.w / 2, room.y + room.h / 2);
     const worldRoom = {
@@ -311,11 +312,13 @@ function buildDungeon(seed) {
     };
     const scatterRng = mulberry32(grubSeed + roomIndex);
     const enemies = [];
-    for (let i = 0; i < GRUBS_PER_ROOM; i++) {
-      const spawn = pickGrubSpawn(worldRoom, playerSpawn, scatterRng);
-      const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + i));
-      enemies.push(grub);
-      obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.puck().radius });
+    if (roomIndex !== 0) {
+      for (let i = 0; i < GRUBS_PER_ROOM; i++) {
+        const spawn = pickGrubSpawn(worldRoom, playerSpawn, scatterRng);
+        const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + i));
+        enemies.push(grub);
+        obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.puck().radius });
+      }
     }
     if (combatRoomIndices.has(roomIndex)) {
       // Grid coordinates name cell centers; the exact floor rectangle
