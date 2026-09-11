@@ -330,7 +330,7 @@ function buildDungeon(seed) {
   // Roman-esque columns dropped into rooms with enough space for them --
   // corners, a symmetric pair flanking opposing walls, or centered --
   // never within reach of a doorway. See placePillars.js. `variant` picks
-  // one of Pillar.js's four purely-visual looks; physics never varies.
+  // classic columns or candelabras for the room; physics never varies.
   placePillars(dungeon, pillarSeed).forEach(({ x, y, variant }) => {
     const world = toWorld(x, y);
     const pillar = add(Pillar(world.x, world.y, { variant }));

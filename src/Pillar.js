@@ -2,12 +2,7 @@ import { fillEllipse, fillRect } from './canvasShapes.js';
 import { TAG_OBSTACLE } from './tags.js';
 import { TAU } from './mathUtils.js';
 
-// Was 4 while every pillar rolled one of 4 visual variants (see the
-// commented-out crystal/square/candelabra code and placePillars.js's own
-// commented-out variant-pool logic below) -- simplified down to just the
-// classic column to cut size; left commented rather than deleted in case
-// the variety is worth bringing back later.
-const VARIANT_COUNT = 1;
+// Active variants: 0 = classic column, 3 = candelabra.
 
 // A small extruded square slab -- a flat top face sitting on a shaded side
 // face dropping down by `height` -- used for both the pillar's base and
@@ -41,9 +36,8 @@ function renderClassicPillar(context, obstacle) {
   renderSlab(context, x, capTopY, capHalfSize, capHeight, stoneColor, shadeColor);
 }
 
-/* -- variant 1: crystal on a squat plinth, variant 2: square pillar with a
-   flame on top, variant 3: 3-prong candelabra -- retired to cut size (see
-   VARIANT_COUNT above); kept here commented rather than deleted.
+/* -- variant 1: crystal on a squat plinth -- retired to cut size;
+   kept here commented rather than deleted.
 
 // Base and shaft radius match the classic pillar's own (see obstacle.base
 // fields / radius below) -- only the shaft height is halved, so the plinth reads as
@@ -106,7 +100,9 @@ function renderCrystalPillar(context, obstacle, anim) {
   context.fill();
 }
 
-// -- shared flame flicker, used by variants 2 and 3 -----------------------
+*/
+
+// -- candelabra flame flicker -------------------------------------------
 const FLAME_BASE_COLOR = '#f60';
 const FLAME_MID_COLOR = '#fa0';
 const FLAME_TIP_COLOR = '#fea';
@@ -137,7 +133,7 @@ function renderFlame(context, x, topY, anim) {
   teardrop(FLAME_TIP_COLOR, 0.4);
 }
 
-// -- variant 2: square pillar with a flame on top ------------------------
+/* -- variant 2: square pillar with a flame on top -- still retired -------
 // Base, cap, and shaft width match the classic pillar's own (see
 // obstacle.base/cap/radius fields below) -- only the shaft height is halved.
 const SQUARE_FLAME_SCALE = 2.5;
@@ -169,6 +165,8 @@ function renderSquarePillar(context, obstacle, anim) {
   renderFlame(context, 0, 0, anim);
   context.restore();
 }
+
+*/
 
 // -- variant 3: 3-prong candelabra ----------------------------------------
 const CANDELABRA_METAL_COLOR = '#eb4';
@@ -214,12 +212,7 @@ function renderCandelabra(context, obstacle, anim) {
   });
 }
 
-*/
-
-// Simplified down to the one classic-Roman-column look (see VARIANT_COUNT
-// above) -- still the exact same static circle of radius `r` the retired
-// variants were (see physics.js), so this never changes how the player
-// bounces off it.
+// Both looks share the same static collision circle of radius `r`.
 function Pillar(x = 0, y = 0, props = {}) {
   const {
     r: radius = 26,
@@ -234,7 +227,7 @@ function Pillar(x = 0, y = 0, props = {}) {
     // reads as a separate, bounce-off obstacle rather than blending in.
     stoneColor = '#a99',
     shadeColor = '#444',
-    variant = Math.floor(Math.random() * VARIANT_COUNT),
+    variant = 0,
   } = props;
   let anim = Math.random() * TAU;
 
@@ -260,16 +253,10 @@ function Pillar(x = 0, y = 0, props = {}) {
     },
 
     render(context) {
-      // Branched on `this.variant` back when renderCrystalPillar/
-      // renderSquarePillar/renderCandelabra existed (see the commented-out
-      // block above) -- VARIANT_COUNT === 1 now means `variant` is always
-      // 0, so this is the only reachable case.
-      renderClassicPillar(context, this);
+      if (this.variant === 3) renderCandelabra(context, this, anim);
+      else renderClassicPillar(context, this);
     },
   };
 }
 
 export default Pillar;
-// renderFlame's own export retired along with the commented-out variants
-// above (Decoration.js's candle was its only other consumer, and
-// mapCreator.js no longer places decorations at all).

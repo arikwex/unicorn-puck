@@ -34,7 +34,7 @@ function render(menu) {
   return calls;
 }
 
-test('menu reuses wall, pillar and chalice art without adding gameplay objects', () => {
+test('menu reuses wall, candelabra and chalice art without adding gameplay objects', () => {
   const menu = MainMenu(() => {});
   for (const [width, height] of [[800, 600], [320, 640], [1200, 500]]) {
     canvas.width = width;
@@ -49,7 +49,8 @@ test('menu reuses wall, pillar and chalice art without adding gameplay objects',
     assert.ok(calls.some(({ method, args }) => method === 'translate'
       && args[0] === width * 0.8 && args[1] === height * 0.65), 'chalice on the right');
     assert.ok(calls.some(({ method, color }) => method === 'fill' && color === '#a13'), 'blood in chalice');
-    assert.ok(calls.some(({ color }) => color === '#a99'), 'pillar stone');
+    assert.ok(calls.some(({ color }) => color === '#eb4'), 'candelabra metal');
+    assert.ok(calls.some(({ color }) => color === '#f60'), 'candelabra flames');
     assert.equal(getObjects().length, 0, 'scenery is not registered with the game engine');
   }
 });
