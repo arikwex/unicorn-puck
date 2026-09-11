@@ -762,7 +762,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
       tintContext.clearRect(0, 0, DAMAGE_CANVAS_SIZE, DAMAGE_CANVAS_SIZE);
       tintContext.save();
       renderPlayer(tintContext, { ...this, x: center, y: center }, anim, this.charge, []);
-      // tintContext.globalCompositeOperation = 'source-atop';
+      tintContext.globalCompositeOperation = 'source-atop';
       tintContext.globalAlpha = Math.sin(damageFlashTimer / DAMAGE_FLASH_DURATION * Math.PI / 2);
       tintContext.fillStyle = '#f22';
       tintContext.fillRect(0, 0, DAMAGE_CANVAS_SIZE, DAMAGE_CANVAS_SIZE);
