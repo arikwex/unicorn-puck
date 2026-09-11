@@ -1,4 +1,5 @@
 import BubbleShieldItem from './BubbleShieldItem.js';
+import { emit } from './bus.js';
 import Camera from './camera.js';
 import Chalice from './Chalice.js';
 import { resetChalices } from './chaliceProgress.js';
@@ -167,16 +168,35 @@ function isClearSpot(x, y, radius, walls, circles, entrances) {
 
 // Resamples pickPointInRoom up to `attempts` times looking for a spot
 // clear of every obstacle and entrance; returns null if none work out.
-// Shared by chest and chalice placement -- they only differ in radius,
-// margin, attempt budget, and what happens when this returns null (a
-// chest just goes without; a chalice must still be placed somewhere, see
-// its fallback in buildDungeon).
+// Used by chest placement -- a chest is best-effort (goes without rather
+// than fighting for a better spot), so the first clear candidate is fine.
 function findClearSpot(room, margin, radius, attempts, rng, walls, circles, entrances) {
   for (let attempt = 0; attempt < attempts; attempt++) {
     const candidate = pickPointInRoom(room, margin, rng);
     if (isClearSpot(candidate.x, candidate.y, radius, walls, circles, entrances)) return candidate;
   }
   return null;
+}
+
+// Like findClearSpot, but spends its whole attempt budget and keeps
+// whichever clear candidate landed closest to the room's own center,
+// instead of settling for the first one that happened to pass. Used for
+// chalice placement, which should hug room center as hard as the
+// walls/obstacles/doorway clearance rules allow rather than just being
+// clear of them.
+function findCenterMostClearSpot(room, margin, radius, attempts, rng, walls, circles, entrances) {
+  let best = null;
+  let bestDistance = Infinity;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const candidate = pickPointInRoom(room, margin, rng);
+    if (!isClearSpot(candidate.x, candidate.y, radius, walls, circles, entrances)) continue;
+    const distance = Math.hypot(candidate.x - room.x, candidate.y - room.y);
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+  return best;
 }
 
 // Fisher-Yates shuffle -- used to pick exactly CHALICE_ROOM_FRACTION of
@@ -321,9 +341,11 @@ function buildDungeon(seed) {
     }
   });
 
-  // The level's Chalices of Pegacorn Blood -- same placement rules as a
-  // chest (clear of every obstacle and doorway, biased toward room
-  // center). Exactly round(CHALICE_ROOM_FRACTION * non-spawn rooms) of
+  // The level's Chalices of Pegacorn Blood -- clear of every obstacle and
+  // doorway like a chest, but pulled harder toward room center: it keeps
+  // its whole attempt budget's best candidate rather than a chest's first
+  // clear one (see findCenterMostClearSpot). Exactly
+  // round(CHALICE_ROOM_FRACTION * non-spawn rooms) of
   // them get one -- the count is computed up front and that many distinct
   // rooms are shuffled into, so the target is always hit precisely rather
   // than each room flipping its own coin and the dungeon as a whole
@@ -342,10 +364,10 @@ function buildDungeon(seed) {
       x: roomCenter.x, y: roomCenter.y, w: room.w * TILE, h: room.h * TILE,
     };
     // Chosen for a chalice, so unlike a chest this never gives up on the
-    // room -- it falls back to an unchecked point rather than skipping
-    // entirely and silently shrinking the required total below the count
-    // just committed to above.
-    const spawn = findClearSpot(worldRoom, CHALICE_ROOM_MARGIN, CHALICE_RADIUS, CHALICE_PLACEMENT_ATTEMPTS, chaliceRng, wallBoxes, obstacleCircles, roomEntrancePoints(room))
+    // room -- it falls back to an unchecked (but still center-biased)
+    // point rather than skipping entirely and silently shrinking the
+    // required total below the count just committed to above.
+    const spawn = findCenterMostClearSpot(worldRoom, CHALICE_ROOM_MARGIN, CHALICE_RADIUS, CHALICE_PLACEMENT_ATTEMPTS, chaliceRng, wallBoxes, obstacleCircles, roomEntrancePoints(room))
       || pickPointInRoom(worldRoom, CHALICE_ROOM_MARGIN, chaliceRng);
     add(Chalice(spawn.x, spawn.y));
   });
@@ -388,6 +410,9 @@ function createMap(seed) {
   const itemAbilityHUD = add(ItemAbilityHUD());
   const miniMap = add(MiniMap(player));
   add(ToastSystem());
+  // Shown instantly (not after any delay) since it's establishing the
+  // whole game's premise, not reacting to something the player just did.
+  emit('toast', { message: 'Collect all Pegacorn Blood Chalices to win!' });
   add(Camera().follow(player));
   const dragController = add(DragController(player));
   add(PhysicsWorld());

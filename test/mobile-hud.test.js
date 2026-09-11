@@ -52,12 +52,12 @@ function screenRect(call) {
   return [x * sx + tx, y * sy + ty, w * sx, h * sy];
 }
 
-test('HUD uses half scale on narrow screens and coarse-pointer devices, updating on resize', () => {
+test('HUD uses 0.65 scale on narrow screens and coarse-pointer devices, updating on resize', () => {
   assert.equal(hudScale(), 1);
   canvas.width = 390;
-  assert.equal(hudScale(), 0.5);
+  assert.equal(hudScale(), 0.65);
   canvas.width = 1024; coarse = true;
-  assert.equal(hudScale(), 0.5, 'landscape phones and tablets remain half-size');
+  assert.equal(hudScale(), 0.65, 'landscape phones and tablets remain mobile-sized');
   coarse = false;
   assert.equal(hudScale(), 1);
 });
@@ -69,11 +69,12 @@ test('minimap is bottom-left on desktop and mobile, with a white player dot', ()
   renderScreenHUD(map, context);
   assert.equal(draws.length, 0, 'Oracle Eyes still controls visibility');
   player.oracleEyes = true;
-  for (const [width, height, scale] of [[800, 600, 1], [390, 844, 0.5]]) {
+  for (const [width, height, scale] of [[800, 600, 1], [390, 844, 0.65]]) {
     canvas.width = width; canvas.height = height; draws = [];
     renderScreenHUD(map, context);
     const panel = draws.find(({ method }) => method === 'fillRect');
-    assert.deepEqual(screenRect(panel), [16 * scale, height - 176 * scale, 160 * scale, 160 * scale]);
+    const expected = [16 * scale, height - 176 * scale, 160 * scale, 160 * scale];
+    screenRect(panel).forEach((value, i) => assert.ok(Math.abs(value - expected[i]) < 1e-8));
     const dot = draws.find(({ method }) => method === 'arc');
     assert.equal(dot.color, '#fff');
     assert.equal(dot.args[2] * dot.transform[0], 4 * scale);
@@ -96,11 +97,11 @@ test('health, counter, abilities, toasts and status cards all opt into anchored 
     };
     renderScreenHUD(hud, context);
     const [ax, ay] = hud.hudAnchor;
-    assert.deepEqual(observed, [0.5, 0, 0, 0.5, canvas.width * ax * 0.5, canvas.height * ay * 0.5]);
+    assert.deepEqual(observed, [0.65, 0, 0, 0.65, canvas.width * ax * 0.35, canvas.height * ay * 0.35]);
     assert.deepEqual(context.transform, [1, 0, 0, 1, 0, 0], 'HUD scaling cannot leak to the next object');
   }
   const healthOutline = draws.find(({ method }) => method === 'strokeRect');
-  assert.deepEqual(screenRect(healthOutline), [44, 16.5, 90, 15]);
+  assert.deepEqual(screenRect(healthOutline), [88 * 0.65, 33 * 0.65, 180 * 0.65, 30 * 0.65]);
   const toast = draws.find(({ method, args }) => method === 'fillText' && args[0] === 'Defeat all enemies to exit room');
   assert.equal(toast.args[1] * toast.transform[0] + toast.transform[4], canvas.width / 2);
 });
@@ -118,5 +119,5 @@ test('engine applies scaling only to anchored UI, leaving aim overlays and world
   stop();
   assert.deepEqual(worldTransform, [1, 0, 0, 1, 0, 0]);
   assert.deepEqual(aimTransform, [1, 0, 0, 1, 0, 0]);
-  assert.deepEqual(hudTransform, [0.5, 0, 0, 0.5, 0, 0]);
+  assert.deepEqual(hudTransform, [0.65, 0, 0, 0.65, 0, 0]);
 });

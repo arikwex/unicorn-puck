@@ -132,7 +132,7 @@ test('entering locks once; only that room’s final kill opens all gates with ei
   assert.equal(room.state, 'active');
   assert.equal(getObjectsByTag(TAG_OBSTACLE).length, 4);
   assert.equal(getObjects().length - before, doors.length * 9, 'one grate + eight splats per doorway');
-  assert.deepEqual(notifications, [{ message: 'Defeat all enemies to exit room', priority: true }]);
+  assert.deepEqual(notifications, [{ message: 'Defeat all enemies to exit room' }]);
   assert.equal(sounds.length, 1);
   room.update();
   assert.equal(sounds.length, 1);

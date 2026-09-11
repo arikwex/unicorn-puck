@@ -9,29 +9,14 @@ const HEIGHT = 44;
 const MARGIN = 24;
 
 function ToastSystem() {
-  const queue = [];
   let message;
   let elapsed = 0;
   let unsubscribe = [];
 
-  function showNext() {
-    const next = queue.shift();
-    message = next?.message;
+  function show(text, itemCollected = false) {
+    message = text;
     elapsed = 0;
-    if (next?.itemCollected) playItemCollected();
-  }
-
-  function enqueue(notification, priority = false) {
-    if (priority) {
-      // Resume an interrupted pickup message afterward without replaying
-      // its already-heard chime. Combat instructions appear immediately.
-      if (message) queue.unshift({ message });
-      queue.unshift(notification);
-      showNext();
-    } else {
-      queue.push(notification);
-      if (!message) showNext();
-    }
+    if (itemCollected) playItemCollected();
   }
 
   return {
@@ -40,21 +25,20 @@ function ToastSystem() {
 
     start() {
       unsubscribe = [
-        on('item-collected', ({ name }) => enqueue({ message: `${name} Collected`, itemCollected: true })),
-        on('toast', ({ message, priority }) => enqueue({ message }, priority)),
+        on('item-collected', ({ name }) => show(`${name} Collected`, true)),
+        on('toast', ({ message }) => show(message)),
       ];
     },
 
     destroy() {
       unsubscribe.forEach((off) => off());
-      queue.length = 0;
       message = undefined;
     },
 
     update(dt) {
       if (!message) return;
       elapsed += dt;
-      if (elapsed >= DURATION) showNext();
+      if (elapsed >= DURATION) message = undefined;
     },
 
     renderHUD(context) {

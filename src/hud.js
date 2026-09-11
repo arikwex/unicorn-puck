@@ -1,6 +1,6 @@
 import { canvas } from './canvas.js';
 
-const MOBILE_HUD_SCALE = 0.5;
+const MOBILE_HUD_SCALE = 0.65;
 const MOBILE_WIDTH = 600;
 
 function hudScale() {

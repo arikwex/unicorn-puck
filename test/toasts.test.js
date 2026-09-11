@@ -65,13 +65,13 @@ test('an item event shows a bottom-center toast for 3.5 seconds with one chime',
   assert.equal(soundStarts, 1);
 });
 
-test('rapid pickups queue, pairing each displayed toast with exactly one sound', () => {
+test('new pickups immediately replace the toast and restart its duration with one chime', () => {
   const toasts = add(ToastSystem());
   bus.emit('item-collected', { name: 'Health Potion' });
-  bus.emit('item-collected', { name: 'Pegacorn Blood Chalice' });
   assert.equal(soundStarts, 1);
   assert.equal(draw(toasts).text[0].text, 'Health Potion Collected');
-  toasts.update(3.5);
+  toasts.update(3);
+  bus.emit('item-collected', { name: 'Pegacorn Blood Chalice' });
   assert.equal(soundStarts, 2);
   assert.equal(draw(toasts).text[0].text, 'Pegacorn Blood Chalice Collected');
   toasts.update(3.4);
@@ -79,19 +79,21 @@ test('rapid pickups queue, pairing each displayed toast with exactly one sound',
   toasts.update(0.11);
   assert.equal(draw(toasts).text.length, 0);
   assert.equal(soundStarts, 2);
+  toasts.update(10);
+  assert.equal(draw(toasts).text.length, 0, 'replaced toasts never reappear');
 });
 
-test('clearing a scene removes its subscription and pending notifications', () => {
+test('clearing a scene removes its subscription and current notification', () => {
   const previous = add(ToastSystem());
   bus.emit('item-collected', { name: 'First' });
-  bus.emit('item-collected', { name: 'Queued' });
+  bus.emit('item-collected', { name: 'Replacement' });
   clear();
   bus.emit('item-collected', { name: 'While Cleared' });
-  assert.equal(soundStarts, 1);
+  assert.equal(soundStarts, 2);
   assert.equal(draw(previous).text.length, 0);
   const next = add(ToastSystem());
   bus.emit('item-collected', { name: 'New Run' });
-  assert.equal(soundStarts, 2);
+  assert.equal(soundStarts, 3);
   assert.equal(draw(next).text[0].text, 'New Run Collected');
 });
 
@@ -144,19 +146,18 @@ test('chalice pickup emits once and uses only the toast chime', () => {
   assert.equal(soundStarts, 1);
 });
 
-test('combat instructions appear immediately without a pickup chime or losing queued pickups', () => {
+test('generic and pickup toasts replace each other immediately without replaying old messages', () => {
   const toasts = add(ToastSystem());
   bus.emit('item-collected', { name: 'Health Potion' });
   bus.emit('item-collected', { name: 'Pegacorn Blood Chalice' });
-  bus.emit('toast', { message: 'Defeat all enemies to exit room', priority: true });
+  bus.emit('toast', { message: 'Defeat all enemies to exit room' });
   assert.equal(draw(toasts).text[0].text, 'Defeat all enemies to exit room');
-  assert.equal(soundStarts, 1);
-  toasts.update(3.5);
-  assert.equal(draw(toasts).text[0].text, 'Health Potion Collected');
-  assert.equal(soundStarts, 1, 'resuming a pickup never repeats its chime');
-  toasts.update(3.5);
-  assert.equal(draw(toasts).text[0].text, 'Pegacorn Blood Chalice Collected');
   assert.equal(soundStarts, 2);
+  bus.emit('item-collected', { name: 'Bubble Shield' });
+  assert.equal(draw(toasts).text[0].text, 'Bubble Shield Collected');
+  assert.equal(soundStarts, 3);
+  toasts.update(3.5);
+  assert.equal(draw(toasts).text.length, 0);
   clear();
   bus.emit('toast', { message: 'After teardown' });
   assert.equal(draw(toasts).text.length, 0);

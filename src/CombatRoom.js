@@ -53,7 +53,7 @@ function CombatRoom(bounds, doorways, enemies) {
         grates = doorways.map((door) => add(MetalGrate(door)));
         doorways.forEach(splash);
         playCombatImpact();
-        emit('toast', { message: 'Defeat all enemies to exit room', priority: true });
+        emit('toast', { message: 'Defeat all enemies to exit room' });
       }
     },
 
