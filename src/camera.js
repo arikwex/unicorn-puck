@@ -56,13 +56,6 @@ function Camera(x = 0, y = 0, k = 8) {
       context.scale(this.zoom, this.zoom);
       context.translate(-this.x, -this.y);
     },
-
-    screenToWorld(screenX, screenY) {
-      return {
-        x: (screenX - canvas.width / 2) / this.zoom + this.x,
-        y: (screenY - canvas.height / 2) / this.zoom + this.y,
-      };
-    },
   };
 
   // Snap to the target immediately so the first frame doesn't ease in

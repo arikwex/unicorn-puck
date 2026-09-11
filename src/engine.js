@@ -70,7 +70,7 @@ function tick(now) {
   const expired = [];
   // Callbacks may add effects and re-sort objects. Iterate a snapshot so
   // every object present at the start of the phase updates exactly once.
-  [...objects].forEach((object) => {
+  [...objects].map((object) => {
     if (object.update?.(dt)) expired.push(object);
   });
   if (expired.length) remove(expired);
@@ -81,14 +81,14 @@ function tick(now) {
   // used for updates) so an object whose `order` it recomputes each update
   // -- e.g. the player keying it off its own y, for depth sorting -- is drawn
   // in its current order immediately, not just after its next add().
-  [...objects].sort((a, b) => (a.order || 0) - (b.order || 0)).forEach((object) => object.render?.(ctx));
+  [...objects].sort((a, b) => (a.order || 0) - (b.order || 0)).map((object) => object.render?.(ctx));
 
   ctx.restore();
 
   // HUD objects draw last in canvas pixels, independent of camera or depth.
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  [...objects].forEach((object) => renderScreenHUD(object, ctx));
+  [...objects].map((object) => renderScreenHUD(object, ctx));
   ctx.restore();
   requestAnimationFrame(tick);
 }
