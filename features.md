@@ -5,7 +5,7 @@
 - [x] basic enemy grub (4 sergmented spheres with face, no attack)
 - [x] basic combat instance room (kill all enemies to continue?)
 - [x] tresure chest -> Bump to damage / crack open
-- toast system -> item collected should show momentary toast "Health Potion Collected" or "Pegacorn Blood Chalice Collected" etc. (momentary 2 seconds from bottom of screen). use even bus to trigger. small sfx "du-ding" when invoked.
+- toast system -> item collected should show momentary toast "Health Potion Collected" or "Pegacorn Blood Chalice Collected" etc. (momentary 2 seconds from bottom of screen). use even bus to trigger. small sfx "du-ding" when invoked. (use the same sound that is currently the "chalice collected" sound, but use it for all toast events. rename it to "item collected" and it's always used one-to-one with toast=item-collected.)
 - pinball style dingers
 - crystal -> Bump to damage / recharge unicorn power
 - lever + gateway

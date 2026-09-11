@@ -47,54 +47,63 @@ function renderClassicPillar(context, obstacle) {
 }
 
 // -- variant 1: crystal on a squat plinth --------------------------------
-const CRYSTAL_BASE_HALF_SIZE = 20;
-const CRYSTAL_BASE_HEIGHT = 8;
-const CRYSTAL_SHAFT_HEIGHT = 22;
-const CRYSTAL_SHAFT_RADIUS = 16;
-const CRYSTAL_FLOAT_HEIGHT = 26; // rest height above the plinth top
-const CRYSTAL_BOB_SPEED = 1.6; // rad/s
-const CRYSTAL_BOB_AMOUNT = 5;
-const CRYSTAL_SIZE = 16; // half-diagonal of the diamond
-const CRYSTAL_COLOR = '#e0263f';
-const CRYSTAL_DARK_COLOR = '#8f1226';
-const CRYSTAL_HIGHLIGHT_COLOR = '#ff9db0';
-const CRYSTAL_GLOW_COLOR = '#e0263f';
+// Base and shaft radius match the classic pillar's own (see obstacle.base*/
+// radius below) -- only the shaft height is halved, so the plinth reads as
+// a shorter version of the same column rather than its own thinner one.
+const CRYSTAL_BASE_SIZE = 16; // half-diagonal of the diamond, pre-scale
+const CRYSTAL_OVERALL_SCALE = 1.3; // 30% larger
+const CRYSTAL_VERTICAL_STRETCH = 1.5; // additional vertical-only stretch, on top of the overall scale
+const CRYSTAL_SIZE = CRYSTAL_BASE_SIZE * CRYSTAL_OVERALL_SCALE;
+const CRYSTAL_FLOAT_HEIGHT = 40; // rest height above the plinth top -- clears the now-taller gem
+const CRYSTAL_BOB_SPEED = 0.9; // rad/s -- slow, so it clearly reads as levitating rather than jittering
+const CRYSTAL_BOB_AMOUNT = 9;
+const CRYSTAL_COLOR = '#22c3d4'; // teal
+const CRYSTAL_DARK_COLOR = '#0d6e78';
+const CRYSTAL_HIGHLIGHT_COLOR = '#bdf5fa';
+const CRYSTAL_GLOW_COLOR = '#22c3d4';
 
 function renderCrystalPillar(context, obstacle, anim) {
-  const { x, y, stoneColor, shadeColor } = obstacle;
-  const shaftTop = y - CRYSTAL_SHAFT_HEIGHT;
-  renderSlab(context, x, y, CRYSTAL_BASE_HALF_SIZE, CRYSTAL_BASE_HEIGHT, stoneColor, shadeColor);
-  renderShaft(context, x, shaftTop, y, CRYSTAL_SHAFT_RADIUS, stoneColor, shadeColor);
+  const {
+    x, y, radius, baseHalfSize, baseHeight, shaftHeight, stoneColor, shadeColor,
+  } = obstacle;
+  const shaftTop = y - shaftHeight / 2;
+  renderSlab(context, x, y, baseHalfSize, baseHeight, stoneColor, shadeColor);
+  renderShaft(context, x, shaftTop, y, radius, stoneColor, shadeColor);
 
   const gemY = shaftTop - CRYSTAL_FLOAT_HEIGHT + Math.sin(anim * CRYSTAL_BOB_SPEED) * CRYSTAL_BOB_AMOUNT;
+  // Vertical half-extent gets the extra stretch; horizontal keeps the
+  // diamond's original width-to-height ratio applied to the (already
+  // 30%-larger) base size.
+  const vSize = CRYSTAL_SIZE * CRYSTAL_VERTICAL_STRETCH;
+  const hSize = CRYSTAL_SIZE * 0.7;
 
   // Soft pulsing glow behind the gem.
   context.globalAlpha = 0.3 + 0.15 * Math.sin(anim * CRYSTAL_BOB_SPEED * 1.3);
-  fillEllipse(context, x, gemY, CRYSTAL_SIZE * 1.6, CRYSTAL_SIZE * 1.1, CRYSTAL_GLOW_COLOR);
+  fillEllipse(context, x, gemY, hSize * 1.8, vSize * 0.9, CRYSTAL_GLOW_COLOR);
   context.globalAlpha = 1;
 
   // Diamond: full shape in the base color, then an overlapping bottom
   // half in the dark color for a simple two-facet shading.
   context.fillStyle = CRYSTAL_COLOR;
   context.beginPath();
-  context.moveTo(x, gemY - CRYSTAL_SIZE);
-  context.lineTo(x + CRYSTAL_SIZE * 0.7, gemY);
-  context.lineTo(x, gemY + CRYSTAL_SIZE);
-  context.lineTo(x - CRYSTAL_SIZE * 0.7, gemY);
+  context.moveTo(x, gemY - vSize);
+  context.lineTo(x + hSize, gemY);
+  context.lineTo(x, gemY + vSize);
+  context.lineTo(x - hSize, gemY);
   context.closePath();
   context.fill();
   context.fillStyle = CRYSTAL_DARK_COLOR;
   context.beginPath();
-  context.moveTo(x - CRYSTAL_SIZE * 0.7, gemY);
-  context.lineTo(x, gemY + CRYSTAL_SIZE);
-  context.lineTo(x + CRYSTAL_SIZE * 0.7, gemY);
+  context.moveTo(x - hSize, gemY);
+  context.lineTo(x, gemY + vSize);
+  context.lineTo(x + hSize, gemY);
   context.closePath();
   context.fill();
   context.fillStyle = CRYSTAL_HIGHLIGHT_COLOR;
   context.beginPath();
-  context.moveTo(x - 4, gemY - CRYSTAL_SIZE * 0.5);
-  context.lineTo(x + 2, gemY - CRYSTAL_SIZE * 0.15);
-  context.lineTo(x - 2, gemY - CRYSTAL_SIZE * 0.05);
+  context.moveTo(x - 4 * CRYSTAL_OVERALL_SCALE, gemY - vSize * 0.5);
+  context.lineTo(x + 2 * CRYSTAL_OVERALL_SCALE, gemY - vSize * 0.15);
+  context.lineTo(x - 2 * CRYSTAL_OVERALL_SCALE, gemY - vSize * 0.05);
   context.closePath();
   context.fill();
 }
@@ -131,30 +140,36 @@ function renderFlame(context, x, topY, anim) {
 }
 
 // -- variant 2: square pillar with a flame on top ------------------------
-const SQUARE_HALF_SIZE = 20;
-const SQUARE_HEIGHT = 100;
-const SQUARE_BASE_HEIGHT = 10;
-const SQUARE_CAP_HEIGHT = 10;
+// Base, cap, and shaft width match the classic pillar's own (see
+// obstacle.base*/cap*/radius below) -- only the shaft height is halved.
+const SQUARE_FLAME_SCALE = 2.5;
 
 function renderSquarePillar(context, obstacle, anim) {
   const {
-    x, y, stoneColor, shadeColor,
+    x, y, radius, baseHalfSize, baseHeight, shaftHeight, capHalfSize, capHeight, stoneColor, shadeColor,
   } = obstacle;
   const shaftBottom = y;
-  const shaftTop = y - SQUARE_HEIGHT;
+  const shaftTop = y - shaftHeight / 2;
 
-  context.fillStyle = shadeColor;
-  context.fillRect(x - SQUARE_HALF_SIZE - 4, shaftBottom - SQUARE_BASE_HEIGHT, (SQUARE_HALF_SIZE + 4) * 2, SQUARE_BASE_HEIGHT);
+  renderSlab(context, x, shaftBottom, baseHalfSize, baseHeight, stoneColor, shadeColor);
 
   context.fillStyle = stoneColor;
-  context.fillRect(x - SQUARE_HALF_SIZE, shaftTop, SQUARE_HALF_SIZE * 2, shaftBottom - shaftTop);
+  context.fillRect(x - radius, shaftTop, radius * 2, shaftBottom - shaftTop);
   context.fillStyle = shadeColor;
-  context.fillRect(x + SQUARE_HALF_SIZE * 0.4, shaftTop, SQUARE_HALF_SIZE * 0.6, shaftBottom - shaftTop);
+  context.fillRect(x + radius * 0.4, shaftTop, radius * 0.6, shaftBottom - shaftTop);
 
-  context.fillStyle = shadeColor;
-  context.fillRect(x - SQUARE_HALF_SIZE - 4, shaftTop - SQUARE_CAP_HEIGHT, (SQUARE_HALF_SIZE + 4) * 2, SQUARE_CAP_HEIGHT);
+  const capTopY = shaftTop - capHeight;
+  renderSlab(context, x, capTopY, capHalfSize, capHeight, stoneColor, shadeColor);
 
-  renderFlame(context, x, shaftTop - SQUARE_CAP_HEIGHT, anim);
+  // renderSlab's own top face is a flat rect running from
+  // capTopY - capHalfSize*0.6 up to capTopY, so that (not capTopY itself)
+  // is the cap's actual highest visible point -- anchoring the flame
+  // there instead sits it on the surface rather than sunk into the cap.
+  context.save();
+  context.translate(x, capTopY - capHalfSize * 0.6);
+  context.scale(SQUARE_FLAME_SCALE, SQUARE_FLAME_SCALE);
+  renderFlame(context, 0, 0, anim);
+  context.restore();
 }
 
 // -- variant 3: 3-prong candelabra ----------------------------------------
