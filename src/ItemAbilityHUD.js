@@ -29,17 +29,17 @@ function ItemAbilityHUD() {
   return {
     hudAnchor: [0, 0],
     hud(context) {
-      collectedItemAbilities().forEach((ability, i) => {
+      collectedItemAbilities.forEach(([name, desc, draw], i) => {
         const rowY = START_Y + i * ROW_HEIGHT;
 
         context.save();
         context.translate(ICON_X, rowY);
         context.scale(ICON_SCALE, ICON_SCALE);
-        ability.draw(context);
+        draw(context);
         context.restore();
 
-        renderText(context, ability.name, TEXT_X, rowY + NAME_OFFSET_Y, NAME_FONT, NAME_COLOR);
-        renderText(context, ability.desc, TEXT_X, rowY + DESCRIPTION_OFFSET_Y, DESCRIPTION_FONT, DESCRIPTION_COLOR);
+        renderText(context, name, TEXT_X, rowY + NAME_OFFSET_Y, NAME_FONT, NAME_COLOR);
+        renderText(context, desc, TEXT_X, rowY + DESCRIPTION_OFFSET_Y, DESCRIPTION_FONT, DESCRIPTION_COLOR);
       });
     },
   };

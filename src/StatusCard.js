@@ -19,10 +19,7 @@ const DEFAULT_COLOR = '#f22'; // matches the damage-flash red used elsewhere
 // in then out over DURATION seconds, then calling `onDone` (and
 // self-removing) exactly once. Used for both the game-over and level-win
 // screens (see GameFlow.js), which only differ in text/color.
-function StatusCard(onDone, props = {}) {
-  const {
-    lines = ['GAME OVER'], color = DEFAULT_COLOR,
-  } = props;
+function StatusCard(onDone, lines = ['GAME OVER'], color = DEFAULT_COLOR) {
   let elapsed = 0;
 
   return {
@@ -36,35 +33,31 @@ function StatusCard(onDone, props = {}) {
     },
 
     hud(context) {
-      let alpha = 1;
-      if (elapsed < FADE_IN) alpha = elapsed / FADE_IN;
-      else if (elapsed > DURATION - FADE_OUT) alpha = Math.max(0, (DURATION - elapsed) / FADE_OUT);
-
-      const cx = canvas.width / 2;
-      const cy = canvas.height / 2;
       const width = clamp(canvas.width * CARD_WIDTH_RATIO, CARD_WIDTH_MIN, CARD_WIDTH_MAX);
       const font = clamp(canvas.width * TITLE_FONT_RATIO, TITLE_FONT_MIN, TITLE_FONT_MAX);
 
-      context.save();
       context.font = `900 ${font}px sans-serif`;
 
       const lineHeight = font * 1.15;
       const height = Math.max(CARD_HEIGHT_MIN, lineHeight * lines.length + CARD_PADDING * 2);
 
-      context.globalAlpha = alpha;
-      fillRect(context, cx - width / 2, cy - height / 2, width, height, '#000', 0.75);
+      // Fade in, hold, fade out. (It removes itself at DURATION, so the
+      // fade-out never goes negative.)
+      context.globalAlpha = Math.min(1, elapsed / FADE_IN, (DURATION - elapsed) / FADE_OUT);
+      // Drawn around the screen center (hud() runs inside a save/restore).
+      context.translate(canvas.width / 2, canvas.height / 2);
+      fillRect(context, -width / 2, -height / 2, width, height, '#000', 0.75);
       context.strokeStyle = color;
       context.lineWidth = 4;
-      context.strokeRect(cx - width / 2, cy - height / 2, width, height);
+      context.strokeRect(-width / 2, -height / 2, width, height);
 
       context.textAlign = 'center';
       context.textBaseline = 'middle';
       context.fillStyle = color;
-      const startY = cy - (lineHeight * (lines.length - 1)) / 2;
+      const startY = -(lineHeight * (lines.length - 1)) / 2;
       // fillText's maxWidth squeezes a line that would overflow the card
       // (e.g. "PEGACORN BLOOD" on a phone) instead of spilling past it.
-      lines.forEach((line, i) => context.fillText(line, cx, startY + i * lineHeight, width - CARD_PADDING * 2));
-      context.restore();
+      lines.forEach((line, i) => context.fillText(line, 0, startY + i * lineHeight, width - CARD_PADDING * 2));
     },
   };
 }

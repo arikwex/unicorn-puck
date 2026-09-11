@@ -94,8 +94,9 @@ const CORRIDOR_WIDTH_FACTOR = 3;
 // dungeon's physical scale relative to the player's radius doesn't shift.
 const TILE = 30 * 2 * Math.SQRT2;
 
-function gridToWorld(x, y, gridWidth, gridHeight) {
-  return { x: (x - gridWidth / 2) * TILE, y: (y - gridHeight / 2) * TILE };
+// The dungeon grid is square, `size` cells a side, centered on the origin.
+function gridToWorld(x, y, size) {
+  return { x: (x - size / 2) * TILE, y: (y - size / 2) * TILE };
 }
 
 // A grub's spawn point within its room (world space), scattered randomly
@@ -217,11 +218,12 @@ function findLongHallways(rawDungeon) {
   const isCorridor = (x, y) => floorSet.has(`${x},${y}`) && !isRoomCell(x, y);
   const hallways = [];
 
-  function scan(outer, inner, alongX) {
-    for (let a = 0; a < outer; a++) {
+  const { size } = rawDungeon;
+  function scan(alongX) {
+    for (let a = 0; a < size; a++) {
       let start = null;
-      for (let b = 0; b <= inner; b++) {
-        if (b < inner && isCorridor(...(alongX ? [b, a] : [a, b]))) {
+      for (let b = 0; b <= size; b++) {
+        if (b < size && isCorridor(...(alongX ? [b, a] : [a, b]))) {
           if (start === null) start = b;
           continue;
         }
@@ -234,8 +236,8 @@ function findLongHallways(rawDungeon) {
       }
     }
   }
-  scan(rawDungeon.gh, rawDungeon.gridWidth, true);
-  scan(rawDungeon.gridWidth, rawDungeon.gh, false);
+  scan(true);
+  scan(false);
 
   return hallways;
 }
@@ -261,7 +263,7 @@ function buildDungeon(seed) {
   const rawDungeon = generateDungeon(seed);
   const dungeon = inflateDungeon(rawDungeon, CORRIDOR_WIDTH_FACTOR);
   const combatRoomIndices = selectCombatRooms(dungeon.rooms.length, seed + 6);
-  const toWorld = (x, y) => gridToWorld(x, y, dungeon.gridWidth, dungeon.gh);
+  const toWorld = (x, y) => gridToWorld(x, y, dungeon.size);
   const floorSet = new Set(dungeon.floor.map(({ x, y }) => `${x},${y}`));
   const nonSpawnRoomIndices = dungeon.rooms.map((_, i) => i).filter((i) => i !== 0);
   // A room's entrance cells (grid) as world-space points, radius 0 -- fed
@@ -456,7 +458,7 @@ function buildDungeon(seed) {
 
   // The dungeon's own world-space bounding box -- always square, and always
   // this same fixed size/position for every seed (see donjonDungeon.js's
-  // own GRID_WIDTH/GRID_HEIGHT and computeWalls: every uncarved cell,
+  // own GRID_WIDTH/GRID_HEIGHT and classifyCells: every uncarved cell,
   // including the whole boundary ring, is a wall, so it always fills the
   // grid to its edges). mapWorldMin is offset an extra half-TILE beyond
   // -mapWorldSpan/2 because a merged wall rect's own world center (see the
@@ -465,7 +467,7 @@ function buildDungeon(seed) {
   // half a tile before gridToWorld(0, 0), not exactly at it. Handed to
   // MiniMap so it can scale itself once at map-build time instead of
   // re-deriving a wall bounding box from scratch every single frame.
-  const mapWorldSpan = dungeon.gridWidth * TILE;
+  const mapWorldSpan = dungeon.size * TILE;
   const mapWorldMin = -mapWorldSpan / 2 - TILE / 2;
   return {
     ...playerSpawn, mapWorldSpan, mapWorldMin,

@@ -1,9 +1,8 @@
 // The 5 permanent item abilities: id, display name, a 3-5 word description
 // of the buff, a simple flat-color + 4px-outline hieroglyph icon (drawn at
 // local (0, 0)), and what picking one up actually does to the player.
-// `collected` is a small ordered-list singleton (reset per run, like
-// chaliceProgress.js) read by ItemAbilityHUD for its stack and by
-// Item.js/mapCreator.js to avoid spawning the same ability twice.
+// `collectedItemAbilities` is a small ordered-list singleton (reset per
+// run, like chaliceProgress.js) read by ItemAbilityHUD for its stack.
 
 import { fillCircle } from './canvasShapes.js';
 
@@ -92,71 +91,42 @@ const VALKYRIE_BOOST_MULTIPLIER = 1.3; // +30% to the whole launch-power curve, 
 
 // No string `id` field -- an ability's id is just its own index into this
 // array (see collectItemAbility/mapCreator.js), which minifies far smaller
-// than a repeated quoted name and needs no separate lookup.
+// than a repeated quoted name and needs no separate lookup. Each entry is
+// [name, description, draw(context), apply(player)] -- positional rather
+// than keyed, since object keys survive minification.
 const ITEM_ABILITY_CATALOG = [
-  {
-    name: 'BATTLE ARMOR',
-    desc: '+2 max health',
-    draw: drawBattleArmor,
-    apply(player) {
-      player.maxHp += 2;
-      player.heal(2); // granted immediately, not just headroom for later
-    },
-  },
-  {
-    name: 'VALKYRIE WINGS',
-    desc: 'higher max boost speed',
-    draw: drawValkyrieWings,
-    apply(player) {
-      player.boostPower *= VALKYRIE_BOOST_MULTIPLIER;
-    },
-  },
-  {
-    name: 'MITHRIL HORN',
-    desc: '+1 impact damage',
-    draw: drawMithrilHorn,
-    apply(player) {
-      player.horn += 1;
-    },
-  },
-  {
-    name: 'CHROMATIC HOOF',
-    desc: 'bounces reboost momentum',
-    draw: drawChromaticHoof,
-    apply(player) {
-      player.hoof = true;
-    },
-  },
-  {
-    name: 'ORACLE EYES',
-    desc: 'reveals the minimap',
-    draw: drawOracleEyes,
-    apply(player) {
-      player.oracleEyes = true;
-    },
-  },
+  ['BATTLE ARMOR', '+2 max health', drawBattleArmor, (player) => {
+    player.maxHp += 2;
+    player.heal(2); // granted immediately, not just headroom for later
+  }],
+  ['VALKYRIE WINGS', 'higher max boost speed', drawValkyrieWings, (player) => {
+    player.boostPower *= VALKYRIE_BOOST_MULTIPLIER;
+  }],
+  ['MITHRIL HORN', '+1 impact damage', drawMithrilHorn, (player) => {
+    player.horn += 1;
+  }],
+  ['CHROMATIC HOOF', 'bounces reboost momentum', drawChromaticHoof, (player) => {
+    player.hoof = true;
+  }],
+  ['ORACLE EYES', 'reveals the minimap', drawOracleEyes, (player) => {
+    player.oracleEyes = true;
+  }],
 ];
 
-let collected = [];
+// Collected abilities, oldest first -- read directly by ItemAbilityHUD.
+const collectedItemAbilities = [];
 
 function resetItemAbilities() {
-  collected = [];
+  collectedItemAbilities.length = 0;
 }
 
-// Applies the ability to `player` and records it for the HUD stack; a
-// no-op if this id doesn't exist or was somehow already collected (each
-// only ever spawns once per dungeon, see mapCreator.js, so the latter
-// should never actually happen).
+// Applies the ability to `player` and records it for the HUD stack. Each
+// ability only ever spawns once per dungeon (see mapCreator.js), so it's
+// never collected twice.
 function collectItemAbility(id, player) {
   const ability = ITEM_ABILITY_CATALOG[id];
-  if (!ability || collected.includes(ability)) return null;
-  ability.apply(player);
-  collected.push(ability);
-  return ability;
-}
-
-function collectedItemAbilities() {
-  return collected;
+  ability[3](player);
+  collectedItemAbilities.push(ability);
 }
 
 export {

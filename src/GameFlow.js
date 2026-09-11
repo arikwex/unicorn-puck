@@ -43,7 +43,7 @@ function GameWatcher(player, dragController, playerHealthHUD, chaliceHUD, itemAb
       if (lost) fireSplatBurst(player.x, player.y, DEATH_SPLAT_COUNT, DEATH_SPLAT_COLORS, DEATH_SPLAT_SPEED_MAX, DEATH_SPLAT_SIZE_MIN, DEATH_SPLAT_SIZE_MAX);
       remove([player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap]);
       add(won
-        ? StatusCard(showMenu, { lines: ['PEGACORN BLOOD', 'RECLAIMED'], color: '#fff' })
+        ? StatusCard(showMenu, ['PEGACORN BLOOD', 'RECLAIMED'], '#fff')
         : StatusCard(showMenu));
       return true;
     },

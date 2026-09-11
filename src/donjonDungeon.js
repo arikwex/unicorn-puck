@@ -98,14 +98,14 @@ function Grid() {
   return {
     regionAt: (x, y) => region[index(x, y)],
     open: (x, y) => region[index(x, y)] >= 0,
-    isRoom: (x, y) => room[index(x, y)] === 1,
+    isRoom: (x, y) => room[index(x, y)],
     carve(x, y, regionId, isRoom) {
       region[index(x, y)] = regionId;
       if (isRoom) room[index(x, y)] = 1;
     },
+    // Only ever clears pruned corridor cells, never room cells.
     clear(x, y) {
       region[index(x, y)] = -1;
-      room[index(x, y)] = 0;
     },
   };
 }
@@ -153,12 +153,8 @@ function carveRoom(grid, room, regionId) {
 // Whether the lattice cell two steps away from (x, y) in `dir` is free to
 // tunnel into: in bounds, and neither it nor the wall cell between them
 // has been carved yet (keeps each maze run a "perfect" tree on its own).
-function canCarve(grid, x, y, dir) {
-  const midX = x + dir[0];
-  const midY = y + dir[1];
-  const nextX = x + dir[0] * 2;
-  const nextY = y + dir[1] * 2;
-  return inBounds(nextX, nextY) && !grid.open(midX, midY) && !grid.open(nextX, nextY);
+function canCarve(grid, x, y, [dx, dy]) {
+  return inBounds(x + dx * 2, y + dy * 2) && !grid.open(x + dx, y + dy) && !grid.open(x + dx * 2, y + dy * 2);
 }
 
 // Randomized-recursive-backtracker maze carve, biased by
@@ -169,7 +165,7 @@ function growMaze(grid, rng, startX, startY, regionId) {
   let lastDir = null;
 
   while (stack.length) {
-    const [x, y] = stack[stack.length - 1];
+    const [x, y] = stack.at(-1);
     const open = DIRS.filter((dir) => canCarve(grid, x, y, dir));
 
     if (open.length === 0) {
@@ -178,8 +174,8 @@ function growMaze(grid, rng, startX, startY, regionId) {
       continue;
     }
 
-    const canContinueStraight = lastDir && open.some((d) => d[0] === lastDir[0] && d[1] === lastDir[1]);
-    const dir = (canContinueStraight && rng() < CORRIDOR_STRAIGHTNESS)
+    // `open` holds the shared DIRS arrays, so identity finds the last one.
+    const dir = (open.includes(lastDir) && rng() < CORRIDOR_STRAIGHTNESS)
       ? lastDir
       : open[randInt(rng, 0, open.length - 1)];
 
@@ -238,8 +234,6 @@ function findConnectors(grid) {
 // never left in more than one disconnected piece) plus occasional extra
 // connectors for loops ("doors=standard").
 function connectRegions(grid, rng, regionCount) {
-  if (regionCount <= 1) return;
-
   const parent = Array.from({ length: regionCount }, (_, i) => i);
   const find = (id) => {
     while (parent[id] !== id) {
@@ -252,47 +246,29 @@ function connectRegions(grid, rng, regionCount) {
   shuffle(rng, findConnectors(grid)).forEach((connector) => {
     const rootA = find(connector.a);
     const rootB = find(connector.b);
-    if (rootA === rootB) {
-      if (rng() < EXTRA_CONNECTOR_CHANCE) grid.carve(connector.x, connector.y, rootA, false);
-      return;
-    }
-    grid.carve(connector.x, connector.y, rootA, false);
+    // A connector already inside one region is only kept (as a loop) by chance.
+    if (rootA !== rootB || rng() < EXTRA_CONNECTOR_CHANCE) grid.carve(connector.x, connector.y, rootA, false);
     parent[rootB] = rootA;
   });
 }
 
-// Cells directly touching a room are never pruned, even if trimming their
-// far side would otherwise leave them with only one open neighbor -- that
-// protects every room's doorway from being trimmed away entirely, which
-// would strand the room with no way in or out.
-function computeRoomAdjacent(grid) {
-  const adjacent = new Uint8Array(GRID_WIDTH * GRID_HEIGHT);
-  for (let x = 0; x < GRID_WIDTH; x++) {
-    for (let y = 0; y < GRID_HEIGHT; y++) {
-      if (!grid.isRoom(x, y)) continue;
-      DIRS.forEach(([dx, dy]) => {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (inBounds(nx, ny) && !grid.isRoom(nx, ny)) adjacent[ny * GRID_WIDTH + nx] = 1;
-      });
-    }
-  }
-  return (x, y) => adjacent[y * GRID_WIDTH + x] === 1;
-}
-
-// "remove_deadends=all": repeatedly clears any non-room, non-room-adjacent
-// carved cell with at most one open neighbor, until none remain -- leaving
-// only rooms and the loop-connected corridors actually needed between
-// them.
-function removeDeadEnds(grid, isRoomAdjacent) {
+// "remove_deadends=all": repeatedly clears any non-room carved cell with at
+// most one open neighbor, until none remain -- leaving only rooms and the
+// loop-connected corridors actually needed between them. Cells directly
+// touching a room are never pruned, even if trimming their far side would
+// otherwise leave them with only one open neighbor -- that protects every
+// room's doorway from being trimmed away entirely, which would strand the
+// room with no way in or out. (Open cells are never on the outer ring, so
+// their neighbors are always in bounds.)
+function removeDeadEnds(grid) {
   let removedAny = true;
   while (removedAny) {
     removedAny = false;
     for (let x = 0; x < GRID_WIDTH; x++) {
       for (let y = 0; y < GRID_HEIGHT; y++) {
-        if (!grid.open(x, y) || grid.isRoom(x, y) || isRoomAdjacent(x, y)) continue;
-        const openNeighbors = DIRS.filter(([dx, dy]) => inBounds(x + dx, y + dy) && grid.open(x + dx, y + dy));
-        if (openNeighbors.length <= 1) {
+        if (!grid.open(x, y) || grid.isRoom(x, y)
+          || DIRS.some(([dx, dy]) => grid.isRoom(x + dx, y + dy))) continue;
+        if (DIRS.filter(([dx, dy]) => grid.open(x + dx, y + dy)).length <= 1) {
           grid.clear(x, y);
           removedAny = true;
         }
@@ -301,32 +277,20 @@ function removeDeadEnds(grid, isRoomAdjacent) {
   }
 }
 
-// Every uncarved cell becomes a wall tile -- not just the ones touching
-// floor. Floor and walls are complementary and together cover the whole
-// grid, including the outer ring (never reachable by carving -- see the
-// GRID_WIDTH/GRID_HEIGHT comment, so the dungeon always ends up fully
-// enclosed for "egress=no" with no extra work needed). Filling every
-// uncarved cell, not just the boundary layer, means there's no leftover
-// unclassified "hole" cell for a later pass (e.g. inflateDungeon.js's
+// Every cell is floor (carved: room, corridor, or door) or wall -- not just
+// the walls touching floor. Together they cover the whole grid, including
+// the outer ring (never reachable by carving -- see the GRID_WIDTH/
+// GRID_HEIGHT comment, so the dungeon always ends up fully enclosed for
+// "egress=no" with no extra work needed). Classifying every cell means
+// there's no leftover "hole" for a later pass (e.g. inflateDungeon.js's
 // tile-for-tile upscale) to render as neither floor nor wall.
-function computeWalls(grid) {
+function classifyCells(grid) {
+  const floor = [];
   const walls = [];
   for (let x = 0; x < GRID_WIDTH; x++) {
-    for (let y = 0; y < GRID_HEIGHT; y++) {
-      if (!grid.open(x, y)) walls.push({ x, y });
-    }
+    for (let y = 0; y < GRID_HEIGHT; y++) (grid.open(x, y) ? floor : walls).push({ x, y });
   }
-  return walls;
-}
-
-function carvedCells(grid) {
-  const cells = [];
-  for (let x = 0; x < GRID_WIDTH; x++) {
-    for (let y = 0; y < GRID_HEIGHT; y++) {
-      if (grid.open(x, y)) cells.push({ x, y });
-    }
-  }
-  return cells;
+  return { floor, walls };
 }
 
 // Generates a rooms-and-corridors dungeon in integer grid coordinates.
@@ -342,14 +306,12 @@ function generateDonjonDungeon(seed) {
 
   const regionCount = fillMaze(grid, rng, rooms.length);
   connectRegions(grid, rng, regionCount);
-  removeDeadEnds(grid, computeRoomAdjacent(grid));
+  removeDeadEnds(grid);
 
   return {
     rooms,
-    floor: carvedCells(grid),
-    walls: computeWalls(grid),
-    gridWidth: GRID_WIDTH,
-    gh: GRID_HEIGHT,
+    ...classifyCells(grid),
+    size: GRID_WIDTH, // the grid is square: GRID_WIDTH === GRID_HEIGHT
   };
 }
 

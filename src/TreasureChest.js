@@ -72,11 +72,10 @@ function renderChest(context, flash) {
 // map-generation time rather than this chest rolling it the moment it breaks.
 function TreasureChest(x, y, contents) {
   let hitsRemaining = HITS_REQUIRED;
-  let flashTimer = 0;
-  let hitCooldown = 0;
-  // Time since the most recent hit -- starts past both effects' durations
-  // so a freshly spawned chest doesn't pop/rattle on its own.
-  let hitAnimElapsed = HIT_RATTLE_DURATION;
+  // Seconds since the most recent hit -- drives the hit cooldown, the white
+  // flash, the hop and the rattle. Starts a full cooldown back, past every
+  // one of them, so a freshly spawned chest is idle and hittable.
+  let sinceHit = HIT_COOLDOWN;
 
   return {
     x,
@@ -86,18 +85,14 @@ function TreasureChest(x, y, contents) {
     tags: [TAG_OBSTACLE],
 
     tick(dt) {
-      flashTimer = Math.max(0, flashTimer - dt);
-      hitCooldown = Math.max(0, hitCooldown - dt);
-      hitAnimElapsed += dt;
+      sinceHit += dt;
     },
 
     // Called by the player on contact, with its pre-bounce state.
     hit(player) {
-      if (hitCooldown > 0 || player.chg <= CHARGING_THRESHOLD) return;
+      if (sinceHit < HIT_COOLDOWN || player.chg <= CHARGING_THRESHOLD) return;
 
-      hitCooldown = HIT_COOLDOWN;
-      flashTimer = FLASH_DURATION;
-      hitAnimElapsed = 0;
+      sinceHit = 0;
       hitsRemaining -= 1;
       fireSplatBurst(this.x, this.y, SPARK_COUNT, [SPARK_COLOR], SPARK_SPEED_MAX, SPARK_SIZE_MIN, SPARK_SIZE_MAX);
 
@@ -108,14 +103,15 @@ function TreasureChest(x, y, contents) {
     },
 
     render(context) {
-      const flash = flashTimer > 0 ? Math.sin(Math.min(1, flashTimer / FLASH_DURATION) * Math.PI) : 0;
-      // Half-sine hop (up and back down) plus a sine wave whose amplitude
-      // decays exponentially -- a damped oscillator -- for the rattle.
-      const bounceY = hitAnimElapsed < HIT_BOUNCE_DURATION
-        ? -HIT_BOUNCE_HEIGHT * Math.sin(Math.PI * (hitAnimElapsed / HIT_BOUNCE_DURATION))
+      // A half-sine flash pulse and a half-sine hop (up and back down), plus
+      // a sine wave whose amplitude decays exponentially -- a damped
+      // oscillator -- for the rattle.
+      const flash = sinceHit < FLASH_DURATION ? Math.sin(Math.PI * sinceHit / FLASH_DURATION) : 0;
+      const bounceY = sinceHit < HIT_BOUNCE_DURATION
+        ? -HIT_BOUNCE_HEIGHT * Math.sin(Math.PI * (sinceHit / HIT_BOUNCE_DURATION))
         : 0;
-      const rattle = hitAnimElapsed < HIT_RATTLE_DURATION
-        ? HIT_RATTLE_AMPLITUDE * Math.sin(hitAnimElapsed * HIT_RATTLE_FREQUENCY) * Math.exp(-hitAnimElapsed * HIT_RATTLE_DAMPING)
+      const rattle = sinceHit < HIT_RATTLE_DURATION
+        ? HIT_RATTLE_AMPLITUDE * Math.sin(sinceHit * HIT_RATTLE_FREQUENCY) * Math.exp(-sinceHit * HIT_RATTLE_DAMPING)
         : 0;
 
       context.save();

@@ -23,13 +23,12 @@ const COLLECT_SPLAT_SIZE_MAX = 12;
 
 function Item(x, y, abilityId) {
   let anim = Math.random() * TAU;
-  const ability = ITEM_ABILITY_CATALOG[abilityId];
+  const [name, , draw] = ITEM_ABILITY_CATALOG[abilityId];
 
   return {
     x,
     y,
     z: y,
-    abilityId,
 
     tick(dt) {
       anim += dt;
@@ -41,7 +40,7 @@ function Item(x, y, abilityId) {
 
       collectItemAbility(abilityId, player);
       fireSplatBurst(this.x, this.y, COLLECT_SPLAT_COUNT, COLLECT_SPLAT_COLORS, COLLECT_SPLAT_SPEED_MAX, COLLECT_SPLAT_SIZE_MIN, COLLECT_SPLAT_SIZE_MAX);
-      showItemCollectedToast(ability.name);
+      showItemCollectedToast(name);
       return true;
     },
 
@@ -49,7 +48,7 @@ function Item(x, y, abilityId) {
       context.save();
       context.translate(this.x, this.y + Math.sin(anim * BOB_SPEED) * BOB_AMOUNT);
       context.scale(WORLD_SCALE, WORLD_SCALE);
-      ability.draw(context);
+      draw(context);
       context.restore();
     },
   };

@@ -31,8 +31,7 @@ function inflateDungeon(dungeon, factor) {
     })),
     floor: expandTiles(dungeon.floor, factor),
     walls: expandTiles(dungeon.walls, factor),
-    gridWidth: dungeon.gridWidth * factor,
-    gh: dungeon.gh * factor,
+    size: dungeon.size * factor,
   };
 }
 
