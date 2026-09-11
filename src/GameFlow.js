@@ -3,12 +3,13 @@
 // previous screen (dungeon, grubs, drag input, HUD) leaks into the next.
 
 import { chalicesComplete } from './chaliceProgress.js';
-import { add, clear, remove } from './engine.js';
+import { add, clear, getObjectsByTag, remove } from './engine.js';
 import createMap from './mapCreator.js';
 import MainMenu from './MainMenu.js';
 import { playDungeonTheme } from './music.js';
 import SplatEffect from './SplatEffect.js';
 import StatusCard from './StatusCard.js';
+import { TAG_COMBAT_ROOM } from './tags.js';
 
 // Same ROYGBV set the player's own on-hit splats use (see
 // PlayerCharacter.js's fireDamageSplats) -- death gets a bigger burst of
@@ -42,7 +43,8 @@ function fireDeathSplats(x, y) {
 function GameWatcher(player, dragController, playerHealthHUD, chaliceHUD) {
   return {
     update() {
-      const won = chalicesComplete();
+      const won = chalicesComplete()
+        && !getObjectsByTag(TAG_COMBAT_ROOM).some((room) => room.state === 'active');
       const lost = player.hp <= 0;
       if (!won && !lost) return;
 

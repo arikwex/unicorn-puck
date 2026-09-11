@@ -129,6 +129,22 @@ function playItemCollected() {
   play(itemCollectedBuffer(), 0.7, 1);
 }
 
+// A heavy struck-metal boom: fast downward pitch sweep, bass harmonics
+// audible on small speakers, and a long, gently beating resonant tail.
+const combatImpactBuffer = lazySound(3.2, (t) => {
+  const attack = Math.min(1, t / 0.004);
+  const tail = Math.exp(-t * 1.65) * Math.min(1, (3.2 - t) / 0.15);
+  const phase = TAU * (48 * t + 15 * (1 - Math.exp(-t * 12)));
+  const body = Math.sin(phase) + 0.35 * Math.sin(phase * 2) + 0.2 * Math.sin(phase * 3);
+  const ring = Math.sin(TAU * 143 * t) * 0.18 + Math.sin(TAU * 147 * t) * 0.12;
+  const strike = noise() * Math.exp(-t * 65) * 0.3;
+  return 0.42 * attack * (body * tail + ring * Math.exp(-t * 1.3) * tail + strike);
+});
+
+function playCombatImpact() {
+  play(combatImpactBuffer(), 0.9, 1);
+}
+
 export {
-  playItemCollected, playEnemyHit, playLaunch, playOozeShot, playPlayerDamage, playWallBounce,
+  playCombatImpact, playItemCollected, playEnemyHit, playLaunch, playOozeShot, playPlayerDamage, playWallBounce,
 };

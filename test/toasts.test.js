@@ -143,3 +143,21 @@ test('chalice pickup emits once and uses only the toast chime', () => {
   assert.equal(chaliceProgress().collected, 1);
   assert.equal(soundStarts, 1);
 });
+
+test('combat instructions appear immediately without a pickup chime or losing queued pickups', () => {
+  const toasts = add(ToastSystem());
+  bus.emit('item-collected', { name: 'Health Potion' });
+  bus.emit('item-collected', { name: 'Pegacorn Blood Chalice' });
+  bus.emit('toast', { message: 'Defeat all enemies to exit room', priority: true });
+  assert.equal(draw(toasts).text[0].text, 'Defeat all enemies to exit room');
+  assert.equal(soundStarts, 1);
+  toasts.update(3.5);
+  assert.equal(draw(toasts).text[0].text, 'Health Potion Collected');
+  assert.equal(soundStarts, 1, 'resuming a pickup never repeats its chime');
+  toasts.update(3.5);
+  assert.equal(draw(toasts).text[0].text, 'Pegacorn Blood Chalice Collected');
+  assert.equal(soundStarts, 2);
+  clear();
+  bus.emit('toast', { message: 'After teardown' });
+  assert.equal(draw(toasts).text.length, 0);
+});

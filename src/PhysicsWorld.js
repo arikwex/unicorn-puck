@@ -39,9 +39,22 @@ function PhysicsWorld() {
       function detect(a, b) {
         const bodyA = bodies.get(a);
         const bodyB = bodies.get(b);
-        const contact = bodyB.shape === 'box'
+        let contact = bodyB.shape === 'box'
           ? circleBoxContact(bodyA, bodyB)
           : circleCircleContact(bodyA, bodyB);
+        // Grates must hold even when chained launches cross their entire
+        // thickness in a frame. Capture the entry face, not the far face.
+        if (b.blocksSweptMotion) {
+          const start = previousBodies.get(a);
+          const time = sweptCircleHitTime(start, bodyA, bodyB);
+          if (time > 0 && time <= 1) {
+            const hit = { ...bodyA, x: start.x + (bodyA.x - start.x) * time,
+              y: start.y + (bodyA.y - start.y) * time, radius: bodyA.radius + 0.001 };
+            const swept = circleBoxContact(hit, bodyB);
+            if (swept) contact = { ...swept, penetration: Math.max(0,
+              (bodyA.x - hit.x) * swept.nx + (bodyA.y - hit.y) * swept.ny) };
+          }
+        }
         if (contact) contacts.push([a, b, contact]);
       }
 

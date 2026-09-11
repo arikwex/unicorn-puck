@@ -11,9 +11,16 @@
 - lever + gateway
 - level end mechanics (exit gateway / flag / unicorn key)
 
-Item abilities
-- increase max health by 2 (grant +2 health at the moment it is gained)
-- increase
+Item abilities (All very simple solid color with 6px thick outline shapes. Hieroglyph/iconographs of the intended item).
+- BATTLE ARMOR: increase max health by 2 (grant +2 health at the moment it is gained)
+- VALKYRIE WINGS: max boost speed
+- MITHRIL HORN: all impact damage +1
+- CHROMATIC HOOF: after hitting an enemy, bouncing will reboost your momentum instead of decaying (like pinball)
+- ORACLE EYES: show minimap in top right (just map + your location)
+
+Items show up as a stack of: icon + name/description (description under name saying what the buff is in 3-5 words)
+Items stacked in order they are found (under the chalice part of the hud, equidistance as collected).
+
 
 
 Game Mechanics:

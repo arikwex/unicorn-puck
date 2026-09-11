@@ -2,6 +2,8 @@ import Camera from './camera.js';
 import Chalice from './Chalice.js';
 import { resetChalices } from './chaliceProgress.js';
 import ChaliceHUD from './ChaliceHUD.js';
+import CombatRoom from './CombatRoom.js';
+import { findRoomDoorways, selectCombatRooms } from './combatRoomLayout.js';
 import CubeObstacle from './CubeObstacle.js';
 import Decoration, { DECORATION_TYPES } from './Decoration.js';
 import generateDungeon, { mulberry32 } from './donjonDungeon.js';
@@ -198,6 +200,7 @@ function buildDungeon(seed) {
   // obstacle clearance checks are always in the same post-inflation world
   // scale as the walls/pillars/grubs actually added to the engine.
   const dungeon = inflateDungeon(generateDungeon(seed), CORRIDOR_WIDTH_FACTOR);
+  const combatRoomIndices = selectCombatRooms(dungeon.rooms.length, seed + 6);
   const toWorld = (x, y) => gridToWorld(x, y, dungeon.gridWidth, dungeon.gridHeight);
   const floorSet = new Set(dungeon.floor.map(({ x, y }) => `${x},${y}`));
   // A room's entrance cells (grid) as world-space points, radius 0 -- fed
@@ -250,10 +253,19 @@ function buildDungeon(seed) {
       x: roomCenter.x, y: roomCenter.y, w: room.w * TILE, h: room.h * TILE,
     };
     const scatterRng = mulberry32(grubSeed + roomIndex);
+    const enemies = [];
     for (let i = 0; i < GRUBS_PER_ROOM; i++) {
       const spawn = pickGrubSpawn(worldRoom, playerSpawn, scatterRng);
       const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + i));
+      enemies.push(grub);
       obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.puck().radius });
+    }
+    if (combatRoomIndices.has(roomIndex)) {
+      // Grid coordinates name cell centers; the exact floor rectangle
+      // starts half a tile before the first center, not at that center.
+      const center = toWorld(room.x + (room.w - 1) / 2, room.y + (room.h - 1) / 2);
+      add(CombatRoom({ ...center, w: room.w * TILE, h: room.h * TILE },
+        findRoomDoorways(room, floorSet, TILE, toWorld), enemies));
     }
 
     // Every room gets a chest, kept clear of every wall/pillar/grub and
