@@ -28,6 +28,7 @@ function StatusCard(onDone, props = {}) {
   let elapsed = 0;
 
   return {
+    hudAnchor: [0.5, 0.5],
     update(dt) {
       elapsed += dt;
       if (elapsed >= duration) {

@@ -31,6 +31,7 @@ function outlinedText(context, text, x, y, font, color) {
 // growing downward one equidistant row per pickup.
 function ItemAbilityHUD() {
   return {
+    hudAnchor: [0, 0],
     renderHUD(context) {
       collectedItemAbilities().forEach((ability, i) => {
         const rowY = START_Y + i * ROW_HEIGHT;

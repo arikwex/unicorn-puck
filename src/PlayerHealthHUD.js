@@ -12,6 +12,7 @@ const BAR_HEIGHT = 30;
 
 function PlayerHealthHUD(player) {
   return {
+    hudAnchor: [0, 0],
     renderHUD(context) {
       renderPlayerPortrait(context, PORTRAIT_X, PORTRAIT_Y, PORTRAIT_SCALE);
       const shields = player.bubbleShields;

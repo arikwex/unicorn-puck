@@ -1,4 +1,5 @@
 import { canvas, ctx } from './canvas.js';
+import { renderScreenHUD } from './hud.js';
 import { TAG_CAMERA } from './tags.js';
 
 let objects = [];
@@ -90,7 +91,7 @@ function tick(now) {
   // HUD objects draw last in canvas pixels, independent of camera or depth.
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  [...objects].forEach((object) => object.renderHUD?.(ctx));
+  [...objects].forEach((object) => renderScreenHUD(object, ctx));
   ctx.restore();
   requestAnimationFrame(tick);
 }

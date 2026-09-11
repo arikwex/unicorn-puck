@@ -35,6 +35,7 @@ function ToastSystem() {
   }
 
   return {
+    hudAnchor: [0.5, 1],
     order: 1e6,
 
     start() {

@@ -9,18 +9,19 @@ const PADDING = 10; // world-bounds inset, in map pixels, so edge walls aren't c
 const BG_COLOR = 'rgba(0, 0, 0, 0.55)';
 const BORDER_COLOR = '#fff';
 const WALL_COLOR = '#7c6865';
-const PLAYER_COLOR = '#ff2f4f';
+const PLAYER_COLOR = '#fff';
 const PLAYER_DOT_RADIUS = 4;
 
 function isWall(object) {
   return object.tags?.includes(TAG_OBSTACLE) && typeof object.w === 'number' && typeof object.h === 'number';
 }
 
-// Revealed only once the player has Oracle Eyes -- a top-right overview of
+// Revealed only once the player has Oracle Eyes -- a bottom-left overview of
 // every wall (recomputing their bounding box each frame is cheap; there
 // are only ever a few dozen) plus the player's own current position.
 function MiniMap(player) {
   return {
+    hudAnchor: [0, 1],
     renderHUD(context) {
       if (!player.oracleEyes) return;
       const walls = getObjectsByTag(TAG_OBSTACLE).filter(isWall);
@@ -38,8 +39,8 @@ function MiniMap(player) {
       });
       const span = Math.max(maxX - minX, maxY - minY) || 1;
       const scale = (MAP_SIZE - PADDING * 2) / span;
-      const originX = canvas.width - MAP_MARGIN - MAP_SIZE;
-      const originY = MAP_MARGIN;
+      const originX = MAP_MARGIN;
+      const originY = canvas.height - MAP_MARGIN - MAP_SIZE;
       const toMap = (wx, wy) => [
         originX + PADDING + (wx - minX) * scale,
         originY + PADDING + (wy - minY) * scale,

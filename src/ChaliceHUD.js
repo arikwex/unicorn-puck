@@ -18,6 +18,7 @@ const STROKE_COLOR = '#000';
 // singleton Chalice.js writes to on pickup.
 function ChaliceHUD() {
   return {
+    hudAnchor: [0, 0],
     renderHUD(context) {
       renderChaliceIcon(context, ICON_X, ICON_Y, ICON_SCALE);
 

@@ -6,8 +6,10 @@
 // Item.js/mapCreator.js to avoid spawning the same ability twice.
 
 const OUTLINE_WIDTH = 4; // 2px thinner than its original 6
-const FILL_COLOR = '#eee';
-const OUTLINE_COLOR = '#111';
+// Same gold/dark-gold pair as Chalice.js/TreasureChest.js, for a consistent
+// "treasure" palette across every collectible in the game.
+const FILL_COLOR = '#e8c34a';
+const OUTLINE_COLOR = '#a9822a';
 
 function fillOutlined(context) {
   context.fillStyle = FILL_COLOR;
@@ -18,40 +20,43 @@ function fillOutlined(context) {
   context.stroke();
 }
 
-// A chestplate/shield silhouette.
+// A chestplate/shield silhouette, kept to a roughly square bounding box
+// (32x34) like every other icon here so the HUD stack reads as one set.
 function drawBattleArmor(context) {
   context.beginPath();
-  context.moveTo(-14, -16);
-  context.lineTo(14, -16);
-  context.lineTo(14, 4);
-  context.quadraticCurveTo(14, 20, 0, 26);
-  context.quadraticCurveTo(-14, 20, -14, 4);
+  context.moveTo(-16, -14);
+  context.lineTo(16, -14);
+  context.lineTo(16, 4);
+  context.quadraticCurveTo(16, 16, 0, 20);
+  context.quadraticCurveTo(-16, 16, -16, 4);
   context.closePath();
   fillOutlined(context);
 }
 
 // Two swept feather-petal shapes meeting at a center point -- wide enough
 // that the fill still reads clearly under the outline stroke, rather than
-// being a sliver the stroke could nearly swallow.
+// being a sliver the stroke could nearly swallow, and pulled in from a
+// former 52-wide/30-tall bbox to a squarer 36x34.
 function drawValkyrieWings(context) {
   context.beginPath();
-  context.moveTo(0, 10);
-  context.quadraticCurveTo(-14, -2, -26, -18);
-  context.quadraticCurveTo(-8, -10, -2, 12);
+  context.moveTo(0, 12);
+  context.quadraticCurveTo(-10, -4, -18, -20);
+  context.quadraticCurveTo(-6, -8, -2, 14);
   context.closePath();
-  context.moveTo(0, 10);
-  context.quadraticCurveTo(14, -2, 26, -18);
-  context.quadraticCurveTo(8, -10, 2, 12);
+  context.moveTo(0, 12);
+  context.quadraticCurveTo(10, -4, 18, -20);
+  context.quadraticCurveTo(6, -8, 2, 14);
   context.closePath();
   fillOutlined(context);
 }
 
-// A tapering spike.
+// A tapering spike, widened from a former 18-wide/40-tall bbox to a
+// squarer 24x32.
 function drawMithrilHorn(context) {
   context.beginPath();
-  context.moveTo(-8, 18);
-  context.quadraticCurveTo(-10, -6, 2, -22);
-  context.quadraticCurveTo(6, -4, 8, 18);
+  context.moveTo(-12, 16);
+  context.quadraticCurveTo(-14, -8, 2, -16);
+  context.quadraticCurveTo(10, -6, 12, 16);
   context.closePath();
   fillOutlined(context);
 }
@@ -68,12 +73,15 @@ function drawChromaticHoof(context) {
   fillOutlined(context);
 }
 
-// An almond eye with a pupil.
+// An eye with a pupil, rounded out from a former 40-wide/28-tall almond
+// to a square 32x32 (quadratic-bezier extrema land at half the control
+// point's offset when both endpoints share a coordinate, hence -32/32
+// rather than -16/16 to reach a true +-16 peak).
 function drawOracleEyes(context) {
   context.beginPath();
-  context.moveTo(-20, 0);
-  context.quadraticCurveTo(0, -14, 20, 0);
-  context.quadraticCurveTo(0, 14, -20, 0);
+  context.moveTo(-16, 0);
+  context.quadraticCurveTo(0, -32, 16, 0);
+  context.quadraticCurveTo(0, 32, -16, 0);
   context.closePath();
   fillOutlined(context);
   context.beginPath();
