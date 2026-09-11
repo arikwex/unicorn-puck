@@ -404,8 +404,9 @@ function Grub(x, y, room, seed, props = {}) {
         }
       }
 
-      this.x = clamp(this.x + this.vx * dt, minX, maxX);
-      this.y = clamp(this.y + this.vy * dt, minY, maxY);
+      const q = COLLISION_RADIUS * size;
+      this.x = clamp(this.x + this.vx * dt, minX + q, maxX - q);
+      this.y = clamp(this.y + this.vy * dt, minY + q, maxY - q);
       this.vx -= this.vx * 4.5 * dt;
       this.vy -= this.vy * 4.5 * dt;
       this.order = this.y;
