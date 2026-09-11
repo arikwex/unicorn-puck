@@ -1,4 +1,4 @@
-import { fillCircle } from './canvasShapes.js';
+import { fillCircle, fillEllipse } from './canvasShapes.js';
 import DamageCallout from './DamageCallout.js';
 import { mulberry32 } from './donjonDungeon.js';
 import { add, getObjectsByTag } from './engine.js';
@@ -20,7 +20,7 @@ const RECOVERING = 2;
 const SMALL = 0;
 const MEDIUM = 1;
 const LARGE = 2;
-const FACE_COLORS = ['#5f5', '#f93', '#f22'];
+const FACE_COLORS = ['#5f5', '#3de', '#f93']; // per type: face/ooze color
 
 function randRange(rng, min, max) {
   return min + rng() * (max - min);
@@ -167,26 +167,6 @@ function segmentPosition(grub, index) {
   };
 }
 
-function renderBackSpike(context, segment, size, flash) {
-  context.beginPath();
-  context.moveTo(segment.x - segment.r * 0.45, segment.y - segment.r * 0.6);
-  context.lineTo(segment.x, segment.y - segment.r * 1.9);
-  context.lineTo(segment.x + segment.r * 0.45, segment.y - segment.r * 0.6);
-  context.closePath();
-  context.lineWidth = 5 * size;
-  context.strokeStyle = '#a41';
-  context.fillStyle = FACE_COLORS[MEDIUM];
-  context.stroke();
-  context.fill();
-  if (flash > 0) {
-    context.globalAlpha = flash;
-    context.strokeStyle = context.fillStyle = '#fff';
-    context.stroke();
-    context.fill();
-    context.globalAlpha = 1;
-  }
-}
-
 function renderGrub(context, grub, flashTimer) {
   const segments = SEGMENT_RADII.map((_, i) => segmentPosition(grub, i));
   const flash = flashTimer > 0 ? Math.sin(Math.min(1, flashTimer / FLASH_DURATION) * Math.PI) : 0;
@@ -213,14 +193,7 @@ function renderGrub(context, grub, flashTimer) {
   const facingIntoPage = Math.sin(grub.a) > 0;
   for (let step = 0; step < segments.length; step++) {
     const i = facingIntoPage ? step : segments.length - 1 - step;
-    if (grub.type === MEDIUM && i > 0) renderBackSpike(context, segments[i], grub.size, flash);
     fillCircle(context, segments[i].x, segments[i].y, segments[i].r, BODY_COLORS[i % BODY_COLORS.length]);
-    if (grub.type === LARGE && i > 0) {
-      const { x, y, r } = segments[i];
-      for (const side of [-1, 1]) {
-        fillCircle(context, x + side * r * 0.4, y - r * 0.35, r * 0.2, FACE_COLORS[LARGE]);
-      }
-    }
     if (flash > 0) {
       context.globalAlpha = flash;
       fillCircle(context, segments[i].x, segments[i].y, segments[i].r, '#fff');
@@ -255,6 +228,186 @@ function mouthPosition(grub, head = segmentPosition(grub, 0)) {
   const sway = Math.sin(grub.anim * 7) * 0.3;
   const [x, y] = orbit3d(12, 5, 0, grub.a + sway);
   return { x: head.x + x * grub.size, y: head.y + y * grub.size };
+}
+
+// -- hovering orb enemies (MEDIUM and LARGE) ----------------------------------
+// A sphere floating above its ground point, in the same faux-3D as the
+// player: parts are placed around the facing angle with orbit3d and drawn
+// back to front by depth, so they swing behind and in front of the body as
+// it turns, and eyes round the far side are hidden by it.
+const ORB_RADIUS = 24;
+const ORB_HOVER = 22; // body center height above the ground point
+// Per type: [body, outline, crystal/orbiter fill, crystal/orbiter far side, eye, eye core].
+const ORB_THEMES = [, ['#154', '#3db', '#9fe', '#4bc', '#39f', '#dff'], ['#321', '#f93', '#fb5', '#c62', '#f93', '#fe9']];
+const EYE_DISTANCE = ORB_RADIUS * 0.82; // eye centers sit just inside the silhouette
+// Medium crystal winglets per side: [height on the body (+ is down),
+// length, tilt up from horizontal (radians), half-width]. Two big ones
+// angled up and back, two small ones angled down and back.
+const WINGLETS = [[-8, 44, 0.6, 11], [9, 27, -0.5, 7]];
+const WINGLET_SPLAY = 0.85; // how far each side's winglets angle outward from straight back
+const ORBITERS = 5;
+const ORBIT_RADIUS = ORB_RADIUS * 1.65;
+const ORBITER_RADIUS = 6.5;
+
+// While winding up a shot the whole orb shudders harder and harder: two
+// off-ratio sines per axis stand in for noise, ramping in with aimT^2.
+function aimShake(grub) {
+  if (grub.state !== AIMING) return [0, 0];
+  const t = grub.aimT * AIM_DURATION;
+  const k = 3 * grub.aimT * grub.aimT;
+  return [(Math.sin(t * 41) + Math.sin(t * 67) / 2) * k, (Math.sin(t * 53 + 1) + Math.sin(t * 31) / 2) * k];
+}
+
+// World-space center of the body sphere: hovering, gently bobbing, shaking.
+function orbCenter(grub) {
+  const [shakeX, shakeY] = aimShake(grub);
+  return {
+    x: grub.x + shakeX * grub.size,
+    y: grub.y + (shakeY - ORB_HOVER + Math.sin(grub.t * 2.5) * 3) * grub.size,
+  };
+}
+
+// A point on/around the orb, in its own local space (x forward, y down, z
+// sideways -- see orbit3d), as [screenX, screenY, depth].
+function orbPoint(grub, center, x, y, z) {
+  const [px, py, depth] = orbit3d(x, y, z, grub.a);
+  return [center.x + px * grub.size, center.y + py * grub.size, depth];
+}
+
+// An eye on the sphere's surface, facing out along local direction
+// `azimuth` from the facing angle: foreshortened toward the silhouette as it
+// turns away, and hidden once it's round the back. Diamond or oval.
+function renderOrbEye(context, grub, center, azimuth, radius, diamond, theme) {
+  const [x, y, depth] = orbPoint(grub, center, Math.cos(azimuth) * EYE_DISTANCE, -2, Math.sin(azimuth) * EYE_DISTANCE);
+  if (depth > EYE_DISTANCE * 0.2) return;
+  const squash = 0.3 + 0.7 * Math.min(1, Math.max(0, -depth / EYE_DISTANCE));
+  // Aiming charges it up: the core swells and a halo builds around it.
+  const charge = (grub.state === AIMING) * grub.aimT;
+  context.globalAlpha = charge * 0.45;
+  fillEllipse(context, x, y, radius * 1.7 * squash * grub.size, radius * 1.7 * grub.size, theme[4]);
+  context.globalAlpha = 1;
+  [[1.25, theme[0]], [1, theme[4]], [0.45 + charge * 0.3, theme[5]]].forEach(([scale, color]) => {
+    const r = radius * scale * grub.size;
+    context.fillStyle = color;
+    context.beginPath();
+    if (diamond) {
+      context.moveTo(x, y - r);
+      context.lineTo(x + r * squash, y);
+      context.lineTo(x, y + r);
+      context.lineTo(x - r * squash, y);
+    } else {
+      context.ellipse(x, y, r * squash, r, 0, 0, TAU);
+    }
+    context.fill();
+  });
+}
+
+function renderOrbBody(context, grub, center, theme, flash) {
+  const r = ORB_RADIUS * grub.size;
+  fillCircle(context, center.x, center.y, r, theme[0]);
+  // A dim lit cap on the upper side reads as roundness.
+  context.globalAlpha = 0.25;
+  fillCircle(context, center.x - r * 0.25, center.y - r * 0.3, r * 0.55, theme[1]);
+  context.globalAlpha = flash;
+  fillCircle(context, center.x, center.y, r, '#fff');
+  context.globalAlpha = 1;
+  context.beginPath();
+  context.arc(center.x, center.y, r, 0, TAU);
+  context.strokeStyle = flash > 0.5 ? '#fff' : theme[1];
+  context.lineWidth = 4 * grub.size;
+  context.stroke();
+  if (grub.type === MEDIUM) {
+    renderOrbEye(context, grub, center, 0, 9, false, theme);
+  } else {
+    for (let k = 0; k < 4; k++) renderOrbEye(context, grub, center, k * TAU / 4, 8.5, true, theme);
+  }
+}
+
+// A crystal-shard winglet, as a flat kite in its own plane: mounted on the
+// back half of the sphere, splayed outward, and tilted up or down. Like the
+// player's wings, it's projected straight through the facing angle -- so it
+// narrows to an edge-on sliver (kept visible by its outline stroke) as it
+// turns side-on, and shows its lighter or darker face depending on which
+// side is toward the camera.
+function renderWinglet(context, grub, center, side, [mountY, length, tilt, width], theme) {
+  const flutter = Math.sin(grub.t * 5 + mountY + side) * 0.12;
+  const alongX = -Math.cos(WINGLET_SPLAY);
+  const alongZ = side * Math.sin(WINGLET_SPLAY);
+  const [mx, mz] = [-ORB_RADIUS * 0.45, side * ORB_RADIUS * 0.62];
+  const ux = Math.cos(tilt + flutter);
+  const uy = Math.sin(tilt + flutter);
+  // (along, up) in the winglet's own plane -> screen.
+  const point = (a, h) => orbPoint(grub, center, mx + alongX * a, mountY - h, mz + alongZ * a);
+  const kite = [[0, 0], [ux * length * 0.45 - uy * width, uy * length * 0.45 + ux * width], [ux * length, uy * length],
+    [ux * length * 0.45 + uy * width, uy * length * 0.45 - ux * width]].map(([a, h]) => point(a, h));
+  // Which face shows: the sign of the projected kite's winding.
+  const [[x0, y0], [x1, y1], [x2, y2]] = kite;
+  const facing = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0) > 0 === side > 0;
+  context.beginPath();
+  kite.forEach(([x, y]) => context.lineTo(x, y));
+  context.closePath();
+  context.fillStyle = theme[facing ? 2 : 3];
+  context.fill();
+  context.strokeStyle = theme[1];
+  context.lineWidth = 3 * grub.size;
+  context.stroke();
+  // The shard's center ridge.
+  context.beginPath();
+  context.moveTo(x0, y0);
+  context.lineTo(x2, y2);
+  context.lineWidth = 1.5 * grub.size;
+  context.stroke();
+}
+
+function renderOrb(context, grub, flashTimer) {
+  const flash = flashTimer > 0 ? Math.sin(Math.min(1, flashTimer / FLASH_DURATION) * Math.PI) : 0;
+  const theme = ORB_THEMES[grub.type];
+  const center = orbCenter(grub);
+  // A soft ground shadow sells the hover.
+  context.globalAlpha = 0.25;
+  fillEllipse(context, grub.x, grub.y, ORB_RADIUS * 0.8 * grub.size, ORB_RADIUS * 0.28 * grub.size, '#000');
+  context.globalAlpha = 1;
+
+  const parts = [{ depth: 0, draw: () => renderOrbBody(context, grub, center, theme, flash) }];
+  if (grub.type === MEDIUM) {
+    for (const side of [-1, 1]) {
+      WINGLETS.forEach((winglet) => parts.push({
+        // Sorted by the winglet's midpoint, well back of its mount.
+        depth: orbPoint(grub, center, -ORB_RADIUS * 0.45 - winglet[1] * 0.4, 0, side * ORB_RADIUS)[2],
+        draw: () => renderWinglet(context, grub, center, side, winglet, theme),
+      }));
+    }
+  } else {
+    // Five small orbs circling slowly in a tilted ring, each bobbing on its
+    // own phase; nearer ones draw a touch larger.
+    for (let i = 0; i < ORBITERS; i++) {
+      const phase = grub.orbit + i * TAU / ORBITERS;
+      const [x, y, depth] = orbPoint(grub, center, Math.cos(phase) * ORBIT_RADIUS,
+        Math.sin(grub.t * 2 + i * 1.7) * 5, Math.sin(phase) * ORBIT_RADIUS);
+      parts.push({
+        depth,
+        draw: () => {
+          const r = ORBITER_RADIUS * grub.size * (1 - depth / ORBIT_RADIUS * 0.15);
+          fillCircle(context, x, y, r, theme[2]);
+          context.strokeStyle = theme[3];
+          context.lineWidth = 2 * grub.size;
+          context.stroke();
+          fillCircle(context, x - r * 0.3, y - r * 0.3, r * 0.35, theme[5]);
+        },
+      });
+    }
+  }
+  parts.sort((a, b) => b.depth - a.depth).forEach((part) => part.draw());
+}
+
+// Where a volley leaves from: the small grub's mouth, the medium orb's eye,
+// or the large orb's center.
+function muzzle(grub) {
+  if (grub.type === SMALL) return mouthPosition(grub);
+  const center = orbCenter(grub);
+  if (grub.type === LARGE) return center;
+  const [x, y] = orbPoint(grub, center, EYE_DISTANCE, -2, 0);
+  return { x, y };
 }
 
 // A purple-outlined, four-segment grub that patrols randomly within its
@@ -321,6 +474,8 @@ function Grub(x, y, room, seed, type = SMALL) {
     vy: 0,
     a: Math.random() * TAU,
     anim: Math.random() * 7,
+    t: Math.random() * 7, // running clock for orb bob/flutter
+    orbit: Math.random() * TAU, // large orbs' ring phase (spins up while aiming)
     target: null,
     state: PATROL,
     aimT: 0, // 0..1 through the aim tell (and back down while recovering)
@@ -365,12 +520,12 @@ function Grub(x, y, room, seed, type = SMALL) {
         aimElapsed += dt;
         this.aimT = Math.min(1, aimElapsed / AIM_DURATION);
         if (aimElapsed >= AIM_DURATION) {
-          const mouth = mouthPosition(this);
+          const mouth = muzzle(this);
           const dx = targetX - mouth.x;
           const dy = targetY - mouth.y;
           const heading = Math.atan2(dy, dx);
           const shots = [1, 3, 8][type];
-          const palette = type ? { color: FACE_COLORS[type], highlightColor: type === LARGE ? '#fbb' : '#fdb' } : undefined;
+          const palette = type ? { color: FACE_COLORS[type], highlightColor: ORB_THEMES[type][5] } : undefined;
           for (let i = 0; i < shots; i++) {
             // Large volleys use fixed compass directions even while tracking the player.
             const angle = type === LARGE ? i * TAU / 8 : heading + (i - (shots - 1) / 2) * MEDIUM_SPREAD_ANGLE;
@@ -418,6 +573,8 @@ function Grub(x, y, room, seed, type = SMALL) {
       this.vx -= this.vx * 4.5 * dt;
       this.vy -= this.vy * 4.5 * dt;
       this.z = this.y;
+      this.t += dt;
+      this.orbit += dt * (0.5 + (this.state === AIMING) * this.aimT * 3);
 
       flashTimer = Math.max(0, flashTimer - dt);
       hitCooldown = Math.max(0, hitCooldown - dt);
@@ -463,9 +620,9 @@ function Grub(x, y, room, seed, type = SMALL) {
     },
 
     render(context) {
-      renderGrub(context, this, flashTimer);
+      (type ? renderOrb : renderGrub)(context, this, flashTimer);
       if (healthBarTimer > 0) {
-        renderHealthBar(context, this.x, this.y - HEALTH_BAR_OFFSET_Y * size,
+        renderHealthBar(context, this.x, this.y - (type ? 72 : HEALTH_BAR_OFFSET_Y) * size,
           HEALTH_BAR_WIDTH * size, HEALTH_BAR_HEIGHT * size, this.hp, this.maxHp);
       }
     },
