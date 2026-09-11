@@ -31,14 +31,17 @@ const GRUB_ROOM_MARGIN = 50;
 const CHEST_ROOM_MARGIN = 50;
 const CHEST_PLACEMENT_ATTEMPTS = 30;
 // The level's required collectibles: winning means collecting *every*
-// chalice that spawns, not a fixed count -- each non-spawn room
-// independently rolls CHALICE_SPAWN_CHANCE for one, so a 12-room dungeon
-// (11 non-spawn rooms) nets roughly 8 chalices, not exactly 11. Unlike a
+// chalice that spawns, not a fixed count. Exactly CHALICE_ROOM_FRACTION of
+// non-spawn rooms get one -- the room count is computed up front and that
+// many distinct rooms are shuffled into (see buildDungeon), rather than
+// each room independently rolling the fraction as a per-room chance,
+// which could unluckily land on far fewer (even zero) chalices for a
+// given dungeon instead of reliably landing on the target count. Unlike a
 // chest, placement within a chosen room never gives up (see the fallback
 // in buildDungeon) since a skipped chalice would shrink the required
 // total without actually placing the item, silently making the level
 // unwinnable.
-const CHALICE_SPAWN_CHANCE = 0.75;
+const CHALICE_ROOM_FRACTION = 0.5;
 const CHALICE_RADIUS = 20;
 const CHALICE_ROOM_MARGIN = 40;
 const CHALICE_PLACEMENT_ATTEMPTS = 30;
@@ -162,6 +165,19 @@ function findClearSpot(room, margin, radius, attempts, rng, walls, circles, entr
   return null;
 }
 
+// Fisher-Yates shuffle -- used to pick exactly CHALICE_ROOM_FRACTION of
+// the non-spawn rooms for a chalice (a fixed count decided up front,
+// rather than a per-room coin flip that could unluckily under- or
+// over-shoot the target across an entire dungeon).
+function shuffled(list, rng) {
+  const result = [...list];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 // Builds the dungeon's walls as CubeObstacles and returns a world-space
 // spawn point (the center of its first room). `seed` drives the whole
 // layout; pillar placement and grub scatter/patrol each offset from it so
@@ -251,47 +267,34 @@ function buildDungeon(seed) {
 
   // The level's Chalices of Pegacorn Blood -- same placement rules as a
   // chest (clear of every obstacle and doorway, biased toward room
-  // center). Every non-spawn room independently rolls CHALICE_SPAWN_CHANCE
-  // for one, so the total is dynamic (roughly 75% of non-spawn rooms, not
-  // a fixed count); winning means collecting all of whatever that turns
-  // out to be (see chaliceProgress.resetChalices below). Runs after the
-  // loop above so wallBoxes/obstacleCircles already reflect every wall,
-  // pillar, grub, and chest across the whole dungeon, not just whichever
-  // rooms happened to be processed first.
+  // center). Exactly round(CHALICE_ROOM_FRACTION * non-spawn rooms) of
+  // them get one -- the count is computed up front and that many distinct
+  // rooms are shuffled into, so the target is always hit precisely rather
+  // than each room flipping its own coin and the dungeon as a whole
+  // landing wherever that happens to fall (including, unluckily, zero).
+  // Runs after the loop above so wallBoxes/obstacleCircles already
+  // reflect every wall, pillar, grub, and chest across the whole dungeon,
+  // not just whichever rooms happened to be processed first.
   const chaliceRng = mulberry32(seed + 4);
-  let chaliceCount = 0;
-  dungeon.rooms.forEach((room, roomIndex) => {
-    if (roomIndex === 0) return; // never the player's own spawn room
-    if (chaliceRng() >= CHALICE_SPAWN_CHANCE) return;
+  const nonSpawnRoomIndices = dungeon.rooms.map((_, i) => i).filter((i) => i !== 0);
+  const chaliceRoomCount = Math.round(nonSpawnRoomIndices.length * CHALICE_ROOM_FRACTION);
+  const chaliceRoomIndices = shuffled(nonSpawnRoomIndices, chaliceRng).slice(0, chaliceRoomCount);
 
+  chaliceRoomIndices.forEach((roomIndex) => {
+    const room = dungeon.rooms[roomIndex];
     const roomCenter = toWorld(room.x + room.w / 2, room.y + room.h / 2);
     const worldRoom = {
       x: roomCenter.x, y: roomCenter.y, w: room.w * TILE, h: room.h * TILE,
     };
-    const entrancePoints = roomEntrancePoints(room);
     // Chosen for a chalice, so unlike a chest this never gives up on the
     // room -- it falls back to an unchecked point rather than skipping
-    // entirely and silently shrinking the required total.
-    const spawn = findClearSpot(worldRoom, CHALICE_ROOM_MARGIN, CHALICE_RADIUS, CHALICE_PLACEMENT_ATTEMPTS, chaliceRng, wallBoxes, obstacleCircles, entrancePoints)
-      || pickPointInRoom(worldRoom, CHALICE_ROOM_MARGIN, chaliceRng);
-    add(Chalice(spawn.x, spawn.y));
-    chaliceCount++;
-  });
-  // Vanishingly unlikely with a 75% per-room chance across any real
-  // dungeon, but a 0-chalice level would be unwinnable (chalicesComplete()
-  // requires a positive total) -- guarantee at least one.
-  if (chaliceCount === 0 && dungeon.rooms.length > 1) {
-    const room = dungeon.rooms[1];
-    const roomCenter = toWorld(room.x + room.w / 2, room.y + room.h / 2);
-    const worldRoom = {
-      x: roomCenter.x, y: roomCenter.y, w: room.w * TILE, h: room.h * TILE,
-    };
+    // entirely and silently shrinking the required total below the count
+    // just committed to above.
     const spawn = findClearSpot(worldRoom, CHALICE_ROOM_MARGIN, CHALICE_RADIUS, CHALICE_PLACEMENT_ATTEMPTS, chaliceRng, wallBoxes, obstacleCircles, roomEntrancePoints(room))
       || pickPointInRoom(worldRoom, CHALICE_ROOM_MARGIN, chaliceRng);
     add(Chalice(spawn.x, spawn.y));
-    chaliceCount = 1;
-  }
-  resetChalices(chaliceCount);
+  });
+  resetChalices(chaliceRoomIndices.length);
 
   return playerSpawn;
 }
