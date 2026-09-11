@@ -7,7 +7,7 @@ import { add, clear, getObjectsByTag, remove } from './engine.js';
 import createMap from './mapCreator.js';
 import MainMenu from './MainMenu.js';
 import { playDungeonTheme } from './music.js';
-import SplatEffect from './SplatEffect.js';
+import { fireSplatBurst } from './SplatEffect.js';
 import StatusCard from './StatusCard.js';
 import { TAG_COMBAT_ROOM } from './tags.js';
 
@@ -24,16 +24,6 @@ const DEATH_SPLAT_SIZE_MAX = 26;
 // every trip back through the main menu would just be a jarring re-fade.
 let musicStarted = false;
 
-function fireDeathSplats(x, y) {
-  for (let i = 0; i < DEATH_SPLAT_COUNT; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = Math.sqrt(Math.random()) * DEATH_SPLAT_SPEED_MAX;
-    const size = DEATH_SPLAT_SIZE_MIN + Math.random() * (DEATH_SPLAT_SIZE_MAX - DEATH_SPLAT_SIZE_MIN);
-    const color = DEATH_SPLAT_COLORS[i % DEATH_SPLAT_COLORS.length];
-    add(SplatEffect(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, color, { size }));
-  }
-}
-
 // Watches the live player for either end condition -- hp running out, or
 // every chalice collected -- and hands off to the matching status card.
 // Fires the death splats only for the loss case; both cases tear down
@@ -48,7 +38,7 @@ function GameWatcher(player, dragController, playerHealthHUD, chaliceHUD, itemAb
       const lost = player.hp <= 0;
       if (!won && !lost) return;
 
-      if (lost) fireDeathSplats(player.x, player.y);
+      if (lost) fireSplatBurst(player.x, player.y, DEATH_SPLAT_COUNT, DEATH_SPLAT_COLORS, DEATH_SPLAT_SPEED_MAX, DEATH_SPLAT_SIZE_MIN, DEATH_SPLAT_SIZE_MAX);
       remove([player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap]);
       add(won
         ? StatusCard(showMenu, { lines: ['PEGACORN BLOOD', 'RECLAIMED'], color: '#fff' })

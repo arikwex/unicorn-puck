@@ -6,9 +6,9 @@
 // chaliceProgress counter GameFlow.js watches for the win condition.
 
 import { emit } from './bus.js';
-import { add, getObjectsByTag } from './engine.js';
+import { getObjectsByTag } from './engine.js';
 import { collectChalice } from './chaliceProgress.js';
-import SplatEffect from './SplatEffect.js';
+import { fireSplatBurst } from './SplatEffect.js';
 import { TAG_PLAYER } from './tags.js';
 
 const TAU = Math.PI * 2;
@@ -69,16 +69,6 @@ function renderChaliceIcon(context, x, y, scale) {
   context.restore();
 }
 
-function fireCollectSplats(x, y) {
-  for (let i = 0; i < COLLECT_SPLAT_COUNT; i++) {
-    const angle = Math.random() * TAU;
-    const speed = Math.sqrt(Math.random()) * COLLECT_SPLAT_SPEED_MAX;
-    const size = COLLECT_SPLAT_SIZE_MIN + Math.random() * (COLLECT_SPLAT_SIZE_MAX - COLLECT_SPLAT_SIZE_MIN);
-    const color = COLLECT_SPLAT_COLORS[i % COLLECT_SPLAT_COLORS.length];
-    add(SplatEffect(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, color, { size }));
-  }
-}
-
 function Chalice(x, y) {
   let anim = Math.random() * TAU;
   let collected = false;
@@ -99,7 +89,7 @@ function Chalice(x, y) {
 
       collected = true;
       collectChalice();
-      fireCollectSplats(this.x, this.y);
+      fireSplatBurst(this.x, this.y, COLLECT_SPLAT_COUNT, COLLECT_SPLAT_COLORS, COLLECT_SPLAT_SPEED_MAX, COLLECT_SPLAT_SIZE_MIN, COLLECT_SPLAT_SIZE_MAX);
       emit('item-collected', { name: 'Pegacorn Blood Chalice' });
       return true;
     },

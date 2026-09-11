@@ -5,9 +5,9 @@
 // event Chalice.js already uses.
 
 import { emit } from './bus.js';
-import { add, getObjectsByTag } from './engine.js';
+import { getObjectsByTag } from './engine.js';
 import { collectItemAbility, ITEM_ABILITY_CATALOG } from './ItemAbility.js';
-import SplatEffect from './SplatEffect.js';
+import { fireSplatBurst } from './SplatEffect.js';
 import { TAG_PLAYER } from './tags.js';
 
 const TAU = Math.PI * 2;
@@ -16,18 +16,10 @@ const BOB_SPEED = 2.2; // rad/s
 const BOB_AMOUNT = 4; // px
 const WORLD_SCALE = 1.8;
 const COLLECT_SPLAT_COUNT = 8;
+const COLLECT_SPLAT_COLORS = ['#fff'];
 const COLLECT_SPLAT_SPEED_MAX = 200;
 const COLLECT_SPLAT_SIZE_MIN = 6;
 const COLLECT_SPLAT_SIZE_MAX = 12;
-
-function fireCollectSplats(x, y, color) {
-  for (let i = 0; i < COLLECT_SPLAT_COUNT; i++) {
-    const angle = Math.random() * TAU;
-    const speed = Math.sqrt(Math.random()) * COLLECT_SPLAT_SPEED_MAX;
-    const size = COLLECT_SPLAT_SIZE_MIN + Math.random() * (COLLECT_SPLAT_SIZE_MAX - COLLECT_SPLAT_SIZE_MIN);
-    add(SplatEffect(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, color, { size }));
-  }
-}
 
 function Item(x, y, abilityId) {
   let anim = Math.random() * TAU;
@@ -51,7 +43,7 @@ function Item(x, y, abilityId) {
 
       collected = true;
       collectItemAbility(abilityId, player);
-      fireCollectSplats(this.x, this.y, '#fff');
+      fireSplatBurst(this.x, this.y, COLLECT_SPLAT_COUNT, COLLECT_SPLAT_COLORS, COLLECT_SPLAT_SPEED_MAX, COLLECT_SPLAT_SIZE_MIN, COLLECT_SPLAT_SIZE_MAX);
       emit('item-collected', { name: ability.name });
       return true;
     },

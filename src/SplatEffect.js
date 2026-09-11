@@ -4,6 +4,8 @@
 // Self-expiring, like Grub's own defeat -- update() returns true once the
 // puddle has fully faded, and the engine removes it.
 
+import { add } from './engine.js';
+
 const TAU = Math.PI * 2;
 
 const FLIGHT_DURATION_MIN = 0.3;
@@ -85,4 +87,20 @@ function SplatEffect(x, y, vx, vy, color, props = {}) {
   };
 }
 
+// Shared by every "pop N splats out radially from a point" effect (a
+// chalice/item pickup, a chest breaking, a death) -- they all sampled the
+// same disk (sqrt(rng()) for uniform area density, not just uniform
+// radius) and cycled through a color list the same way, just copy-pasted
+// per caller. `rng` defaults to Math.random for cosmetic, non-reproducible
+// callers; pass a seeded one to keep a burst reproducible instead.
+function fireSplatBurst(x, y, count, colors, speedMax, sizeMin, sizeMax, rng = Math.random) {
+  for (let i = 0; i < count; i++) {
+    const angle = rng() * TAU;
+    const speed = Math.sqrt(rng()) * speedMax;
+    const size = sizeMin + rng() * (sizeMax - sizeMin);
+    add(SplatEffect(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, colors[i % colors.length], { size }));
+  }
+}
+
 export default SplatEffect;
+export { fireSplatBurst };

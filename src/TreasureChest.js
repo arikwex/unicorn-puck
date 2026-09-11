@@ -6,10 +6,9 @@
 import { add } from './engine.js';
 import BubbleShieldItem from './BubbleShieldItem.js';
 import HealthItem from './HealthItem.js';
-import SplatEffect from './SplatEffect.js';
+import { fireSplatBurst } from './SplatEffect.js';
 import { TAG_OBSTACLE, TAG_PLAYER } from './tags.js';
 
-const TAU = Math.PI * 2;
 const SHIELD_DROP_CHANCE = 0.5;
 const HITS_REQUIRED = 2;
 // Exported so mapCreator.js's placement check uses the exact same radius
@@ -52,16 +51,6 @@ const WOOD_COLOR = '#8b5a2b';
 const WOOD_DARK_COLOR = '#6b4423';
 const METAL_COLOR = '#e8c34a';
 const METAL_DARK_COLOR = '#a9822a';
-
-function fireBurst(x, y, count, colors, speedMax, sizeMin, sizeMax) {
-  for (let i = 0; i < count; i++) {
-    const angle = Math.random() * TAU;
-    const speed = Math.sqrt(Math.random()) * speedMax;
-    const size = sizeMin + Math.random() * (sizeMax - sizeMin);
-    const color = colors[i % colors.length];
-    add(SplatEffect(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, color, { size }));
-  }
-}
 
 // Drawn in local coordinates, centered on (0, 0) -- the caller translates
 // (for the hit-pop) and rotates (for the hit-rattle) around that origin
@@ -146,10 +135,10 @@ function TreasureChest(x, y, props = {}) {
       flashTimer = FLASH_DURATION;
       hitAnimElapsed = 0;
       hitsRemaining -= 1;
-      fireBurst(this.x, this.y, SPARK_COUNT, [SPARK_COLOR], SPARK_SPEED_MAX, SPARK_SIZE_MIN, SPARK_SIZE_MAX);
+      fireSplatBurst(this.x, this.y, SPARK_COUNT, [SPARK_COLOR], SPARK_SPEED_MAX, SPARK_SIZE_MIN, SPARK_SIZE_MAX);
 
       if (hitsRemaining > 0) return;
-      fireBurst(this.x, this.y, BREAK_SPLAT_COUNT, BREAK_SPLAT_COLORS, BREAK_SPLAT_SPEED_MAX, BREAK_SPLAT_SIZE_MIN, BREAK_SPLAT_SIZE_MAX);
+      fireSplatBurst(this.x, this.y, BREAK_SPLAT_COUNT, BREAK_SPLAT_COLORS, BREAK_SPLAT_SPEED_MAX, BREAK_SPLAT_SIZE_MIN, BREAK_SPLAT_SIZE_MAX);
       add(contents(this.x, this.y));
       return true;
     },
