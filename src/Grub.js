@@ -331,12 +331,10 @@ function Grub(x, y, room, seed, props = {}) {
       if (this.hp <= 0) return true;
       const player = getObjectsByTag(TAG_PLAYER)[0];
       const canAim = player && player.hp > 0
-        && Math.abs(player.x - room.x) <= room.w / 2
-        && Math.abs(player.y - room.y) <= room.h / 2
         && Math.hypot(player.x - this.x, player.y - this.y) <= ATTACK_RANGE;
 
       // Roll a fresh reaction delay when acquiring the player, including
-      // re-entry: time spent off-room must not make every grub ready at once.
+      // re-entry: time spent out of range must not make every grub ready at once.
       if (canAim && !hadAimTarget) {
         attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
       } else {
