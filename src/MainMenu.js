@@ -26,30 +26,15 @@ const PROMPT_PULSE_SPEED = 3; // rad/s
 
 const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-// Draws `text` centered on (cx, y), each glyph colored by its own hue --
-// `hueAt(index)` lets the title cycle continuously while a caller wanting a
-// flat color can just pass `() => fixedHue`.
-function renderRainbowText(context, text, cx, y, font, hueAt) {
-  context.font = font;
-  context.textBaseline = 'alphabetic';
-  const widths = [...text].map((char) => context.measureText(char).width);
-  const totalWidth = widths.reduce((sum, w) => sum + w, 0);
-  let x = cx - totalWidth / 2;
-  [...text].forEach((char, i) => {
-    context.fillStyle = `hsl(${hueAt(i)}, 100%, 65%)`;
-    context.fillText(char, x, y);
-    x += widths[i];
-  });
-}
-
 // Large centered idle unicorn, a shifting rainbow "PEGACORN" over a
 // permanently red "BLOOD", and a pulsing "click/tap anywhere" prompt at the
 // bottom -- the whole thing is HUD-space (raw canvas pixels), so it's
 // unaffected by any camera. Calls `onBegin()` on the first pointer press
-// anywhere on the canvas.
+// anywhere on the canvas -- `{ once: true }` fires and detaches itself, so
+// there's no started flag/wrapper/destroy() needed to guard against a
+// second call.
 function MainMenu(onBegin) {
   let anim = 0;
-  let started = false;
   // Render-only scenery: never added to the world or pickup/physics passes.
   const candelabra = Pillar(0, 0, { variant: 3 });
   const walls = [
@@ -58,19 +43,9 @@ function MainMenu(onBegin) {
     { left: -0.15, right: 0.12, y: 0.53 },
   ].map((placement) => ({ ...placement, wall: CubeObstacle() }));
 
-  function onPointerDown() {
-    if (started) return;
-    started = true;
-    onBegin();
-  }
-
-  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointerdown', onBegin, { once: true });
 
   return {
-    destroy() {
-      canvas.removeEventListener('pointerdown', onPointerDown);
-    },
-
     update(dt) {
       anim += dt;
       candelabra.update(dt);
@@ -108,11 +83,21 @@ function MainMenu(onBegin) {
       const topY = canvas.height * 0.2;
       const bottomY = topY + titleFont * TITLE_LINE_GAP;
 
+      // Each letter of the title gets its own hue -- drawn left-aligned at
+      // a manually walked x (textAlign must be 'left' for that, not the
+      // 'center' every other line here uses) starting from the whole
+      // word's own centered left edge.
+      context.font = font;
       context.textAlign = 'left';
       const baseHue = (anim * HUE_ROTATION_SPEED) % 360;
-      renderRainbowText(context, TITLE_TOP, cx, topY, font, (i) => (baseHue + i * HUE_STEP_PER_LETTER) % 360);
+      const widths = [...TITLE_TOP].map((c) => context.measureText(c).width);
+      let x = cx - widths.reduce((a, b) => a + b, 0) / 2;
+      [...TITLE_TOP].forEach((c, i) => {
+        context.fillStyle = `hsl(${(baseHue + i * HUE_STEP_PER_LETTER) % 360}, 100%, 65%)`;
+        context.fillText(c, x, topY);
+        x += widths[i];
+      });
 
-      context.font = font;
       context.textAlign = 'center';
       context.fillStyle = BLOOD_COLOR;
       context.fillText(TITLE_BOTTOM, cx, bottomY);
@@ -126,11 +111,11 @@ function MainMenu(onBegin) {
 
       const promptText = `[${IS_TOUCH ? 'Tap' : 'Click'} Anywhere to Begin]`;
       context.font = `bold ${PROMPT_FONT_SIZE}px sans-serif`;
-      context.textAlign = 'center';
       context.fillStyle = '#fff';
+      // No need to reset globalAlpha back to 1 after -- hud.js's own
+      // renderScreenHUD already wraps every renderHUD call in save/restore.
       context.globalAlpha = 0.6 + 0.4 * Math.sin(anim * PROMPT_PULSE_SPEED);
       context.fillText(promptText, cx, canvas.height - PROMPT_BOTTOM_MARGIN);
-      context.globalAlpha = 1;
     },
   };
 }

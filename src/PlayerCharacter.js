@@ -372,12 +372,6 @@ const FEATHER_LENGTH_MIN = 0.14; // root-most feather's protrusion length
 const FEATHER_CUT_PULL_1 = 0.55; // control point 1: how far from the tip, along FEATHER_CUT_ANGLE, as a fraction of that feather's own length
 const FEATHER_CUT_PULL_2 = 0.35; // control point 2: how far back from the next base point, along the baseline, as a fraction of one baseline segment
 
-function rotate(x, y, angle) {
-  const c = Math.cos(angle);
-  const s = Math.sin(angle);
-  return [x * c - y * s, x * s + y * c];
-}
-
 // Traces the trailing edge as FEATHER_COUNT feathers running from `from`
 // (the terminal phalanx) to `to` (the blade of scapula), assuming the
 // current path position is already at `from`. Each feather is a straight
@@ -400,45 +394,6 @@ function traceFeathers(context, from, to) {
     context.lineTo(tipX, tipY);
     context.bezierCurveTo(curve1X, curve1Y, curve2X, curve2Y, innerX, innerY);
   }
-
-  // const baseline = [to[0] - from[0], to[1] - from[1]];
-  // const baselineLength = Math.hypot(baseline[0], baseline[1]);
-  // const baselineDir = [baseline[0] / baselineLength, baseline[1] / baselineLength];
-
-  // // Perpendicular to the baseline, pointing away from the wing's interior
-  // // (away from the coracoid, which sits at the origin).
-  // const [perpX, perpY] = rotate(baselineDir[0], baselineDir[1], Math.PI / 2);
-  // const midpoint = [from[0] + baseline[0] / 2, from[1] + baseline[1] / 2];
-  // const outwardSign = (midpoint[0] * perpX + midpoint[1] * perpY) > 0 ? 1 : -1;
-
-  // const [featherX, featherY] = rotate(baselineDir[0], baselineDir[1], outwardSign * FEATHER_SWEEP_ANGLE);
-  // const [cutX, cutY] = rotate(baselineDir[0], baselineDir[1], outwardSign * FEATHER_CUT_ANGLE);
-
-  // for (let i = 0; i < FEATHER_COUNT; i++) {
-  //   const baseStart = [
-  //     from[0] + baseline[0] * (i / FEATHER_COUNT),
-  //     from[1] + baseline[1] * (i / FEATHER_COUNT),
-  //   ];
-  //   const baseEnd = [
-  //     from[0] + baseline[0] * ((i + 1) / FEATHER_COUNT),
-  //     from[1] + baseline[1] * ((i + 1) / FEATHER_COUNT),
-  //   ];
-  //   const lengthFraction = FEATHER_LENGTH_MAX
-  //     + (FEATHER_LENGTH_MIN - FEATHER_LENGTH_MAX) * (i / (FEATHER_COUNT - 1));
-  //   const length = lengthFraction * baselineLength;
-
-  //   // Feather 1's tip is `from` itself -- whatever curve already ends
-  //   // there doubles as its outward edge, so there's nothing to draw here.
-  //   const tip = i === 0 ? from : [baseStart[0] + featherX * length, baseStart[1] + featherY * length];
-  //   if (i > 0) context.lineTo(tip[0], tip[1]);
-
-  //   const control1 = [tip[0] + cutX * length * FEATHER_CUT_PULL_1, tip[1] + cutY * length * FEATHER_CUT_PULL_1];
-  //   const control2 = [
-  //     baseEnd[0] - baselineDir[0] * (baselineLength / FEATHER_COUNT) * FEATHER_CUT_PULL_2,
-  //     baseEnd[1] - baselineDir[1] * (baselineLength / FEATHER_COUNT) * FEATHER_CUT_PULL_2,
-  //   ];
-  //   context.bezierCurveTo(control1[0], control1[1], control2[0], control2[1], baseEnd[0], baseEnd[1]);
-  // }
 }
 
 function traceWing(context, W, H) {
@@ -808,7 +763,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
       tintContext.clearRect(0, 0, DAMAGE_CANVAS_SIZE, DAMAGE_CANVAS_SIZE);
       tintContext.save();
       renderPlayer(tintContext, { ...this, x: center, y: center }, anim, this.charge, []);
-      tintContext.globalCompositeOperation = 'source-atop';
+      // tintContext.globalCompositeOperation = 'source-atop';
       tintContext.globalAlpha = Math.sin(damageFlashTimer / DAMAGE_FLASH_DURATION * Math.PI / 2);
       tintContext.fillStyle = '#f22';
       tintContext.fillRect(0, 0, DAMAGE_CANVAS_SIZE, DAMAGE_CANVAS_SIZE);
