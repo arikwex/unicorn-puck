@@ -60,28 +60,41 @@ test('numeric types have scaled collision geometry, 5/8/13 HP, and cost 1/2/3 sl
   assert.equal(Grub(0, 0, room, 1).type, SMALL);
 });
 
-test('body, face, tell, and recovery scale together; medium grubs add orange eyes and three spikes', () => {
-  const small = make(SMALL); const medium = make(MEDIUM);
-  for (const angle of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
-    for (const state of [PATROL, AIMING, RECOVERING]) {
-      for (const grub of [small, medium]) Object.assign(grub, { a: angle, anim: 0, state, aimT: 0.75 });
-      const smallCalls = draw(small); const mediumCalls = draw(medium);
-      const arcs = (calls) => calls.filter(({ method }) => method === 'arc').map(({ args }) => args);
-      const a = arcs(smallCalls); const b = arcs(mediumCalls);
-      assert.equal(a.length, b.length);
-      a.forEach((circle, i) => {
-        for (let field = 0; field < 3; field++) assert.ok(Math.abs(b[i][field] - circle[field] * 1.4) < 1e-8);
-      });
-      assert.equal(mediumCalls.filter(({ method }) => method === 'lineTo').length, 6, 'three triangular spikes');
-      assert.equal(smallCalls.filter(({ method }) => method === 'lineTo').length, 0);
-      assert.ok(!mediumCalls.some(({ method, color }) => method === 'fill' && color === '#5f5'));
-      if (angle === 0) {
-        const faceDots = smallCalls.filter(({ method, color }) => method === 'fill' && color === '#5f5').length;
-        assert.equal(mediumCalls.filter(({ method, color }) => method === 'fill' && color === '#f93').length, faceDots + 3,
-          'three orange spikes plus all visible face features');
-      }
-    }
+// Index of the first/last call matching a predicate.
+const indexOf = (calls, test) => calls.findIndex(test);
+const lastIndexOf = (calls, test) => calls.length - 1 - [...calls].reverse().findIndex(test);
+
+test('medium orbs are a teal sphere with one foreshortened blue eye and four depth-sorted crystal winglets', () => {
+  const medium = make(MEDIUM);
+  const body = ({ method, color }) => method === 'arc' && color === '#154';
+  const winglet = ({ method, color }) => method === 'fill' && (color === '#9fe' || color === '#4bc');
+  const eye = ({ method, color, alpha }) => method === 'ellipse' && color === '#39f' && alpha === 1;
+  for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+    Object.assign(medium, { a, state: PATROL, aimT: 0 });
+    const calls = draw(medium);
+    assert.equal(calls.find(body).args[2], 24 * 1.4, 'body sphere scales with size');
+    assert.equal(calls.filter(winglet).length, 4, 'two big and two small winglets');
+    assert.equal(calls.filter(eye).length, a === Math.PI / 2 ? 0 : 1, 'the eye hides round the back');
   }
+  // Side-on the eye is a sliver at the silhouette; facing the camera, round.
+  Object.assign(medium, { a: 0 });
+  let [, , rx, ry] = draw(medium).find(eye).args;
+  assert.ok(rx < ry * 0.5);
+  Object.assign(medium, { a: -Math.PI / 2 });
+  [, , rx, ry] = draw(medium).find(eye).args;
+  assert.ok(Math.abs(rx - ry) < 1e-9);
+  // Facing the camera the back-mounted winglets all sit behind the body;
+  // facing away, all in front.
+  let calls = draw(medium);
+  assert.ok(lastIndexOf(calls, winglet) < indexOf(calls, body));
+  Object.assign(medium, { a: Math.PI / 2 });
+  calls = draw(medium);
+  assert.ok(indexOf(calls, winglet) > indexOf(calls, body));
+  // The charge-up shakes the whole orb, harder toward the end of the tell.
+  const center = (aimT) => { Object.assign(medium, { state: AIMING, aimT }); return draw(medium).find(body).args.slice(0, 2); };
+  const [x0, y0] = center(0);
+  const [x1, y1] = center(0.9);
+  assert.ok(Math.hypot(x1 - x0, y1 - y0) > 0.5);
 });
 
 test('all types fire their colored volley once per tell and leave matching ooze trails', () => {
@@ -95,7 +108,13 @@ test('all types fire their colored volley once per tell and leave matching ooze 
     grub.tick(1.99);
     assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 0);
     grub.aimT = 1;
-    const mouth = draw(grub).filter(({ method, args }) => method === 'arc' && args[2] === 4 * grub.size).at(-1).args;
+    // Small grubs spit from the mouth, medium orbs shoot from the eye, large orbs from their center.
+    const calls = draw(grub);
+    const mouth = [
+      () => calls.filter(({ method, args }) => method === 'arc' && args[2] === 4 * grub.size).at(-1).args,
+      () => calls.filter(({ method, color, alpha }) => method === 'ellipse' && color === '#39f' && alpha === 1).at(-1).args,
+      () => calls.find(({ method, color }) => method === 'arc' && color === '#321').args,
+    ][type]();
     grub.tick(0.01);
     const shots = getObjectsByTag(TAG_PROJECTILE);
     assert.equal(shots.length, [1, 3, 8][type]);
@@ -110,7 +129,7 @@ test('all types fire their colored volley once per tell and leave matching ooze 
       assert.ok(Math.abs(shot.vx - Math.cos(angle) * 340) < 1e-8);
       assert.ok(Math.abs(shot.vy - Math.sin(angle) * 340) < 1e-8);
       assert.deepEqual(draw(shot).filter(({ method }) => method === 'fill').map(({ color }) => color),
-        [['#4f5', '#dfd'], ['#f93', '#fdb'], ['#f22', '#fbb']][type]);
+        [['#4f5', '#dfd'], ['#3de', '#dff'], ['#f93', '#fe9']][type]);
     });
     assert.equal(grub.state, RECOVERING);
     grub.tick(0.1);
@@ -120,7 +139,7 @@ test('all types fire their colored volley once per tell and leave matching ooze 
     const splats = getObjects().filter((object) => !before.has(object));
     assert.ok(splats.length > 0);
     for (const splat of splats) {
-      const color = ['#4f5', '#f93', '#f22'][type];
+      const color = ['#4f5', '#3de', '#f93'][type];
       assert.ok(draw(splat).some((call) => call.method === 'stroke' && call.stroke === color));
       splat.tick(1);
       assert.ok(draw(splat).some((call) => call.method === 'fill' && call.color === color));
@@ -139,7 +158,7 @@ test('hit and death splashes use each type’s ooze color', () => {
     const colors = getObjects().flatMap((effect) => draw(effect)
       .filter(({ method }) => method === 'stroke').map(({ stroke }) => stroke));
     assert.equal(colors.length, 14);
-    assert.deepEqual(new Set(colors), new Set([['#4f5', '#85d'], ['#f93'], ['#f22']][type]));
+    assert.deepEqual(new Set(colors), new Set([['#4f5', '#85d'], ['#3de'], ['#f93']][type]));
   }
 });
 
@@ -175,33 +194,32 @@ test('a medium grub keeps combat locked until it dies, then clears once despite 
   assert.equal(soundStarts, 2, 'one start cue and one clear cue');
 });
 
-test('large body and tell scale by 1.5 with red face features and two dots per back segment', () => {
-  const medium = make(MEDIUM); const large = make(LARGE);
-  for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
-    for (const state of [PATROL, AIMING, RECOVERING]) {
-      for (const grub of [medium, large]) Object.assign(grub, { a, anim: 0, state, aimT: 0.75 });
-      const mediumCalls = draw(medium); const calls = draw(large);
-      const bodies = (draws) => draws.filter(({ method }) => method === 'arc').slice(0, 4);
-      const segments = bodies(calls);
-      bodies(mediumCalls).forEach(({ args }, i) => {
-        for (let field = 0; field < 3; field++) {
-          assert.ok(Math.abs(segments[i].args[field] - args[field] * 1.5) < 1e-8);
-        }
-      });
-      assert.equal(calls.filter(({ method }) => method === 'lineTo').length, 0, 'no spikes');
-      const red = calls.filter(({ method, color }) => method === 'arc' && color === '#f22');
-      const dots = red.filter(({ args }) => args[2] < 4 * large.size);
-      assert.equal(dots.length, 6);
-      for (const { args: [x, y, r] } of segments.slice(1)) {
-        const pair = dots.filter(({ args }) => Math.abs(args[2] - r * 0.2) < 1e-8);
-        assert.equal(pair.length, 2, 'each back segment has its own pair');
-        assert.ok(pair[0].args[0] < x && pair[1].args[0] > x);
-        assert.ok(pair.every(({ args }) => Math.hypot(args[0] - x, args[1] - y) + args[2] < r));
-      }
-      const mediumFace = mediumCalls.filter(({ method, color }) => method === 'arc' && color === '#f93');
-      assert.equal(red.length - dots.length, mediumFace.length, 'all visible face features turn red');
-    }
+test('large orbs have four diamond eyes (far ones hidden) and five orbiters circling around and behind them', () => {
+  const large = make(LARGE);
+  const body = ({ method, color }) => method === 'arc' && color === '#321';
+  const orbiter = ({ method, color }) => method === 'arc' && color === '#fb5';
+  // Diamond eyes: the outer orange fill after a moveTo/lineTo path.
+  const eyes = (calls) => calls.filter(({ method, color, alpha }, i) => method === 'fill' && color === '#f93' && alpha === 1
+    && calls[i - 1]?.method === 'lineTo');
+  let sawOrbitersOnBothSides = false;
+  for (let k = 0; k < 16; k++) {
+    Object.assign(large, { a: k * Math.PI / 8, orbit: k * 0.7, state: PATROL, aimT: 0 });
+    const calls = draw(large);
+    assert.equal(calls.find(body).args[2], 24 * 2.1, 'body sphere scales with size');
+    const visible = eyes(calls).length;
+    assert.ok(visible >= 2 && visible <= 3, 'eyes round the back are hidden');
+    assert.equal(calls.filter(orbiter).length, 5);
+    const bodyAt = indexOf(calls, body);
+    sawOrbitersOnBothSides ||= indexOf(calls, orbiter) < bodyAt && lastIndexOf(calls, orbiter) > bodyAt;
   }
+  assert.ok(sawOrbitersOnBothSides, 'orbiters pass behind and in front of the body');
+  // The ring drifts slowly, and spins up while charging a volley.
+  Object.assign(large, { orbit: 0, state: PATROL, aimT: 0 });
+  large.tick(0.1);
+  const idleSpin = large.orbit;
+  Object.assign(large, { orbit: 0, state: AIMING, aimT: 0.9 });
+  large.tick(0.1);
+  assert.ok(idleSpin > 0 && large.orbit > idleSpin * 2);
 });
 
 test('large grubs track moving players but always fire the same eight compass directions', () => {
