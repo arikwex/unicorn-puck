@@ -33,9 +33,27 @@ import ToastSystem from './ToastSystem.js';
 // seeds that), kept at least GRUB_MIN_PLAYER_DISTANCE from wherever the player spawns
 // and GRUB_ROOM_MARGIN off its room's own walls where the room is big
 // enough to allow both.
-const GRUBS_PER_ROOM = 6;
+// A room's own grub count scales with its (raw, pre-inflation) size: a
+// square room's width+height minus 3 gives exactly 3/5/7 grubs for a
+// 3x3/4x4/5x5 room -- and since donjonDungeon.js only ever generates 3- or
+// 5-cell room dimensions (see its own ROOM_MIN_SIZE/ROOM_MAX_SIZE), a
+// non-square 3x5 (or 5x3) room -- "size 4" on average -- lands on the same
+// formula's 5 grubs too, rather than needing a separate lookup table.
+function roomGrubCount(rawRoom) {
+  return rawRoom.w + rawRoom.h - 3;
+}
 const GRUB_MIN_PLAYER_DISTANCE = 200;
 const GRUB_ROOM_MARGIN = 50;
+// A hallway only ever gets a grub if it's a straight run of at least this
+// many raw grid cells (see findLongHallways) -- a short jog between two
+// rooms stays empty. A qualifying hallway's own grub count then scales with
+// its length (one per HALLWAY_GRUB_SPACING cells, capped at
+// HALLWAY_MAX_GRUBS), patrolling that hallway alone (see
+// pickGrubSpawn/Grub's own room-confinement, reused unchanged for a
+// hallway's box).
+const HALLWAY_MIN_LENGTH = 4;
+const HALLWAY_GRUB_SPACING = 4;
+const HALLWAY_MAX_GRUBS = 3;
 // Every room gets exactly one chest (or none, if CHEST_PLACEMENT_ATTEMPTS
 // random spots in a row all land too close to something -- a small,
 // pillar-crowded room just goes without rather than overlapping a wall).
@@ -212,6 +230,71 @@ function shuffled(list, rng) {
   return result;
 }
 
+const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+// The raw generator's corridors are exactly one grid cell wide (see its own
+// top-of-file comment), so a "hallway" -- a straight run with no turns,
+// junctions, or room cells -- is just a chain of cells that each have
+// exactly two floor neighbors sitting on opposite sides of the same axis.
+// A cell with a *different* neighbor count/shape (a turn, a T/+ junction,
+// or a room interior cell) can't extend a chain and caps it instead.
+function hallwayAxisAt(x, y, floorSet, isRoomCell) {
+  if (isRoomCell(x, y)) return null;
+  const neighbors = DIRS4.filter(([dx, dy]) => floorSet.has(`${x + dx},${y + dy}`));
+  if (neighbors.length !== 2) return null;
+  const [[dx0, dy0], [dx1, dy1]] = neighbors;
+  if (dx0 !== -dx1 || dy0 !== -dy1) return null; // a corner, not a straight-through cell
+  return dx0 !== 0 ? [1, 0] : [0, 1];
+}
+
+// Finds every straight corridor run longer than HALLWAY_MIN_LENGTH cells in
+// the *raw* (pre-inflation) grid, each as a {x, y, w, h} box in that same
+// raw grid -- the caller inflates/converts to world space itself, same as
+// it already does for dungeon.rooms.
+function findLongHallways(rawDungeon) {
+  const floorSet = new Set(rawDungeon.floor.map(({ x, y }) => `${x},${y}`));
+  const isRoomCell = (x, y) => rawDungeon.rooms.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+  const visited = new Set();
+  const hallways = [];
+
+  rawDungeon.floor.forEach(({ x, y }) => {
+    if (visited.has(`${x},${y}`)) return;
+    const axis = hallwayAxisAt(x, y, floorSet, isRoomCell);
+    if (!axis) return;
+    const [dx, dy] = axis;
+
+    // Walk backward to the run's true start, then forward again collecting
+    // every cell -- so it doesn't matter which cell of the run forEach
+    // happens to reach first.
+    let sx = x;
+    let sy = y;
+    while (hallwayAxisAt(sx - dx, sy - dy, floorSet, isRoomCell)) { sx -= dx; sy -= dy; }
+    const cells = [];
+    let cx = sx;
+    let cy = sy;
+    while (hallwayAxisAt(cx, cy, floorSet, isRoomCell)) {
+      cells.push({ x: cx, y: cy });
+      visited.add(`${cx},${cy}`);
+      cx += dx;
+      cy += dy;
+    }
+
+    if (cells.length >= HALLWAY_MIN_LENGTH) {
+      const xs = cells.map((cell) => cell.x);
+      const ys = cells.map((cell) => cell.y);
+      hallways.push({
+        x: Math.min(...xs),
+        y: Math.min(...ys),
+        w: Math.max(...xs) - Math.min(...xs) + 1,
+        h: Math.max(...ys) - Math.min(...ys) + 1,
+        length: cells.length,
+      });
+    }
+  });
+
+  return hallways;
+}
+
 // Builds the dungeon's walls as CubeObstacles and returns a world-space
 // spawn point (the center of its first room). `seed` drives the whole
 // layout; pillar placement and grub scatter/patrol each offset from it so
@@ -220,12 +303,18 @@ function buildDungeon(seed) {
   const pillarSeed = seed + 1;
   const grubSeed = seed + 2;
   const chestSeed = seed + 3;
+  const hallwayGrubSeed = seed + 7;
   // `dungeon` (and every room/obstacle placement below, including chests)
   // works entirely off this already-inflated result, never the raw
   // generateDungeon() output -- so chest placement's own room bounds and
   // obstacle clearance checks are always in the same post-inflation world
-  // scale as the walls/pillars/grubs actually added to the engine.
-  const dungeon = inflateDungeon(generateDungeon(seed), CORRIDOR_WIDTH_FACTOR);
+  // scale as the walls/pillars/grubs actually added to the engine. The raw
+  // (pre-inflation) result is kept too, purely so findLongHallways can
+  // analyze corridor shape while it's still exactly one grid cell wide --
+  // trivial to reason about -- rather than after inflateDungeon widens
+  // every passage into a CORRIDOR_WIDTH_FACTOR-cell-thick block.
+  const rawDungeon = generateDungeon(seed);
+  const dungeon = inflateDungeon(rawDungeon, CORRIDOR_WIDTH_FACTOR);
   const combatRoomIndices = selectCombatRooms(dungeon.rooms.length, seed + 6);
   const toWorld = (x, y) => gridToWorld(x, y, dungeon.gridWidth, dungeon.gridHeight);
   const floorSet = new Set(dungeon.floor.map(({ x, y }) => `${x},${y}`));
@@ -300,11 +389,11 @@ function buildDungeon(seed) {
   const spawnRoomGrid = dungeon.rooms[0];
   const playerSpawn = toWorld(spawnRoomGrid.x + spawnRoomGrid.w / 2, spawnRoomGrid.y + spawnRoomGrid.h / 2);
 
-  // GRUBS_PER_ROOM grubs per room -- except the player's own spawn room,
-  // which stays enemy-free so the run always opens on calm ground -- each
-  // scattered to its own spot and with its own seeded patrol, so behavior
-  // stays reproducible run to run, and never within GRUB_MIN_PLAYER_DISTANCE
-  // of the player's spawn.
+  // roomGrubCount(room) grubs per room -- except the player's own spawn
+  // room, which stays enemy-free so the run always opens on calm ground --
+  // each scattered to its own spot and with its own seeded patrol, so
+  // behavior stays reproducible run to run, and never within
+  // GRUB_MIN_PLAYER_DISTANCE of the player's spawn.
   dungeon.rooms.forEach((room, roomIndex) => {
     const roomCenter = toWorld(room.x + room.w / 2, room.y + room.h / 2);
     const worldRoom = {
@@ -313,7 +402,7 @@ function buildDungeon(seed) {
     const scatterRng = mulberry32(grubSeed + roomIndex);
     const enemies = [];
     if (roomIndex !== 0) {
-      for (let i = 0; i < GRUBS_PER_ROOM; i++) {
+      for (let i = 0; i < roomGrubCount(rawDungeon.rooms[roomIndex]); i++) {
         const spawn = pickGrubSpawn(worldRoom, playerSpawn, scatterRng);
         const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + i));
         enemies.push(grub);
@@ -341,6 +430,31 @@ function buildDungeon(seed) {
       add(TreasureChest(chestSpawn.x, chestSpawn.y, { contents: chestContentsFor(roomIndex) }));
       // So a chalice placed afterward (see below) won't land on top of it.
       obstacleCircles.push({ x: chestSpawn.x, y: chestSpawn.y, radius: CHEST_RADIUS });
+    }
+  });
+
+  // A grub or two garrisoned in some of the dungeon's longer hallways
+  // (see findLongHallways/HALLWAY_MIN_LENGTH), confined to that one
+  // hallway's own box exactly the way a room grub is confined to its room
+  // -- pickGrubSpawn and Grub's own patrol bounds don't care whether the
+  // box they're given is a room or a corridor.
+  const hallwayRng = mulberry32(hallwayGrubSeed);
+  findLongHallways(rawDungeon).forEach((hallway, hallwayIndex) => {
+    const inflated = {
+      x: hallway.x * CORRIDOR_WIDTH_FACTOR,
+      y: hallway.y * CORRIDOR_WIDTH_FACTOR,
+      w: hallway.w * CORRIDOR_WIDTH_FACTOR,
+      h: hallway.h * CORRIDOR_WIDTH_FACTOR,
+    };
+    const center = toWorld(inflated.x + inflated.w / 2, inflated.y + inflated.h / 2);
+    const worldHallway = {
+      x: center.x, y: center.y, w: inflated.w * TILE, h: inflated.h * TILE,
+    };
+    const grubCount = Math.min(HALLWAY_MAX_GRUBS, Math.floor(hallway.length / HALLWAY_GRUB_SPACING));
+    for (let i = 0; i < grubCount; i++) {
+      const spawn = pickGrubSpawn(worldHallway, playerSpawn, hallwayRng);
+      const grub = add(Grub(spawn.x, spawn.y, worldHallway, hallwayGrubSeed + hallwayIndex * 100 + i));
+      obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.puck().radius });
     }
   });
 
