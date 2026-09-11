@@ -47,8 +47,7 @@ function renderHealthBar(context, x, y, width, height, currentHp, maxHp, props =
   const tickWidth = Math.max(0, (width - inset * 2 - gap * (slots - 1)) / slots);
   const tickHeight = Math.max(0, height - inset * 2);
   for (let i = 0; i < currentHp + shields; i++) {
-    context.fillStyle = i < currentHp ? color : SHIELD_COLOR;
-    context.fillRect(left + inset + i * (tickWidth + gap), top + inset, tickWidth, tickHeight);
+    fillRect(context, left + inset + i * (tickWidth + gap), top + inset, tickWidth, tickHeight, i < currentHp ? color : SHIELD_COLOR);
   }
 
   context.strokeStyle = outlineColor;

@@ -1,9 +1,9 @@
+import { TAU } from './mathUtils.js';
+
 // Canvas fill primitives shared by every world object that needed
 // them, instead of each one (Chalice/Pillar/PlayerCharacter for the
 // ellipse, Grub/PlayerCharacter for the circle) redefining an identical
 // copy locally.
-
-const TAU = Math.PI * 2;
 
 function fillCircle(context, x, y, radius, color) {
   context.fillStyle = color;
@@ -19,8 +19,8 @@ function fillEllipse(context, x, y, radiusX, radiusY, color) {
   context.fill();
 }
 
-// Keep translucent backgrounds independent of the caller's fade/style.
-function fillRect(context, x, y, width, height, color, alpha) {
+// Scopes its fill style (and any translucency) to this one rect.
+function fillRect(context, x, y, width, height, color, alpha = 1) {
   context.save();
   context.globalAlpha *= alpha;
   context.fillStyle = color;

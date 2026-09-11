@@ -4,9 +4,9 @@
 // Self-expiring, like Grub's own defeat -- update() returns true once the
 // puddle has fully faded, and the engine removes it.
 
+import { fillEllipse } from './canvasShapes.js';
 import { add } from './engine.js';
-
-const TAU = Math.PI * 2;
+import { TAU } from './mathUtils.js';
 
 const FLIGHT_DURATION_MIN = 0.3;
 const FLIGHT_DURATION_MAX = 0.55;
@@ -76,10 +76,7 @@ function SplatEffect(x, y, vx, vy, color, props = {}) {
       const puddleT = Math.min(1, puddleElapsed / PUDDLE_DURATION);
       const scale = 1 + PUDDLE_GROWTH * puddleT;
       context.globalAlpha = 1 - puddleT;
-      context.fillStyle = color;
-      context.beginPath();
-      context.ellipse(landX, landY, size * scale, size * scale * PUDDLE_ASPECT, 0, 0, TAU);
-      context.fill();
+      fillEllipse(context, landX, landY, size * scale, size * scale * PUDDLE_ASPECT, color);
       context.globalAlpha = 1;
     },
   };

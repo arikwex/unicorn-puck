@@ -1,4 +1,6 @@
+import { fillCircle } from './canvasShapes.js';
 import { add, getObjectsByTag } from './engine.js';
+import { TAU } from './mathUtils.js';
 import contact from './physics.js';
 import SplatEffect from './SplatEffect.js';
 import { TAG_ENEMY, TAG_OBSTACLE, TAG_PLAYER, TAG_PROJECTILE } from './tags.js';
@@ -41,7 +43,7 @@ function GrubProjectile(x, y, vx, vy, props = {}) {
       const distance = Math.hypot(dx, dy);
       while (distanceToNextSplat <= distance) {
         const t = distanceToNextSplat / distance;
-        const angle = Math.random() * Math.PI * 2;
+        const angle = Math.random() * TAU;
         const speed = 20 + Math.random() * 50;
         add(SplatEffect(lastX + dx * t, lastY + dy * t,
           Math.cos(angle) * speed, Math.sin(angle) * speed, color, {
@@ -70,14 +72,8 @@ function GrubProjectile(x, y, vx, vy, props = {}) {
     },
 
     render(context) {
-      context.fillStyle = color;
-      context.beginPath();
-      context.arc(this.x, this.y, RADIUS, 0, Math.PI * 2);
-      context.fill();
-      context.fillStyle = highlightColor;
-      context.beginPath();
-      context.arc(this.x - 2 * SCALE, this.y - 2 * SCALE, 2.5 * SCALE, 0, Math.PI * 2);
-      context.fill();
+      fillCircle(context, this.x, this.y, RADIUS, color);
+      fillCircle(context, this.x - 2 * SCALE, this.y - 2 * SCALE, 2.5 * SCALE, highlightColor);
     },
   };
 }

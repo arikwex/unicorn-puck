@@ -5,6 +5,8 @@
 // chaliceProgress.js) read by ItemAbilityHUD for its stack and by
 // Item.js/mapCreator.js to avoid spawning the same ability twice.
 
+import { fillCircle } from './canvasShapes.js';
+
 const OUTLINE_WIDTH = 4; // 2px thinner than its original 6
 // Same gold/dark-gold pair as Chalice.js/TreasureChest.js, for a consistent
 // "treasure" palette across every collectible in the game.
@@ -83,10 +85,7 @@ function drawOracleEyes(context) {
   context.quadraticCurveTo(0, 32, -16, 0);
   context.closePath();
   fillOutlined(context);
-  context.beginPath();
-  context.arc(0, 0, 6, 0, Math.PI * 2);
-  context.fillStyle = OUTLINE_COLOR;
-  context.fill();
+  fillCircle(context, 0, 0, 6, OUTLINE_COLOR);
 }
 
 const VALKYRIE_BOOST_MULTIPLIER = 1.3; // +30% to the whole launch-power curve, including its cap

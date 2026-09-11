@@ -9,8 +9,8 @@ import { collectItemAbility, ITEM_ABILITY_CATALOG } from './ItemAbility.js';
 import { fireSplatBurst } from './SplatEffect.js';
 import { TAG_PLAYER } from './tags.js';
 import { showItemCollectedToast } from './ToastSystem.js';
+import { TAU } from './mathUtils.js';
 
-const TAU = Math.PI * 2;
 const PICKUP_RADIUS = 26;
 const BOB_SPEED = 2.2; // rad/s
 const BOB_AMOUNT = 4; // px

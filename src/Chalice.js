@@ -5,14 +5,14 @@
 // participation, just a proximity check), incrementing the shared
 // chaliceProgress counter GameFlow.js watches for the win condition.
 
-import { fillEllipse } from './canvasShapes.js';
+import { fillCircle, fillEllipse, fillRect } from './canvasShapes.js';
 import { getObjectsByTag } from './engine.js';
 import { collectChalice } from './chaliceProgress.js';
 import { fireSplatBurst } from './SplatEffect.js';
 import { TAG_PLAYER } from './tags.js';
 import { showItemCollectedToast } from './ToastSystem.js';
+import { TAU } from './mathUtils.js';
 
-const TAU = Math.PI * 2;
 const WORLD_SCALE = 1.5; // the in-scene chalice, 50% larger than the base icon size
 const PICKUP_RADIUS = 33; // scaled up along with WORLD_SCALE
 const BOB_SPEED = 2.2; // rad/s
@@ -40,11 +40,8 @@ function renderChaliceIcon(context, x, y, scale) {
   fillEllipse(context, 0, 14, 12, 4, METAL_DARK_COLOR);
   fillEllipse(context, 0, 12, 10, 3, METAL_COLOR);
 
-  context.fillStyle = METAL_COLOR;
-  context.fillRect(-2, -4, 4, 16);
-  context.beginPath();
-  context.arc(0, 4, 4, 0, TAU);
-  context.fill();
+  fillRect(context, -2, -4, 4, 16, METAL_COLOR);
+  fillCircle(context, 0, 4, 4, METAL_COLOR);
 
   context.beginPath();
   context.moveTo(-6, -4);

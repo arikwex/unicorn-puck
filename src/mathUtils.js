@@ -1,6 +1,9 @@
 // Tiny generic helpers shared by whatever needed them (menus/cards for
-// `clamp`, the two procedural-audio modules for `noise`), instead of each
-// consumer redefining an identical copy locally.
+// `clamp`, the two procedural-audio modules for `noise`, rendering and
+// audio alike for `TAU`), instead of each consumer redefining an identical
+// copy locally.
+
+const TAU = Math.PI * 2;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -12,4 +15,4 @@ function noise() {
   return Math.random() * 2 - 1;
 }
 
-export { clamp, noise };
+export { clamp, noise, TAU };

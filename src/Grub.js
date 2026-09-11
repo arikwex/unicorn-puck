@@ -4,13 +4,11 @@ import { mulberry32 } from './donjonDungeon.js';
 import { add, getObjectsByTag } from './engine.js';
 import GrubProjectile from './GrubProjectile.js';
 import renderHealthBar from './HealthBar.js';
-import { clamp } from './mathUtils.js';
+import { clamp, TAU } from './mathUtils.js';
 import orbit3d from './orbit3d.js';
 import SplatEffect from './SplatEffect.js';
 import { playEnemyHit, playOozeShot } from './sounds.js';
 import { TAG_ENEMY, TAG_OBSTACLE, TAG_PLAYER } from './tags.js';
-
-const TAU = Math.PI * 2;
 
 // Numeric state ids instead of string names -- cheaper to compare and to
 // ship (a bare digit minifies far smaller than a repeated quoted word).

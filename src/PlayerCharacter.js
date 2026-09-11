@@ -6,8 +6,8 @@ import orbit3d from './orbit3d.js';
 import SplatEffect from './SplatEffect.js';
 import { playPlayerDamage, playWallBounce } from './sounds.js';
 import { TAG_ENEMY, TAG_OBSTACLE, TAG_PLAYER } from './tags.js';
+import { TAU } from './mathUtils.js';
 
-const TAU = Math.PI * 2;
 const DAMAGE_FLASH_DURATION = 0.6;
 // The puck's collision radius, and also the reference "size" Camera.js
 // zooms against so the character reads at a consistent fraction of the

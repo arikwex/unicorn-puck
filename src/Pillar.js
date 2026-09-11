@@ -1,7 +1,7 @@
-import { fillEllipse } from './canvasShapes.js';
+import { fillEllipse, fillRect } from './canvasShapes.js';
 import { TAG_OBSTACLE } from './tags.js';
+import { TAU } from './mathUtils.js';
 
-const TAU = Math.PI * 2;
 // Was 4 while every pillar rolled one of 4 visual variants (see the
 // commented-out crystal/square/candelabra code and placePillars.js's own
 // commented-out variant-pool logic below) -- simplified down to just the
@@ -13,20 +13,16 @@ const VARIANT_COUNT = 1;
 // face dropping down by `height` -- used for both the pillar's base and
 // its capital.
 function renderSlab(context, x, topY, halfSize, height, topColor, sideColor) {
-  context.fillStyle = sideColor;
-  context.fillRect(x - halfSize, topY, halfSize * 2, height);
-  context.fillStyle = topColor;
-  context.fillRect(x - halfSize, topY - halfSize * 0.6, halfSize * 2, halfSize * 0.6);
+  fillRect(context, x - halfSize, topY, halfSize * 2, height, sideColor);
+  fillRect(context, x - halfSize, topY - halfSize * 0.6, halfSize * 2, halfSize * 0.6, topColor);
 }
 
 // The cylindrical shaft: a body rectangle capped with a foreshortened
 // ellipse (its round cross-section, seen from above), plus a shading
 // stripe down one side to hint at the curve.
 function renderShaft(context, x, topY, bottomY, radius, color, shadeColor) {
-  context.fillStyle = color;
-  context.fillRect(x - radius, topY, radius * 2, bottomY - topY);
-  context.fillStyle = shadeColor;
-  context.fillRect(x + radius * 0.15, topY, radius * 0.55, bottomY - topY);
+  fillRect(context, x - radius, topY, radius * 2, bottomY - topY, color);
+  fillRect(context, x + radius * 0.15, topY, radius * 0.55, bottomY - topY, shadeColor);
   fillEllipse(context, x, topY, radius, radius * 0.5, color);
 }
 

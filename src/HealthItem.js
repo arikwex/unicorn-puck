@@ -6,8 +6,8 @@ import DamageCallout from './DamageCallout.js';
 import { add, getObjectsByTag } from './engine.js';
 import { TAG_PLAYER } from './tags.js';
 import { showItemCollectedToast } from './ToastSystem.js';
+import { TAU } from './mathUtils.js';
 
-const TAU = Math.PI * 2;
 const HEAL_AMOUNT = 2;
 const PICKUP_RADIUS = 40; // scaled up along with the heart's own x2 overall size
 const SPAWN_PROTECTION = 0.3; // seconds before it can be collected at all

@@ -11,8 +11,7 @@ function MetalGrate({ x, y, w, h }) {
       const bottom = this.y + this.h / 2;
       context.save();
       fillRect(context, left, top, this.w, bottom - top, '#223', 0.65);
-      context.fillStyle = '#899';
-      for (let i = 0; i <= 3; i++) context.fillRect(left + (i * this.w) / 3 - 2, top, 4, bottom - top);
+      for (let i = 0; i <= 3; i++) fillRect(context, left + (i * this.w) / 3 - 2, top, 4, bottom - top, '#899');
       context.strokeStyle = '#556';
       context.lineWidth = 5;
       context.strokeRect(left, top, this.w, bottom - top);

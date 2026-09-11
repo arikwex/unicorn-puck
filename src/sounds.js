@@ -8,9 +8,7 @@
 // volume/rate params rather than regenerating the waveform.
 
 import { play, synth } from './audio.js';
-import { clamp, noise } from './mathUtils.js';
-
-const TAU = Math.PI * 2;
+import { clamp, noise, TAU } from './mathUtils.js';
 
 // A soft square wave via hard-clamped sine, same trick the reference uses.
 function sqr(phase) {

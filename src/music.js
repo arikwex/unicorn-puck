@@ -7,9 +7,7 @@
 // music(), which sets AudioBufferSourceNode.loop = true.
 
 import { init, music } from './audio.js';
-import { clamp, noise } from './mathUtils.js';
-
-const TAU = Math.PI * 2;
+import { clamp, noise, TAU } from './mathUtils.js';
 
 // -- tempo/timing -----------------------------------------------------------
 const BPM = 120;

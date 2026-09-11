@@ -3,6 +3,7 @@
 // exploding into a bigger white/yellow burst and dropping an item dead
 // center on the hit that finally breaks it.
 
+import { fillRect } from './canvasShapes.js';
 import { add } from './engine.js';
 import BubbleShieldItem from './BubbleShieldItem.js';
 import HealthItem from './HealthItem.js';
@@ -60,23 +61,13 @@ function renderChest(context, flash) {
   const baseTop = -BASE_HEIGHT / 2 + 3;
   const lidTop = baseTop - LID_HEIGHT;
 
-  context.fillStyle = WOOD_COLOR;
-  context.fillRect(left, baseTop, CHEST_WIDTH, BASE_HEIGHT);
-  context.fillStyle = WOOD_DARK_COLOR;
-  context.fillRect(left, lidTop, CHEST_WIDTH, LID_HEIGHT);
-  context.fillStyle = METAL_COLOR;
-  context.fillRect(left, baseTop - 4.5, CHEST_WIDTH, 6);
-  context.fillRect(left, lidTop, 7.5, LID_HEIGHT);
-  context.fillRect(left + CHEST_WIDTH - 7.5, lidTop, 7.5, LID_HEIGHT);
-  context.fillStyle = METAL_DARK_COLOR;
-  context.fillRect(-9, baseTop - 9, 18, 18);
-
-  if (flash > 0) {
-    context.globalAlpha = flash;
-    context.fillStyle = '#fff';
-    context.fillRect(left, lidTop, CHEST_WIDTH, BASE_HEIGHT + LID_HEIGHT);
-    context.globalAlpha = 1;
-  }
+  fillRect(context, left, baseTop, CHEST_WIDTH, BASE_HEIGHT, WOOD_COLOR);
+  fillRect(context, left, lidTop, CHEST_WIDTH, LID_HEIGHT, WOOD_DARK_COLOR);
+  fillRect(context, left, baseTop - 4.5, CHEST_WIDTH, 6, METAL_COLOR);
+  fillRect(context, left, lidTop, 7.5, LID_HEIGHT, METAL_COLOR);
+  fillRect(context, left + CHEST_WIDTH - 7.5, lidTop, 7.5, LID_HEIGHT, METAL_COLOR);
+  fillRect(context, -9, baseTop - 9, 18, 18, METAL_DARK_COLOR);
+  fillRect(context, left, lidTop, CHEST_WIDTH, BASE_HEIGHT + LID_HEIGHT, '#fff', flash);
 }
 
 function TreasureChest(x, y, props = {}) {

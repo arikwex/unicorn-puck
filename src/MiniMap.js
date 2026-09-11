@@ -1,5 +1,5 @@
 import { canvas } from './canvas.js';
-import { fillRect } from './canvasShapes.js';
+import { fillCircle, fillRect } from './canvasShapes.js';
 import { getObjectsByTag } from './engine.js';
 import { TAG_OBSTACLE } from './tags.js';
 
@@ -45,10 +45,7 @@ function MiniMap(player, worldSpan, worldMin) {
       });
 
       const [px, py] = toMap(player.x, player.y);
-      context.fillStyle = PLAYER_COLOR;
-      context.beginPath();
-      context.arc(px, py, 4, 0, Math.PI * 2);
-      context.fill();
+      fillCircle(context, px, py, 4, PLAYER_COLOR);
       context.restore();
     },
   };
