@@ -73,7 +73,7 @@ const AIM_DURATION = 2;
 // reverse via aimProgress counting back down to 0.
 const RECOVER_DURATION = 0.35;
 const ATTACK_DELAY_MIN = 1;
-const ATTACK_DELAY_MAX = 2;
+const ATTACK_DELAY_MAX = 4;
 const ATTACK_RANGE = 600;
 const PROJECTILE_SPEED = 340;
 const HEALTH_BAR_SHOW_DURATION = 2;
