@@ -271,6 +271,13 @@ function Grub(x, y, room, seed, props = {}) {
   let hadAimTarget = false;
   let aimElapsed = 0;
   let recoverElapsed = 0;
+  // The point an aim is currently locked onto -- kept live while the
+  // player's actually in range/sight, held at its last value once they
+  // aren't (or if the player object is gone entirely, e.g. removed on
+  // death/win -- see GameFlow.js), so a shot can never be canceled by
+  // losing track of its target, only ever fired at wherever it last had one.
+  let targetX = x;
+  let targetY = y;
 
   // Sample launch velocity uniformly across a disk, then shift it by a
   // fraction of the player's hit velocity. The seeded rng keeps the
@@ -363,33 +370,34 @@ function Grub(x, y, room, seed, props = {}) {
           this.aimProgress = 0;
         }
       } else if (this.state === AIMING) {
-        if (!canAim) {
-          this.state = PATROL;
-          this.aimProgress = 0;
+        // Once wound up, a shot is never canceled by losing range/sight --
+        // only ever delayed (see onCollision's own hit-response). Keep
+        // tracking the player live while actually reachable; otherwise
+        // keep aiming at wherever it last had them.
+        if (canAim) { targetX = player.x; targetY = player.y; }
+        this.angle = Math.atan2(this.y - targetY, targetX - this.x);
+        aimElapsed += dt;
+        this.aimProgress = Math.min(1, aimElapsed / AIM_DURATION);
+        if (aimElapsed >= AIM_DURATION) {
+          const mouth = mouthPosition(this);
+          const dx = targetX - mouth.x;
+          const dy = targetY - mouth.y;
+          const heading = Math.atan2(dy, dx);
+          const spread = this.large ? [-LARGE_SPREAD_ANGLE, 0, LARGE_SPREAD_ANGLE] : [0];
+          const palette = this.large ? { color: LARGE_COLOR, highlightColor: '#fdb' } : undefined;
+          spread.forEach((offset) => add(GrubProjectile(mouth.x, mouth.y,
+            Math.cos(heading + offset) * PROJECTILE_SPEED, Math.sin(heading + offset) * PROJECTILE_SPEED, palette)));
+          playOozeShot();
+          this.state = RECOVERING;
+          recoverElapsed = 0;
           attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
-        } else {
-          this.angle = Math.atan2(this.y - player.y, player.x - this.x);
-          aimElapsed += dt;
-          this.aimProgress = Math.min(1, aimElapsed / AIM_DURATION);
-          if (aimElapsed >= AIM_DURATION) {
-            const mouth = mouthPosition(this);
-            const dx = player.x - mouth.x;
-            const dy = player.y - mouth.y;
-            const heading = Math.atan2(dy, dx);
-            const spread = this.large ? [-LARGE_SPREAD_ANGLE, 0, LARGE_SPREAD_ANGLE] : [0];
-            const palette = this.large ? { color: LARGE_COLOR, highlightColor: '#fdb' } : undefined;
-            spread.forEach((offset) => add(GrubProjectile(mouth.x, mouth.y,
-              Math.cos(heading + offset) * PROJECTILE_SPEED, Math.sin(heading + offset) * PROJECTILE_SPEED, palette)));
-            playOozeShot();
-            this.state = RECOVERING;
-            recoverElapsed = 0;
-            attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
-          }
         }
       } else if (canAim && attackCooldown <= 0) {
         this.state = AIMING;
         this.target = null;
         this.vx = this.vy = 0;
+        targetX = player.x;
+        targetY = player.y;
         this.angle = Math.atan2(this.y - player.y, player.x - this.x);
         aimElapsed = 0;
         this.aimProgress = 0;
@@ -445,9 +453,17 @@ function Grub(x, y, room, seed, props = {}) {
       flashTimer = FLASH_DURATION;
       healthBarTimer = HEALTH_BAR_SHOW_DURATION;
       hitCooldown = HIT_COOLDOWN;
-      // A charging hit interrupts the tell so knockback can move the grub.
-      this.state = PATROL;
-      this.aimProgress = 0;
+      if (this.state === AIMING) {
+        // A charging hit never cancels a wound-up shot, only delays it --
+        // rewind aimElapsed so at least 1 second remains before it fires,
+        // but never push it sooner (Math.min only ever pulls it earlier
+        // in time, i.e. rewinds, never fast-forwards).
+        aimElapsed = Math.min(aimElapsed, Math.max(0, AIM_DURATION - 1));
+        this.aimProgress = Math.min(1, aimElapsed / AIM_DURATION);
+      } else {
+        this.state = PATROL;
+        this.aimProgress = 0;
+      }
       attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
       this.vx += player.vx * KNOCKBACK_TRANSFER;
       this.vy += player.vy * KNOCKBACK_TRANSFER;
