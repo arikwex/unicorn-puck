@@ -68,7 +68,7 @@ test('body, face, tell, and recovery scale together; large grubs add orange eyes
       assert.ok(!largeCalls.some(({ method, color }) => method === 'fill' && color === '#5f5'));
       if (angle === 0) {
         const faceDots = smallCalls.filter(({ method, color }) => method === 'fill' && color === '#5f5').length;
-        assert.equal(largeCalls.filter(({ method, color }) => method === 'fill' && color === '#ff9a32').length, faceDots + 3,
+        assert.equal(largeCalls.filter(({ method, color }) => method === 'fill' && color === '#f93').length, faceDots + 3,
           'three orange spikes plus all visible face features');
       }
     }
@@ -99,7 +99,7 @@ test('large grubs fire a symmetric three-shot forward fan from their enlarged mo
       const offset = type === 'large' ? (i - 1) * Math.PI / 12 : 0;
       assert.ok(Math.abs(Math.atan2(shot.vy, shot.vx) - heading - offset) < 1e-8);
       assert.deepEqual(draw(shot).filter(({ method }) => method === 'fill').map(({ color }) => color),
-        type === 'large' ? ['#ff9a32', '#ffe1b3'] : ['#3dff5c', '#d9ffde']);
+        type === 'large' ? ['#f93', '#fdb'] : ['#4f5', '#dfd']);
     });
     assert.equal(grub.state, 'recovering');
     grub.update(0.1);
@@ -110,7 +110,7 @@ test('large grubs fire a symmetric three-shot forward fan from their enlarged mo
     const splats = getObjects().filter((object) => !before.has(object));
     assert.ok(splats.length > 0);
     for (const splat of splats) {
-      const color = type === 'large' ? '#ff9a32' : '#3dff5c';
+      const color = type === 'large' ? '#f93' : '#4f5';
       assert.ok(draw(splat).some((call) => call.method === 'stroke' && call.stroke === color));
       splat.update(1);
       assert.ok(draw(splat).some((call) => call.method === 'fill' && call.color === color));
@@ -129,7 +129,7 @@ test('large grub hit and death splashes are orange while small grub colors are u
     const colors = getObjects().flatMap((effect) => draw(effect)
       .filter(({ method }) => method === 'stroke').map(({ stroke }) => stroke));
     assert.equal(colors.length, 14);
-    assert.deepEqual(new Set(colors), new Set(type === 'large' ? ['#ff9a32'] : ['#3dff5c', '#8b4fe0']));
+    assert.deepEqual(new Set(colors), new Set(type === 'large' ? ['#f93'] : ['#4f5', '#85d']));
   }
 });
 
@@ -143,7 +143,7 @@ test('large grubs retain hit cooldown, white outline flash and an eight-slot hea
   assert.equal(grub.hp, 7, 'same-hit cooldown still applies');
   grub.update(0.1);
   const calls = draw(grub);
-  const healthTicks = calls.filter(({ method, color }) => method === 'fillRect' && color === '#46c45c');
+  const healthTicks = calls.filter(({ method, color }) => method === 'fillRect' && color === '#4c5');
   assert.equal(healthTicks.length, 7);
   assert.equal(grub.maxHp, 8);
   assert.ok(calls.some(({ method, stroke, alpha }) => method === 'stroke' && stroke === '#fff' && alpha > 0));

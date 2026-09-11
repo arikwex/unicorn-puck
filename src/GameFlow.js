@@ -15,7 +15,7 @@ import { TAG_COMBAT_ROOM } from './tags.js';
 // Same ROYGBV set the player's own on-hit splats use (see
 // PlayerCharacter.js's fireDamageSplats) -- death gets a bigger burst of
 // the same palette rather than a different effect entirely.
-const DEATH_SPLAT_COLORS = ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#0a84ff', '#af52de'];
+const DEATH_SPLAT_COLORS = ['#f33', '#f90', '#fc0', '#3c5', '#18f', '#a5d'];
 const DEATH_SPLAT_COUNT = 24;
 const DEATH_SPLAT_SPEED_MAX = 320;
 const DEATH_SPLAT_SIZE_MIN = 14;

@@ -59,10 +59,10 @@ const CRYSTAL_SIZE = CRYSTAL_BASE_SIZE * CRYSTAL_OVERALL_SCALE;
 const CRYSTAL_FLOAT_HEIGHT = 40; // rest height above the plinth top -- clears the now-taller gem
 const CRYSTAL_BOB_SPEED = 0.9; // rad/s -- slow, so it clearly reads as levitating rather than jittering
 const CRYSTAL_BOB_AMOUNT = 9;
-const CRYSTAL_COLOR = '#22c3d4'; // teal
-const CRYSTAL_DARK_COLOR = '#0d6e78';
-const CRYSTAL_HIGHLIGHT_COLOR = '#bdf5fa';
-const CRYSTAL_GLOW_COLOR = '#22c3d4';
+const CRYSTAL_COLOR = '#2bc'; // teal
+const CRYSTAL_DARK_COLOR = '#167';
+const CRYSTAL_HIGHLIGHT_COLOR = '#bef';
+const CRYSTAL_GLOW_COLOR = '#2bc';
 
 function renderCrystalPillar(context, obstacle, anim) {
   const {
@@ -111,9 +111,9 @@ function renderCrystalPillar(context, obstacle, anim) {
 }
 
 // -- shared flame flicker, used by variants 2 and 3 -----------------------
-const FLAME_BASE_COLOR = '#ff6a00';
-const FLAME_MID_COLOR = '#ffb100';
-const FLAME_TIP_COLOR = '#fff3b0';
+const FLAME_BASE_COLOR = '#f60';
+const FLAME_MID_COLOR = '#fa0';
+const FLAME_TIP_COLOR = '#fea';
 const FLAME_HEIGHT = 22;
 const FLAME_WIDTH = 12;
 const FLAME_FLICKER_SPEED = 9; // rad/s
@@ -175,8 +175,8 @@ function renderSquarePillar(context, obstacle, anim) {
 }
 
 // -- variant 3: 3-prong candelabra ----------------------------------------
-const CANDELABRA_METAL_COLOR = '#e8c34a';
-const CANDELABRA_METAL_DARK_COLOR = '#a9822a';
+const CANDELABRA_METAL_COLOR = '#eb4';
+const CANDELABRA_METAL_DARK_COLOR = '#a82';
 const CANDELABRA_STEM_HEIGHT = 90;
 const CANDELABRA_STEM_WIDTH = 5;
 const CANDELABRA_BRANCH_Y_OFFSET = 24; // above the stem base, where the side arms split off
@@ -234,12 +234,12 @@ function Pillar(x = 0, y = 0, props = {}) {
     capHalfSize = radius + 6,
     capHeight = 8,
     bounciness = 0.5,
-    // A lighter/darker tint of CubeObstacle's own wall tones (rgb(124,104,101)
-    // top / rgb(69,63,93) side) -- same muted tonal family as the room
+    // A lighter/darker tint of CubeObstacle's own wall tones (#766
+    // top / #445 side) -- same muted tonal family as the room
     // around it, but warmer and lighter than the walls so a pillar still
     // reads as a separate, bounce-off obstacle rather than blending in.
-    stoneColor = '#a39593',
-    shadeColor = '#4a3e3d',
+    stoneColor = '#a99',
+    shadeColor = '#444',
     variant = Math.floor(Math.random() * VARIANT_COUNT),
   } = props;
   let anim = Math.random() * TAU;

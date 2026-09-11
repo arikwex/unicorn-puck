@@ -1,4 +1,5 @@
 import { canvas } from './canvas.js';
+import { fillRect } from './canvasShapes.js';
 import { getObjectsByTag } from './engine.js';
 import { TAG_OBSTACLE } from './tags.js';
 
@@ -6,9 +7,9 @@ import { TAG_OBSTACLE } from './tags.js';
 const MAP_SIZE = 160;
 const MAP_MARGIN = 16;
 const PADDING = 10; // world-bounds inset, in map pixels, so edge walls aren't clipped
-const BG_COLOR = 'rgba(0, 0, 0, 0.55)';
+const BG_COLOR = '#000';
 const BORDER_COLOR = '#fff';
-const WALL_COLOR = '#7c6865';
+const WALL_COLOR = '#766';
 const PLAYER_COLOR = '#fff';
 const PLAYER_DOT_RADIUS = 4;
 
@@ -47,8 +48,7 @@ function MiniMap(player) {
       ];
 
       context.save();
-      context.fillStyle = BG_COLOR;
-      context.fillRect(originX, originY, MAP_SIZE, MAP_SIZE);
+      fillRect(context, originX, originY, MAP_SIZE, MAP_SIZE, BG_COLOR, 0.55);
 
       context.save();
       context.beginPath();

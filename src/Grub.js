@@ -43,16 +43,16 @@ const RELEASE_LUNGE_PEAK_T = 0.07; // fraction of RECOVER_DURATION spent shootin
 // Matches renderTail's own perspectiveY in PlayerCharacter.js -- the same
 // depth-compression ratio, for a consistent faux-3D feel across the cast.
 const SPINE_PERSPECTIVE = 0.6;
-const OUTLINE_COLOR = '#8b4fe0';
+const OUTLINE_COLOR = '#85d';
 const OUTLINE_WIDTH = 11; // full stroke width -- see renderGrub, only half stays visible outside the fill
-const BODY_COLORS = ['#332b47', '#241d33']; // alternating segment shade
-const FACE_COLOR = '#7cff6b';
+const BODY_COLORS = ['#334', '#223']; // alternating segment shade
+const FACE_COLOR = '#7f6';
 const FACE_GLOW_COLOR = '#5f5';
 const EYE_RADIUS = 5;
 const MOUTH_RADIUS = 4;
 const COLLISION_RADIUS = 26;
 const LARGE_SCALE = 1.4;
-const LARGE_COLOR = '#ff9a32';
+const LARGE_COLOR = '#f93';
 const LARGE_SPREAD_ANGLE = Math.PI / 12;
 
 // -- combat -----------------------------------------------------------------
@@ -81,8 +81,8 @@ const HEALTH_BAR_HEIGHT = 15;
 const HEALTH_BAR_OFFSET_Y = 46;
 
 // -- hit/death splats ---------------------------------------------------
-const SPLAT_GREEN = '#3dff5c';
-const SPLAT_PURPLE = '#8b4fe0'; // matches the body's own outline color
+const SPLAT_GREEN = '#4f5';
+const SPLAT_PURPLE = '#85d'; // matches the body's own outline color
 const HIT_SPLAT_COUNT = 3;
 const DEATH_SPLAT_GREEN_COUNT = 4;
 const DEATH_SPLAT_PURPLE_COUNT = 7;
@@ -174,7 +174,7 @@ function renderBackSpike(context, segment, size, flash) {
   context.lineTo(segment.x + segment.radius * 0.45, segment.y - segment.radius * 0.6);
   context.closePath();
   context.lineWidth = 5 * size;
-  context.strokeStyle = '#a84c14';
+  context.strokeStyle = '#a41';
   context.fillStyle = LARGE_COLOR;
   context.stroke();
   context.fill();
@@ -377,7 +377,7 @@ function Grub(x, y, room, seed, props = {}) {
             const dy = player.y - mouth.y;
             const heading = Math.atan2(dy, dx);
             const spread = this.large ? [-LARGE_SPREAD_ANGLE, 0, LARGE_SPREAD_ANGLE] : [0];
-            const palette = this.large ? { color: LARGE_COLOR, highlightColor: '#ffe1b3' } : undefined;
+            const palette = this.large ? { color: LARGE_COLOR, highlightColor: '#fdb' } : undefined;
             spread.forEach((offset) => add(GrubProjectile(mouth.x, mouth.y,
               Math.cos(heading + offset) * PROJECTILE_SPEED, Math.sin(heading + offset) * PROJECTILE_SPEED, palette)));
             playOozeShot();

@@ -8,8 +8,8 @@
 const OUTLINE_WIDTH = 4; // 2px thinner than its original 6
 // Same gold/dark-gold pair as Chalice.js/TreasureChest.js, for a consistent
 // "treasure" palette across every collectible in the game.
-const FILL_COLOR = '#e8c34a';
-const OUTLINE_COLOR = '#a9822a';
+const FILL_COLOR = '#eb4';
+const OUTLINE_COLOR = '#a82';
 
 function fillOutlined(context) {
   context.fillStyle = FILL_COLOR;

@@ -1,4 +1,5 @@
 import { canvas } from './canvas.js';
+import { fillRect } from './canvasShapes.js';
 import { playItemCollected } from './sounds.js';
 
 const DURATION = 3.5;
@@ -51,8 +52,7 @@ function ToastSystem() {
       const x = canvas.width / 2;
       const y = canvas.height - MARGIN - HEIGHT + (1 - enter) ** 2 * HEIGHT;
       context.globalAlpha = Math.min(enter, (DURATION - elapsed) / FADE_OUT);
-      context.fillStyle = 'rgba(0, 0, 0, 0.85)';
-      context.fillRect(x - width / 2, y, width, HEIGHT);
+      fillRect(context, x - width / 2, y, width, HEIGHT, '#000', 0.85);
       context.strokeStyle = '#fff';
       context.lineWidth = 2;
       context.strokeRect(x - width / 2, y, width, HEIGHT);

@@ -45,7 +45,7 @@ test('player health starts full, supports custom HP and clamps damage at zero', 
 test('HUD reflects live HP with shared colors, white outline and padded segments', () => {
   const player = PlayerCharacter();
   const hud = PlayerHealthHUD(player);
-  for (const [hp, color] of [[5, '#46c45c'], [4, '#46c45c'], [3, '#f2d64b'], [2, '#ef9234'], [1, '#d63a3a'], [0, '#d63a3a']]) {
+  for (const [hp, color] of [[5, '#4c5'], [4, '#4c5'], [3, '#ed4'], [2, '#e93'], [1, '#d33'], [0, '#d33']]) {
     player.hp = hp;
     calls = [];
     hud.renderHUD(context);

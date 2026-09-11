@@ -18,10 +18,10 @@ const PICKUP_RADIUS = 33; // scaled up along with WORLD_SCALE
 const BOB_SPEED = 2.2; // rad/s
 const BOB_AMOUNT = 4; // px
 
-const METAL_COLOR = '#e8c34a'; // same gold as TreasureChest, for a consistent "treasure" palette
-const METAL_DARK_COLOR = '#a9822a';
-const WINE_COLOR = '#a5183a';
-const WINE_HIGHLIGHT_COLOR = '#ff5c8a';
+const METAL_COLOR = '#eb4'; // same gold as TreasureChest, for a consistent "treasure" palette
+const METAL_DARK_COLOR = '#a82';
+const WINE_COLOR = '#a13';
+const WINE_HIGHLIGHT_COLOR = '#f58';
 
 const COLLECT_SPLAT_COUNT = 8;
 const COLLECT_SPLAT_COLORS = [METAL_COLOR, WINE_COLOR];

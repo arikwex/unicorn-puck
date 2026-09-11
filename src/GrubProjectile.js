@@ -13,7 +13,7 @@ function trailSpacing() {
 }
 
 function GrubProjectile(x, y, vx, vy, props = {}) {
-  const { color = '#3dff5c', highlightColor = '#d9ffde' } = props;
+  const { color = '#4f5', highlightColor = '#dfd' } = props;
   let remaining = LIFETIME;
   let lastX = x;
   let lastY = y;

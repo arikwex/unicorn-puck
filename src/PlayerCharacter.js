@@ -21,7 +21,7 @@ const PINBALL_BOOST_FACTOR = 1.08; // Chromatic Hoof: fraction of pre-bounce spe
 // -- damage splats -----------------------------------------------------------
 // Red, orange, yellow, green, blue, violet -- one splat of each, always all
 // six, always this order, flung out in a uniform-random direction apiece.
-const DAMAGE_SPLAT_COLORS = ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#0a84ff', '#af52de'];
+const DAMAGE_SPLAT_COLORS = ['#f33', '#f90', '#fc0', '#3c5', '#18f', '#a5d'];
 const DAMAGE_SPLAT_SPEED_MAX = 220; // world units per second, before the arc-height scaling below
 const DAMAGE_SPLAT_SIZE_MIN = 10;
 const DAMAGE_SPLAT_SIZE_MAX = 18;
@@ -109,12 +109,12 @@ const TRAIL_DURATION = 0.5; // seconds a trail sample stays visible
 // does) rather than one shrinking, hue-cycling line -- fixed width, fixed
 // left-to-right order, fading only in alpha toward the trail's old end.
 const TRAIL_STRIPE_COLORS = [
-  [228, 3, 3], // red
-  [255, 140, 0], // orange
-  [255, 237, 0], // yellow
-  [0, 128, 38], // green
-  [0, 77, 255], // blue
-  [117, 7, 135], // violet
+  '#d00', // red
+  '#f80', // orange
+  '#fe0', // yellow
+  '#082', // green
+  '#05f', // blue
+  '#708', // violet
 ];
 const TRAIL_STRIPE_WIDTH = 10.5; // px, fixed -- never shrinks, only fades (50% larger than its original 7)
 const TRAIL_STRIPE_SPACING = 10.5; // px between adjacent stripe centers, scaled with the width so the band still tiles seamlessly
@@ -565,6 +565,8 @@ function renderPlayerPortrait(context, x, y, scale = 1) {
 // how the character was actually facing at that point along the path.
 function renderTrail(context, trail, time) {
   if (trail.length < 2) return;
+  context.save();
+  const opacity = context.globalAlpha;
   context.lineCap = 'round';
   context.lineWidth = TRAIL_STRIPE_WIDTH;
 
@@ -575,17 +577,19 @@ function renderTrail(context, trail, time) {
     const alpha = Math.max(0, 1 - age / TRAIL_DURATION) * b.charge;
     if (alpha <= 0.01) continue;
 
-    TRAIL_STRIPE_COLORS.forEach(([red, green, blue], stripeIndex) => {
+    context.globalAlpha = opacity * alpha;
+    TRAIL_STRIPE_COLORS.forEach((color, stripeIndex) => {
       const offset = (stripeIndex - (TRAIL_STRIPE_COLORS.length - 1) / 2) * TRAIL_STRIPE_SPACING;
       const [ax, ay] = zPosition(a.angle, a.x, a.y, offset);
       const [bx, by] = zPosition(b.angle, b.x, b.y, offset);
-      context.strokeStyle = `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+      context.strokeStyle = color;
       context.beginPath();
       context.moveTo(ax, ay);
       context.lineTo(bx, by);
       context.stroke();
     });
   }
+  context.restore();
 }
 
 function renderPlayer(context, player, anim, charge, trail) {
@@ -806,7 +810,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
       renderPlayer(tintContext, { ...this, x: center, y: center }, anim, this.charge, []);
       tintContext.globalCompositeOperation = 'source-atop';
       tintContext.globalAlpha = Math.sin(damageFlashTimer / DAMAGE_FLASH_DURATION * Math.PI / 2);
-      tintContext.fillStyle = '#ff2020';
+      tintContext.fillStyle = '#f22';
       tintContext.fillRect(0, 0, DAMAGE_CANVAS_SIZE, DAMAGE_CANVAS_SIZE);
       tintContext.restore();
       context.drawImage(damageCanvas, this.x - center, this.y - center);

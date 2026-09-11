@@ -292,7 +292,7 @@ test('damage produces a bright red silhouette pulse that ends after 0.6 seconds'
   player.render(screenContext);
   assert.equal(tintContexts.length, 1);
   const tintContext = tintContexts[0];
-  const tintPasses = () => tintContext.calls.filter((call) => call.method === 'fillRect' && call.color === '#ff2020');
+  const tintPasses = () => tintContext.calls.filter((call) => call.method === 'fillRect' && call.color === '#f22');
   assert.equal(tintPasses().at(-1).alpha, 1);
   assert.equal(tintPasses().at(-1).composite, 'source-atop');
   assert.ok(screenContext.calls.some((call) => call.method === 'drawImage'));

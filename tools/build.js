@@ -41,7 +41,7 @@ async function packageBuild() {
   fs.writeFileSync(bundlePath, code);
   fs.writeFileSync(htmlPath,
     '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<title>PEGACORN BLOOD</title><style>html,body,canvas{width:100%;height:100%;margin:0;background:#272540;display:block;overflow:hidden}</style>' +
+    '<title>PEGACORN BLOOD</title><style>html,body,canvas{width:100%;height:100%;margin:0;background:#224;display:block;overflow:hidden}</style>' +
     '</head><body><canvas></canvas><script>' + code + '</script></body></html>');
 
   await bestzip({ cwd: root, source: 'index.html', destination: zipPath });

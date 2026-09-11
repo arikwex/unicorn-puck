@@ -7,7 +7,7 @@ import { renderPlayer } from './PlayerCharacter.js';
 
 const TITLE_TOP = 'PEGACORN';
 const TITLE_BOTTOM = 'BLOOD';
-const BLOOD_COLOR = '#ff2020'; // matches the damage-flash red used elsewhere
+const BLOOD_COLOR = '#f22'; // matches the damage-flash red used elsewhere
 const TITLE_FONT_RATIO = 0.115; // font size as a fraction of canvas width
 const TITLE_FONT_MIN = 34;
 const TITLE_FONT_MAX = 104;

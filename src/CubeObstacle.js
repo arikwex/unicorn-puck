@@ -6,7 +6,7 @@ function CubeObstacle(x = 0, y = 0, w = 60, h = 60, props = {}) {
   // Dark violet stone, matching the sanctuary reference art's wall/column
   // blocks rather than the previous mossy green.
   const {
-    height = 65, bounciness = 0.4, topColor = '#7c6865', sideColor = '#453f5d',
+    height = 65, bounciness = 0.4, topColor = '#766', sideColor = '#445',
   } = props;
   return {
     x, y, w, h, height, bounciness, topColor, sideColor,

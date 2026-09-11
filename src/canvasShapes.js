@@ -1,4 +1,4 @@
-// Two canvas fill primitives shared by every world object that needed
+// Canvas fill primitives shared by every world object that needed
 // them, instead of each one (Chalice/Pillar/PlayerCharacter for the
 // ellipse, Grub/PlayerCharacter for the circle) redefining an identical
 // copy locally.
@@ -19,4 +19,13 @@ function fillEllipse(context, x, y, radiusX, radiusY, color) {
   context.fill();
 }
 
-export { fillCircle, fillEllipse };
+// Keep translucent backgrounds independent of the caller's fade/style.
+function fillRect(context, x, y, width, height, color, alpha) {
+  context.save();
+  context.globalAlpha *= alpha;
+  context.fillStyle = color;
+  context.fillRect(x, y, width, height);
+  context.restore();
+}
+
+export { fillCircle, fillEllipse, fillRect };

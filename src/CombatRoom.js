@@ -19,7 +19,7 @@ function splash(door) {
     const speed = Math.sqrt(Math.random()) * 240;
     add(SplatEffect(door.x + (Math.random() - 0.5) * door.w,
       door.y + (Math.random() - 0.5) * door.h,
-      Math.cos(angle) * speed, Math.sin(angle) * speed, '#d3d7dc', { size: 9 }));
+      Math.cos(angle) * speed, Math.sin(angle) * speed, '#cdd', { size: 9 }));
   }
 }
 

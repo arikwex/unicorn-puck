@@ -1,4 +1,5 @@
 import { canvas } from './canvas.js';
+import { fillRect } from './canvasShapes.js';
 import { clamp } from './mathUtils.js';
 
 const DEFAULT_DURATION = 3; // seconds on screen before handing back to the main menu
@@ -12,7 +13,7 @@ const CARD_PADDING = 24;
 const TITLE_FONT_RATIO = 0.07;
 const TITLE_FONT_MIN = 30;
 const TITLE_FONT_MAX = 58;
-const DEFAULT_COLOR = '#ff2020'; // matches the damage-flash red used elsewhere
+const DEFAULT_COLOR = '#f22'; // matches the damage-flash red used elsewhere
 
 // A brief centered status card -- one or more lines of bold text, fading
 // in then out over `duration` seconds, then calling `onDone` (and
@@ -60,8 +61,7 @@ function StatusCard(onDone, props = {}) {
       const height = Math.max(CARD_HEIGHT_MIN, lineHeight * lines.length + CARD_PADDING * 2);
 
       context.globalAlpha = alpha;
-      context.fillStyle = 'rgba(0, 0, 0, 0.75)';
-      context.fillRect(cx - width / 2, cy - height / 2, width, height);
+      fillRect(context, cx - width / 2, cy - height / 2, width, height, '#000', 0.75);
       context.strokeStyle = color;
       context.lineWidth = 4;
       context.strokeRect(cx - width / 2, cy - height / 2, width, height);

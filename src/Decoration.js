@@ -25,13 +25,13 @@ const DOWN = 0;
 const LEFT = 1;
 const RIGHT = 2;
 
-const METAL_COLOR = '#a9822a';
-const METAL_LIGHT_COLOR = '#e8c34a';
-const WAX_COLOR = '#e8ddc0';
-const CRYSTAL_COLOR = '#22c3d4';
-const CRYSTAL_DARK_COLOR = '#0d6e78';
-const STONE_COLOR = '#5a4a46';
-const RUNE_GLOW_COLOR = '#8fd6ff';
+const METAL_COLOR = '#a82';
+const METAL_LIGHT_COLOR = '#eb4';
+const WAX_COLOR = '#edb';
+const CRYSTAL_COLOR = '#2bc';
+const CRYSTAL_DARK_COLOR = '#167';
+const STONE_COLOR = '#544';
+const RUNE_GLOW_COLOR = '#8df';
 
 // Every draw function is always drawn in this same canonical upright
 // orientation, full stop -- this is a faux-3D top-down game, so "up" on

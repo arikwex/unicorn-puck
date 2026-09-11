@@ -1,13 +1,14 @@
 import { SHIELD_COLOR } from './bubbleShield.js';
+import { fillRect } from './canvasShapes.js';
 
 // A standard, reusable health bar: an outlined rectangle divided into one
 // large tick per health point, colored green, yellow, orange, or red at
 // quarter-health cutoffs. Pure render function -- callers own when/where to show it
 // and what currentHp/maxHp are; this just draws.
-const GREEN = '#46c45c';
-const YELLOW = '#f2d64b';
-const ORANGE = '#ef9234';
-const RED = '#d63a3a';
+const GREEN = '#4c5';
+const YELLOW = '#ed4';
+const ORANGE = '#e93';
+const RED = '#d33';
 
 function healthColor(fraction) {
   if (fraction > 0.75) return GREEN;
@@ -23,7 +24,7 @@ function renderHealthBar(context, x, y, width, height, currentHp, maxHp, props =
   const {
     outlineColor = '#fff',
     outlineWidth = 2,
-    backgroundColor = 'rgba(0, 0, 0, 0.55)',
+    backgroundColor = '#000',
     tickGap = 2,
     padding = 2,
     shields = 0,
@@ -34,8 +35,7 @@ function renderHealthBar(context, x, y, width, height, currentHp, maxHp, props =
   const left = x - width / 2;
   const top = y - height / 2;
 
-  context.fillStyle = backgroundColor;
-  context.fillRect(left, top, width, height);
+  fillRect(context, left, top, width, height, backgroundColor, 0.55);
 
   // The outline straddles the rectangle edge; measure padding from its
   // inner edge so the full gap remains visible beside the colored ticks.

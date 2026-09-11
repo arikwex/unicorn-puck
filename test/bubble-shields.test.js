@@ -105,7 +105,7 @@ test('exactly one translucent bubble is rendered regardless of stack size, disap
     player.bubbleShields = count;
     draws = [];
     player.render(context);
-    const bubbles = draws.filter(({ method, color }) => method === 'fill' && color === 'rgba(73, 168, 255, 0.18)');
+    const bubbles = draws.filter(({ method, color }) => method === 'fill' && color === SHIELD_COLOR);
     assert.equal(bubbles.length, count > 0 ? 1 : 0);
   }
   player.addBubbleShield(); player.takeDamage();
@@ -117,7 +117,7 @@ test('exactly one translucent bubble is rendered regardless of stack size, disap
 test('blue HUD ticks use empty health slots before expanding, without changing max HP or HP colors', () => {
   const player = PlayerCharacter();
   const hud = PlayerHealthHUD(player);
-  for (const [hp, shields, width, color] of [[2, 2, 180, '#ef9234'], [5, 3, 288, '#46c45c'], [5, 0, 180, '#46c45c']]) {
+  for (const [hp, shields, width, color] of [[2, 2, 180, '#e93'], [5, 3, 288, '#4c5'], [5, 0, 180, '#4c5']]) {
     player.hp = hp; player.bubbleShields = shields; draws = [];
     hud.renderHUD(context);
     const ticks = draws.filter(({ method }) => method === 'fillRect').slice(1);

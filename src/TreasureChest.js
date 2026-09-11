@@ -38,7 +38,7 @@ const SPARK_SIZE_MIN = 4;
 const SPARK_SIZE_MAX = 8;
 
 const BREAK_SPLAT_COUNT = 10;
-const BREAK_SPLAT_COLORS = ['#fff', '#ffe066'];
+const BREAK_SPLAT_COLORS = ['#fff', '#fd6'];
 const BREAK_SPLAT_SPEED_MAX = 260;
 const BREAK_SPLAT_SIZE_MIN = 10;
 const BREAK_SPLAT_SIZE_MAX = 20;
@@ -47,10 +47,10 @@ const BREAK_SPLAT_SIZE_MAX = 20;
 const CHEST_WIDTH = 72;
 const BASE_HEIGHT = 36;
 const LID_HEIGHT = 24;
-const WOOD_COLOR = '#8b5a2b';
-const WOOD_DARK_COLOR = '#6b4423';
-const METAL_COLOR = '#e8c34a';
-const METAL_DARK_COLOR = '#a9822a';
+const WOOD_COLOR = '#853';
+const WOOD_DARK_COLOR = '#642';
+const METAL_COLOR = '#eb4';
+const METAL_DARK_COLOR = '#a82';
 
 // Drawn in local coordinates, centered on (0, 0) -- the caller translates
 // (for the hit-pop) and rotates (for the hit-rattle) around that origin
