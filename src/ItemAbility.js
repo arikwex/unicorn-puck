@@ -6,11 +6,13 @@
 // Item.js/mapCreator.js to avoid spawning the same ability twice.
 
 const OUTLINE_WIDTH = 4; // 2px thinner than its original 6
+const FILL_COLOR = '#eee';
+const OUTLINE_COLOR = '#111';
 
-function fillOutlined(context, fillColor, outlineColor) {
-  context.fillStyle = fillColor;
+function fillOutlined(context) {
+  context.fillStyle = FILL_COLOR;
   context.fill();
-  context.strokeStyle = outlineColor;
+  context.strokeStyle = OUTLINE_COLOR;
   context.lineWidth = OUTLINE_WIDTH;
   context.lineJoin = 'round';
   context.stroke();
@@ -25,21 +27,23 @@ function drawBattleArmor(context) {
   context.quadraticCurveTo(14, 20, 0, 26);
   context.quadraticCurveTo(-14, 20, -14, 4);
   context.closePath();
-  fillOutlined(context, '#8a95a5', '#3d4552');
+  fillOutlined(context);
 }
 
-// Two swept feather-petal shapes meeting at a center point.
+// Two swept feather-petal shapes meeting at a center point -- wide enough
+// that the fill still reads clearly under the outline stroke, rather than
+// being a sliver the stroke could nearly swallow.
 function drawValkyrieWings(context) {
   context.beginPath();
-  context.moveTo(0, 8);
-  context.quadraticCurveTo(-10, -4, -24, -18);
-  context.quadraticCurveTo(-10, -8, -3, 10);
+  context.moveTo(0, 10);
+  context.quadraticCurveTo(-14, -2, -26, -18);
+  context.quadraticCurveTo(-8, -10, -2, 12);
   context.closePath();
-  context.moveTo(0, 8);
-  context.quadraticCurveTo(10, -4, 24, -18);
-  context.quadraticCurveTo(10, -8, 3, 10);
+  context.moveTo(0, 10);
+  context.quadraticCurveTo(14, -2, 26, -18);
+  context.quadraticCurveTo(8, -10, 2, 12);
   context.closePath();
-  fillOutlined(context, '#f2eee0', '#7a6a2e');
+  fillOutlined(context);
 }
 
 // A tapering spike.
@@ -49,7 +53,7 @@ function drawMithrilHorn(context) {
   context.quadraticCurveTo(-10, -6, 2, -22);
   context.quadraticCurveTo(6, -4, 8, 18);
   context.closePath();
-  fillOutlined(context, '#d9ecf2', '#5f7d87');
+  fillOutlined(context);
 }
 
 // A cloven hoof, viewed from below.
@@ -61,7 +65,7 @@ function drawChromaticHoof(context) {
   context.quadraticCurveTo(6, 6, 0, 10);
   context.quadraticCurveTo(-6, 6, -14, 14);
   context.closePath();
-  fillOutlined(context, '#c04fd6', '#5c1f66');
+  fillOutlined(context);
 }
 
 // An almond eye with a pupil.
@@ -71,10 +75,10 @@ function drawOracleEyes(context) {
   context.quadraticCurveTo(0, -14, 20, 0);
   context.quadraticCurveTo(0, 14, -20, 0);
   context.closePath();
-  fillOutlined(context, '#7fd6e0', '#1f4d54');
+  fillOutlined(context);
   context.beginPath();
   context.arc(0, 0, 6, 0, Math.PI * 2);
-  context.fillStyle = '#1f4d54';
+  context.fillStyle = OUTLINE_COLOR;
   context.fill();
 }
 
