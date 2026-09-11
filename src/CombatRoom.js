@@ -1,7 +1,7 @@
 import { add, getObjectsByTag, remove } from './engine.js';
 import MetalGrate from './MetalGrate.js';
 import { playCombatImpact } from './sounds.js';
-import SplatEffect from './SplatEffect.js';
+import { fireSplatBurst } from './SplatEffect.js';
 import { TAG_COMBAT_ROOM, TAG_PLAYER } from './tags.js';
 import { showToast } from './ToastSystem.js';
 
@@ -14,13 +14,7 @@ const ACTIVE = 1;
 const CLEARED = 2;
 
 function splash(door) {
-  for (let i = 0; i < 8; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = Math.sqrt(Math.random()) * 240;
-    add(SplatEffect(door.x + (Math.random() - 0.5) * door.w,
-      door.y + (Math.random() - 0.5) * door.h,
-      Math.cos(angle) * speed, Math.sin(angle) * speed, '#cdd', { size: 9 }));
-  }
+  fireSplatBurst(door.x, door.y, 8, ['#cdd'], 240, 9, 9);
 }
 
 function CombatRoom(bounds, doorways, enemies) {

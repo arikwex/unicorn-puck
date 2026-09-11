@@ -4,7 +4,7 @@ import Chalice from './Chalice.js';
 import { resetChalices } from './chaliceProgress.js';
 import ChaliceHUD from './ChaliceHUD.js';
 import CombatRoom from './CombatRoom.js';
-import { findRoomDoorways, selectCombatRooms } from './combatRoomLayout.js';
+import { selectCombatRooms } from './combatRoomLayout.js';
 import CubeObstacle from './CubeObstacle.js';
 import generateDungeon, { mulberry32 } from './donjonDungeon.js';
 import { add } from './engine.js';
@@ -205,67 +205,39 @@ function shuffled(list, rng) {
   return result;
 }
 
-const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-
-// The raw generator's corridors are exactly one grid cell wide (see its own
-// top-of-file comment), so a "hallway" -- a straight run with no turns,
-// junctions, or room cells -- is just a chain of cells that each have
-// exactly two floor neighbors sitting on opposite sides of the same axis.
-// A cell with a *different* neighbor count/shape (a turn, a T/+ junction,
-// or a room interior cell) can't extend a chain and caps it instead.
-function hallwayAxisAt(x, y, floorSet, isRoomCell) {
-  if (isRoomCell(x, y)) return null;
-  const neighbors = DIRS4.filter(([dx, dy]) => floorSet.has(`${x + dx},${y + dy}`));
-  if (neighbors.length !== 2) return null;
-  const [[dx0, dy0], [dx1, dy1]] = neighbors;
-  if (dx0 !== -dx1 || dy0 !== -dy1) return null; // a corner, not a straight-through cell
-  return dx0 !== 0 ? [1, 0] : [0, 1];
-}
-
-// Finds every straight corridor run longer than HALLWAY_MIN_LENGTH cells in
-// the *raw* (pre-inflation) grid, each as a {x, y, w, h} box in that same
-// raw grid -- the caller inflates/converts to world space itself, same as
-// it already does for dungeon.rooms.
+// Finds every run of at least HALLWAY_MIN_LENGTH consecutive non-room floor
+// cells along a row or column in the *raw* (pre-inflation) grid -- a cheap
+// stand-in for "a long, mostly-straight corridor stretch" that doesn't try
+// to reason about turns/junctions the way a true single-cell-wide-corridor
+// graph walk would (a run can validly include a turn near one end), each
+// returned as a {x, y, w, h} box in that same raw grid -- the caller
+// inflates/converts to world space itself, same as it already does for
+// dungeon.rooms.
 function findLongHallways(rawDungeon) {
   const floorSet = new Set(rawDungeon.floor.map(({ x, y }) => `${x},${y}`));
   const isRoomCell = (x, y) => rawDungeon.rooms.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
-  const visited = new Set();
+  const isCorridor = (x, y) => floorSet.has(`${x},${y}`) && !isRoomCell(x, y);
   const hallways = [];
 
-  rawDungeon.floor.forEach(({ x, y }) => {
-    if (visited.has(`${x},${y}`)) return;
-    const axis = hallwayAxisAt(x, y, floorSet, isRoomCell);
-    if (!axis) return;
-    const [dx, dy] = axis;
-
-    // Walk backward to the run's true start, then forward again collecting
-    // every cell -- so it doesn't matter which cell of the run forEach
-    // happens to reach first.
-    let sx = x;
-    let sy = y;
-    while (hallwayAxisAt(sx - dx, sy - dy, floorSet, isRoomCell)) { sx -= dx; sy -= dy; }
-    const cells = [];
-    let cx = sx;
-    let cy = sy;
-    while (hallwayAxisAt(cx, cy, floorSet, isRoomCell)) {
-      cells.push({ x: cx, y: cy });
-      visited.add(`${cx},${cy}`);
-      cx += dx;
-      cy += dy;
+  function scan(outer, inner, alongX) {
+    for (let a = 0; a < outer; a++) {
+      let start = null;
+      for (let b = 0; b <= inner; b++) {
+        if (b < inner && isCorridor(...(alongX ? [b, a] : [a, b]))) {
+          if (start === null) start = b;
+          continue;
+        }
+        if (start !== null && b - start >= HALLWAY_MIN_LENGTH) {
+          hallways.push(alongX
+            ? { x: start, y: a, w: b - start, h: 1, length: b - start }
+            : { x: a, y: start, w: 1, h: b - start, length: b - start });
+        }
+        start = null;
+      }
     }
-
-    if (cells.length >= HALLWAY_MIN_LENGTH) {
-      const xs = cells.map((cell) => cell.x);
-      const ys = cells.map((cell) => cell.y);
-      hallways.push({
-        x: Math.min(...xs),
-        y: Math.min(...ys),
-        w: Math.max(...xs) - Math.min(...xs) + 1,
-        h: Math.max(...ys) - Math.min(...ys) + 1,
-        length: cells.length,
-      });
-    }
-  });
+  }
+  scan(rawDungeon.gridHeight, rawDungeon.gridWidth, true);
+  scan(rawDungeon.gridWidth, rawDungeon.gridHeight, false);
 
   return hallways;
 }
@@ -395,8 +367,14 @@ function buildDungeon(seed) {
       // Grid coordinates name cell centers; the exact floor rectangle
       // starts half a tile before the first center, not at that center.
       const center = toWorld(room.x + (room.w - 1) / 2, room.y + (room.h - 1) / 2);
-      add(CombatRoom({ ...center, w: room.w * TILE, h: room.h * TILE },
-        findRoomDoorways(room, floorSet, TILE, toWorld), enemies));
+      // One small grate per entrance cell instead of a merged door-wide
+      // one -- reuses the same entrance-cell detection chest/chalice
+      // placement already needs (see roomEntrancePoints/findEntranceCells)
+      // rather than a bespoke per-side door-merging scan.
+      const doorways = roomEntrancePoints(room).map((p) => ({
+        x: p.x, y: p.y, w: TILE, h: TILE,
+      }));
+      add(CombatRoom({ ...center, w: room.w * TILE, h: room.h * TILE }, doorways, enemies));
     }
 
     // Every room gets a chest, kept clear of every wall/pillar/grub and
