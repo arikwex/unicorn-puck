@@ -1,6 +1,6 @@
 // Wall-mounted dressing for otherwise-bare hallway/room walls: a shield, a
 // candle sconce, a mounted crystal, or a runic stone. Purely decorative --
-// no tags, no puck(), nothing for physics to see -- just a render (plus a
+// no tags, no radius/w, nothing for physics to see -- just a render (plus a
 // tiny per-instance anim clock for the candle's flame).
 // renderFlame's own export was retired along with Pillar.js's non-classic
 // variants (see its VARIANT_COUNT comment) -- this whole module is unused

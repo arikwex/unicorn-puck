@@ -7,7 +7,7 @@ import { add } from './engine.js';
 import BubbleShieldItem from './BubbleShieldItem.js';
 import HealthItem from './HealthItem.js';
 import { fireSplatBurst } from './SplatEffect.js';
-import { TAG_OBSTACLE, TAG_PLAYER } from './tags.js';
+import { TAG_OBSTACLE } from './tags.js';
 
 const SHIELD_DROP_CHANCE = 0.5;
 const HITS_REQUIRED = 2;
@@ -85,7 +85,6 @@ function TreasureChest(x, y, props = {}) {
   // rather than this chest rolling it itself the moment it breaks. Default
   // keeps the old random 50/50 for any caller that doesn't care to specify.
   const {
-    bounciness = 0.3,
     contents = (cx, cy) => (Math.random() < SHIELD_DROP_CHANCE ? BubbleShieldItem(cx, cy) : HealthItem(cx, cy)),
   } = props;
   let hitsRemaining = HITS_REQUIRED;
@@ -99,25 +98,8 @@ function TreasureChest(x, y, props = {}) {
     x,
     y,
     order: y,
+    radius: CHEST_RADIUS, // a static circle -- see physics.js
     tags: [TAG_OBSTACLE],
-
-    // Consistent puck-like accessor (see Pillar.js/CubeObstacle.js and
-    // physics.js): a static, circular puck with mass: Infinity.
-    puck() {
-      return {
-        x: this.x,
-        y: this.y,
-        radius: CHEST_RADIUS,
-        mass: Infinity,
-        vx: 0,
-        vy: 0,
-        omega: 0,
-        angle: 0,
-        viscosity: 0,
-        angularViscosity: 0,
-        bounciness,
-      };
-    },
 
     update(dt) {
       flashTimer = Math.max(0, flashTimer - dt);
@@ -125,10 +107,9 @@ function TreasureChest(x, y, props = {}) {
       hitAnimElapsed += dt;
     },
 
-    onCollision(other, collision) {
-      if (!other.tags?.includes(TAG_PLAYER) || hitCooldown > 0) return;
-      const player = collision.otherBody;
-      if (player.charge <= CHARGING_THRESHOLD) return;
+    // Called by the player on contact, with its pre-bounce state.
+    hit(player) {
+      if (hitCooldown > 0 || player.charge <= CHARGING_THRESHOLD) return;
 
       hitCooldown = HIT_COOLDOWN;
       flashTimer = FLASH_DURATION;

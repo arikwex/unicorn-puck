@@ -1,3 +1,4 @@
+import './helpers/audio.js';
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
@@ -12,6 +13,10 @@ const { TAG_PLAYER } = await import('../src/tags.js');
 
 afterEach(clear);
 
+// Grub.js's numeric state ids.
+const PATROL = 0;
+const AIMING = 1;
+
 function encounter() {
   const player = add({ x: 2000, y: 0, hp: 5, tags: [TAG_PLAYER] });
   const room = { x: 0, y: 0, w: 600, h: 600 };
@@ -25,7 +30,7 @@ function firstAimTimes(grubs) {
     for (const grub of grubs) {
       if (times.has(grub)) continue; // Observe acquisition without firing.
       grub.update(0.05);
-      if (grub.state === 'aiming') times.set(grub, frame * 0.05);
+      if (grub.state === AIMING) times.set(grub, frame * 0.05);
     }
   }
   assert.equal(times.size, grubs.length);
@@ -38,7 +43,7 @@ function firstAimTimes(grubs) {
 test('entering a room after a long absence gives each grub a fresh random reaction delay', () => {
   const { player, grubs } = encounter();
   for (let frame = 0; frame < 400; frame++) grubs.forEach((grub) => grub.update(0.05));
-  assert.ok(grubs.every((grub) => grub.state === 'patrol'));
+  assert.ok(grubs.every((grub) => grub.state === PATROL));
   player.x = 0;
   firstAimTimes(grubs);
 });

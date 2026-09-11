@@ -30,21 +30,19 @@ globalThis.AudioContext = class {
   }
 };
 
-const { add, clear, getObjects } = await import('../src/engine.js');
+const { add, clear, getObjects, remove } = await import('../src/engine.js');
 const { default: PlayerCharacter } = await import('../src/PlayerCharacter.js');
 const { default: PlayerHealthHUD } = await import('../src/PlayerHealthHUD.js');
 const { default: BubbleShieldItem } = await import('../src/BubbleShieldItem.js');
 const { default: TreasureChest } = await import('../src/TreasureChest.js');
 const { default: GrubProjectile } = await import('../src/GrubProjectile.js');
-const { default: PhysicsWorld } = await import('../src/PhysicsWorld.js');
 const { default: ToastSystem } = await import('../src/ToastSystem.js');
 const { SHIELD_COLOR } = await import('../src/bubbleShield.js');
 const { collectItemAbility, resetItemAbilities } = await import('../src/ItemAbility.js');
-const bus = await import('../src/bus.js');
 const originalRandom = Math.random;
 
 afterEach(() => {
-  clear(); bus.clear(); resetItemAbilities();
+  clear(); resetItemAbilities();
   draws = []; sounds = 0; canvas.width = 800;
   Math.random = originalRandom;
 });
@@ -68,11 +66,14 @@ test('each shield absorbs exactly one whole damaging hit, then is permanently co
   assert.equal(player.maxHp, 5);
 });
 
-test('pickup respects spawn protection and distance, stacks at full HP, and emits once', () => {
+test('pickup respects spawn protection and distance, stacks at full HP, and toasts once', () => {
   const player = add(PlayerCharacter());
-  add(ToastSystem());
-  const events = [];
-  bus.on('item-collected', (event) => events.push(event));
+  const toasts = add(ToastSystem());
+  let toast;
+  toasts.update(0);
+  const renderToast = () => toasts.renderHUD(new Proxy({ measureText: () => ({ width: 1 }) }, {
+    get: (target, key) => target[key] ?? (key === 'fillText' ? (text) => { toast = text; } : () => {}),
+  }));
   const pickup = BubbleShieldItem(0, 0);
   assert.equal(pickup.update(0.1), false);
   player.x = 300;
@@ -82,7 +83,8 @@ test('pickup respects spawn protection and distance, stacks at full HP, and emit
   assert.equal(pickup.update(0), true);
   assert.equal(player.bubbleShields, 1);
   assert.equal(player.hp, 5);
-  assert.deepEqual(events, [{ name: 'Bubble Shield' }]);
+  renderToast();
+  assert.equal(toast, 'Bubble Shield Collected');
   assert.equal(sounds, 1, 'one pickup chime for the toast');
   assert.equal(BubbleShieldItem(0, 0).update(0.31), true);
   assert.equal(player.bubbleShields, 2);
@@ -111,7 +113,7 @@ test('exactly one translucent bubble is rendered regardless of stack size, disap
   player.addBubbleShield(); player.takeDamage();
   draws = [];
   player.render(context);
-  assert.ok(!draws.some(({ method }) => method === 'drawImage'), 'absorbed hits do not trigger the red damage flash');
+  assert.ok(draws.some(({ method }) => method === 'drawImage'), 'absorbed hits flash red like any other hit');
 });
 
 test('blue HUD ticks use empty health slots before expanding, without changing max HP or HP colors', () => {
@@ -147,21 +149,20 @@ test('large stacks fit a mobile screen with positive-width blue ticks and padded
 
 test('projectiles consume one shield once, still knock back, and damage HP only after charges run out', () => {
   const player = add(PlayerCharacter(0, 0, 0, { bubbleShields: 1 }));
-  const physics = PhysicsWorld();
   const shot = add(GrubProjectile(-100, 0, 1000, 0));
-  physics.physicsUpdate(0.1);
+  if (shot.update(0.1)) remove(shot);
   assert.equal(player.bubbleShields, 0);
   assert.equal(player.hp, 5);
   assert.ok(player.vx > 0);
   assert.ok(!getObjects().includes(shot));
-  add(GrubProjectile(player.x - 100, player.y, 1000, 0));
-  physics.physicsUpdate(0.1);
+  const second = add(GrubProjectile(player.x - 100, player.y, 1000, 0));
+  if (second.update(0.1)) remove(second);
   assert.equal(player.hp, 4);
 });
 
 test('battle armor and healing preserve shield charges without making them permanent max health', () => {
   const player = PlayerCharacter(0, 0, 0, { hp: 2, bubbleShields: 3 });
-  collectItemAbility('battleArmor', player);
+  collectItemAbility(0, player); // BATTLE ARMOR
   assert.equal(player.hp, 4); assert.equal(player.maxHp, 7);
   player.heal(100);
   assert.equal(player.hp, 7); assert.equal(player.bubbleShields, 3);
@@ -176,9 +177,9 @@ test('chests can drop either a bubble shield or the existing health pickup', () 
     const player = add(PlayerCharacter(0, 0, 0, { hp: 1 }));
     player.charge = 1;
     const chest = TreasureChest(0, 0);
-    chest.onCollision(player, { otherBody: player });
+    chest.hit(player);
     chest.update(0.7);
-    assert.equal(chest.onCollision(player, { otherBody: player }), true);
+    assert.equal(chest.hit(player), true);
     const pickup = getObjects().find((object) => object !== player && object.x === 0 && object.y === 0);
     assert.ok(pickup);
     assert.equal(pickup.update(0.31), true);

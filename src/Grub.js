@@ -259,7 +259,7 @@ function mouthPosition(grub, head = segmentPosition(grub, 0)) {
 // walls), which is what keeps the grub "generally within its room" rather
 // than wandering the whole dungeon.
 function Grub(x, y, room, seed, props = {}) {
-  const { bounciness = 0.4, large = false } = props;
+  const { large = false } = props;
   const size = large ? LARGE_SCALE : 1;
   const maxHp = MAX_HP + (large ? 3 : 0);
   const rng = mulberry32(seed);
@@ -322,27 +322,10 @@ function Grub(x, y, room, seed, props = {}) {
     aimProgress: 0,
     hp: maxHp,
     order: y,
+    // A static circle the player bounces off (see physics.js); patrol and
+    // hit momentum drive its position.
+    radius: COLLISION_RADIUS * size,
     tags: [TAG_OBSTACLE, TAG_ENEMY],
-
-    // Consistent puck-like accessor (see CubeObstacle.js/Pillar.js and
-    // physics.js): a circular body with mass: Infinity, so the player
-    // bounces off it while patrol and hit momentum drive its position.
-    // Expose hit velocity for relative motion in the collision pass.
-    puck() {
-      return {
-        x: this.x,
-        y: this.y,
-        radius: COLLISION_RADIUS * size,
-        mass: Infinity,
-        vx: this.vx,
-        vy: this.vy,
-        omega: 0,
-        angle: 0,
-        viscosity: 0,
-        angularViscosity: 0,
-        bounciness,
-      };
-    },
 
     update(dt) {
       if (this.hp <= 0) return true;
@@ -372,7 +355,7 @@ function Grub(x, y, room, seed, props = {}) {
         }
       } else if (this.state === AIMING) {
         // Once wound up, a shot is never canceled by losing range/sight --
-        // only ever delayed (see onCollision's own hit-response). Keep
+        // only ever delayed (see hit()'s own hit-response). Keep
         // tracking the player live while actually reachable; otherwise
         // keep aiming at wherever it last had them.
         if (canAim) { targetX = player.x; targetY = player.y; }
@@ -436,10 +419,9 @@ function Grub(x, y, room, seed, props = {}) {
       return this.hp <= 0;
     },
 
-    onCollision(other, collision) {
-      if (!other.tags?.includes(TAG_PLAYER) || this.hp <= 0 || hitCooldown > 0) return;
-      const player = collision.otherBody;
-      if (player.charge <= CHARGING_THRESHOLD) return;
+    // Called by the player on contact, with its pre-bounce state.
+    hit(player) {
+      if (this.hp <= 0 || hitCooldown > 0 || player.charge <= CHARGING_THRESHOLD) return;
 
       // Mithril Horn adds a flat bonus on top of the usual charge-based roll.
       const damage = (player.charge >= HIGH_CHARGE_DAMAGE_THRESHOLD ? 2 : 1) + player.impactDamageBonus;

@@ -221,9 +221,9 @@ function renderCandelabra(context, obstacle, anim) {
 */
 
 // Simplified down to the one classic-Roman-column look (see VARIANT_COUNT
-// above) -- still shares the exact same puck() (a static circle of
-// `radius`) the retired variants did, so this never changes how the
-// player bounces off it.
+// above) -- still the exact same static circle of `radius` the retired
+// variants were (see physics.js), so this never changes how the player
+// bounces off it.
 function Pillar(x = 0, y = 0, props = {}) {
   const {
     radius = 26,
@@ -232,7 +232,6 @@ function Pillar(x = 0, y = 0, props = {}) {
     shaftHeight = 110, // 2.5x its original 44, so the column actually reads as tall next to the small base/capital
     capHalfSize = radius + 6,
     capHeight = 8,
-    bounciness = 0.5,
     // A lighter/darker tint of CubeObstacle's own wall tones (#766
     // top / #445 side) -- same muted tonal family as the room
     // around it, but warmer and lighter than the walls so a pillar still
@@ -252,7 +251,6 @@ function Pillar(x = 0, y = 0, props = {}) {
     shaftHeight,
     capHalfSize,
     capHeight,
-    bounciness,
     stoneColor,
     shadeColor,
     variant,
@@ -263,27 +261,6 @@ function Pillar(x = 0, y = 0, props = {}) {
 
     update(dt) {
       anim += dt;
-    },
-
-    // Consistent puck-like accessor (see CubeObstacle.js and physics.js):
-    // a static, circular puck with mass: Infinity, always this same
-    // radius regardless of `variant` -- collision never depends on which
-    // one a pillar happens to render as. No `box` flag is how PhysicsWorld
-    // tells it apart from CubeObstacle's boxes (see PhysicsWorld.js).
-    puck() {
-      return {
-        x: this.x,
-        y: this.y,
-        radius: this.radius,
-        mass: Infinity,
-        vx: 0,
-        vy: 0,
-        omega: 0,
-        angle: 0,
-        viscosity: 0,
-        angularViscosity: 0,
-        bounciness: this.bounciness,
-      };
     },
 
     render(context) {

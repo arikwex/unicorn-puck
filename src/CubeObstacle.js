@@ -6,22 +6,13 @@ function CubeObstacle(x = 0, y = 0, w = 60, h = 60, props = {}) {
   // Dark violet stone, matching the sanctuary reference art's wall/column
   // blocks rather than the previous mossy green.
   const {
-    height = 65, bounciness = 0.4, topColor = '#766', sideColor = '#445',
+    height = 65, topColor = '#766', sideColor = '#445',
   } = props;
   return {
-    x, y, w, h, height, bounciness, topColor, sideColor,
+    // x/y center plus w/h is also its static collision box (see physics.js).
+    x, y, w, h, height, topColor, sideColor,
     tags: [TAG_OBSTACLE],
     order: y + h / 2,
-
-    puck() {
-      return {
-        x: this.x, y: this.y,
-        halfWidth: this.w / 2, halfHeight: this.h / 2,
-        box: true, mass: Infinity,
-        vx: 0, vy: 0, omega: 0,
-        bounciness: this.bounciness,
-      };
-    },
 
     render(context) {
       // Snap shared edges in screen space so fractional zoom/panning cannot

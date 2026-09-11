@@ -1,15 +1,14 @@
-import { add } from './engine.js';
+import { add, getObjectsByTag, remove } from './engine.js';
 import { renderBubbleShield } from './bubbleShield.js';
 import { fillCircle, fillEllipse } from './canvasShapes.js';
-import { applyCollisionResponse, applyImpulse, normalizeAngle } from './physics.js';
+import contact from './physics.js';
 import orbit3d from './orbit3d.js';
 import SplatEffect from './SplatEffect.js';
 import { playPlayerDamage, playWallBounce } from './sounds.js';
-import { TAG_ENEMY, TAG_PLAYER, TAG_PROJECTILE, TAG_PUCK } from './tags.js';
+import { TAG_ENEMY, TAG_OBSTACLE, TAG_PLAYER } from './tags.js';
 
 const TAU = Math.PI * 2;
 const DAMAGE_FLASH_DURATION = 0.6;
-const PROJECTILE_KNOCKBACK = 120;
 // The puck's collision radius, and also the reference "size" Camera.js
 // zooms against so the character reads at a consistent fraction of the
 // screen on any device.
@@ -17,6 +16,17 @@ const PLAYER_RADIUS = 38;
 const WALL_BOUNCE_SOUND_MIN_SPEED = 30; // world units/s of velocity change -- below this, a resting/sliding contact stays silent
 const DAMAGE_CANVAS_SIZE = 320;
 const PINBALL_BOOST_FACTOR = 1.08; // Chromatic Hoof: fraction of pre-bounce speed an enemy bounce reboosts back up to (and past)
+// Velocity decay rates (1/s) below/above CHARGE_MIN_SPEED -- see update().
+const DRAG = 0.6;
+const CHARGING_DRAG = 3;
+const RESTITUTION = 0.4; // < 1: bounces off obstacles lose some energy
+
+function normalizeAngle(value) {
+  let normalized = value % TAU;
+  if (normalized > Math.PI) normalized -= TAU;
+  if (normalized <= -Math.PI) normalized += TAU;
+  return normalized;
+}
 
 // -- damage splats -----------------------------------------------------------
 // Red, orange, yellow, green, blue, violet -- one splat of each, always all
@@ -572,11 +582,6 @@ function renderPlayer(context, player, anim, charge, trail) {
   renderWingsAndTail(context, player, angle, anim, true, charge);
 }
 
-// Puck-like character properties. `mass`, `radius`, and `bounciness` are
-// the shape/weight of the puck; `viscosity` and `angularViscosity` are
-// multipliers (default 1 = the baseline damping rates in physics.js) on
-// top of that baseline, so tuning a character's "floatiness" only ever
-// means tuning a multiplier.
 function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
   let anim = 0;
   let damageFlashTimer = 0;
@@ -586,11 +591,6 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     maxHp = 5,
     hp = maxHp,
     bubbleShields = 0,
-    mass = 1,
-    radius = PLAYER_RADIUS,
-    viscosity = 1,
-    angularViscosity = 1,
-    bounciness = 0.55, // < 1: bounces off obstacles lose some energy
   } = props;
 
   return {
@@ -599,7 +599,6 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     angle,
     vx: 0,
     vy: 0,
-    omega: 0,
     hp: Math.max(0, Math.min(maxHp, hp)),
     maxHp,
     bubbleShields: Math.max(0, Math.floor(bubbleShields)),
@@ -611,7 +610,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     charge: 0,
     // Item-ability stats -- see ItemAbility.js for what grants each of
     // these. Plain defaults so every reader (input.js, Grub.js, this
-    // file's own onCollision) can use the field directly, no `|| default`
+    // file's own update) can use the field directly, no `|| default`
     // fallback needed anywhere.
     boostPower: 1, // multiplies a drag-launch's impulse magnitude (Valkyrie Wings)
     impactDamageBonus: 0, // added to every charging-hit damage roll (Mithril Horn)
@@ -621,63 +620,8 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     // for why (same painter's-algorithm depth illusion), but a moving puck
     // needs it refreshed every frame rather than set once.
     order: y,
-    mass,
-    radius,
-    viscosity,
-    angularViscosity,
-    bounciness,
-    tags: [TAG_PLAYER, TAG_PUCK],
-
-    // Consistent puck-like accessor (see CubeObstacle.js and physics.js):
-    // returns the live state itself, so collision resolution mutates the
-    // character directly.
-    puck() {
-      return this;
-    },
-
-    onCollision(other, collision) {
-      if (other.tags?.includes(TAG_PROJECTILE)) {
-        if (this.hp <= 0) return;
-        const projectile = collision.otherBody;
-        this.takeDamage(projectile.damage);
-        const speed = Math.hypot(projectile.vx, projectile.vy);
-        if (speed > 0) {
-          applyImpulse(this, projectile.vx / speed * PROJECTILE_KNOCKBACK,
-            projectile.vy / speed * PROJECTILE_KNOCKBACK, 0);
-        }
-        return;
-      }
-      const isEnemy = other.tags?.includes(TAG_ENEMY);
-      // Grub's own onCollision plays its hit sound when a charging hit
-      // actually lands, so a plain bump into an enemy that does no damage
-      // stays silent here rather than doubling up on the wall-bounce sound.
-      if (!isEnemy) {
-        const impactSpeed = Math.hypot(collision.response.dvx, collision.response.dvy);
-        if (impactSpeed >= WALL_BOUNCE_SOUND_MIN_SPEED) playWallBounce(impactSpeed);
-      }
-
-      if (isEnemy && this.pinballMomentum) {
-        // Chromatic Hoof: a normal bounce's restitution still loses some
-        // energy (bounciness < 1) -- reboost back up to (and a bit past)
-        // whatever speed we had going in, pinball-bumper style, instead of
-        // letting the collision decay it.
-        const preSpeed = Math.hypot(this.vx, this.vy);
-        this.bounce(collision.response);
-        const postSpeed = Math.hypot(this.vx, this.vy);
-        if (postSpeed > 0) {
-          const targetSpeed = Math.max(preSpeed, postSpeed) * PINBALL_BOOST_FACTOR;
-          const scale = targetSpeed / postSpeed;
-          this.vx *= scale;
-          this.vy *= scale;
-        }
-        return;
-      }
-      this.bounce(collision.response);
-    },
-
-    bounce(response) {
-      applyCollisionResponse(this, response);
-    },
+    radius: PLAYER_RADIUS,
+    tags: [TAG_PLAYER],
 
     // A bubble shield absorbs the hit instead of hp (see addBubbleShield),
     // but otherwise takes it exactly like a normal hit -- same flash, same
@@ -710,13 +654,8 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     update(dt) {
       anim += dt;
       damageFlashTimer = Math.max(0, damageFlashTimer - dt);
-      this.order = this.y;
 
       const speed = Math.hypot(this.vx, this.vy);
-      // Above the same speed that starts the charging pose, drag triples --
-      // reads as air resistance actually fighting back once you're really
-      // moving, rather than a flat, speed-independent decay throughout.
-      this.viscosity = speed >= CHARGE_MIN_SPEED ? 5 : 1;
 
       const targetCharge = Math.min(Math.max((speed - CHARGE_MIN_SPEED) / (CHARGE_MAX_SPEED - CHARGE_MIN_SPEED), 0), 1);
       this.charge += (targetCharge - this.charge) * (1 - Math.exp(-CHARGE_EASE_RATE * dt));
@@ -740,6 +679,47 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
         const delta = normalizeAngle(targetAngle - this.angle);
         this.angle = normalizeAngle(this.angle + delta * ease);
       }
+
+      // Above the same speed that starts the charging pose, drag
+      // quintuples -- reads as air resistance actually fighting back once
+      // you're really moving, rather than a flat decay throughout.
+      const decay = Math.exp(-(speed < CHARGE_MIN_SPEED ? DRAG : CHARGING_DRAG) * dt);
+      this.vx *= decay;
+      this.vy *= decay;
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+
+      // Obstacles are static. Every contact is found against (and every
+      // hit callback sees) this pre-bounce snapshot; pushes accumulate so
+      // simultaneous contacts at a wall seam never double the correction.
+      const body = { ...this };
+      getObjectsByTag(TAG_OBSTACLE).forEach((obstacle) => {
+        const hit = contact(body, obstacle);
+        if (!hit) return;
+        if (obstacle.hit?.(body)) remove(obstacle);
+        const [nx, ny, penetration] = hit;
+        const push = Math.max(0, penetration + (this.x - body.x) * nx + (this.y - body.y) * ny);
+        this.x -= nx * push;
+        this.y -= ny * push;
+        const preSpeed = Math.hypot(this.vx, this.vy);
+        const impact = Math.max(0, this.vx * nx + this.vy * ny) * (1 + RESTITUTION);
+        this.vx -= nx * impact;
+        this.vy -= ny * impact;
+        if (!obstacle.tags.includes(TAG_ENEMY)) {
+          // Grub.js plays its own hit sound, so a plain enemy bump stays
+          // silent rather than doubling up on the wall-bounce sound.
+          if (impact >= WALL_BOUNCE_SOUND_MIN_SPEED) playWallBounce(impact);
+        } else if (this.pinballMomentum) {
+          // Chromatic Hoof: reboost past the pre-bounce speed,
+          // pinball-bumper style, instead of letting restitution decay it.
+          const postSpeed = Math.hypot(this.vx, this.vy);
+          if (postSpeed) {
+            this.vx *= preSpeed * PINBALL_BOOST_FACTOR / postSpeed;
+            this.vy *= preSpeed * PINBALL_BOOST_FACTOR / postSpeed;
+          }
+        }
+      });
+      this.order = this.y;
     },
 
     render(context) {

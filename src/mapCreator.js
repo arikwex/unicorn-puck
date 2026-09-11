@@ -17,7 +17,6 @@ import { ITEM_ABILITY_CATALOG, resetItemAbilities } from './ItemAbility.js';
 import ItemAbilityHUD from './ItemAbilityHUD.js';
 import mergeWallsIntoRects from './mergeWalls.js';
 import MiniMap from './MiniMap.js';
-import PhysicsWorld from './PhysicsWorld.js';
 import Pillar from './Pillar.js';
 import placePillars, { findEntranceCells } from './placePillars.js';
 import PlayerCharacter from './PlayerCharacter.js';
@@ -360,7 +359,7 @@ function buildDungeon(seed) {
         const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + enemies.length, { large }));
         spent += grub.enemyCost;
         enemies.push(grub);
-        obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.puck().radius });
+        obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.radius });
       }
     }
     if (combatRoomIndices.has(roomIndex)) {
@@ -414,7 +413,7 @@ function buildDungeon(seed) {
     for (let i = 0; i < grubCount; i++) {
       const spawn = pickGrubSpawn(worldHallway, hallwayRng);
       const grub = add(Grub(spawn.x, spawn.y, worldHallway, hallwayGrubSeed + hallwayIndex * 100 + i));
-      obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.puck().radius });
+      obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.radius });
     }
   });
 
@@ -485,7 +484,6 @@ function createMap(seed) {
   showToast('Collect all Pegacorn Blood Chalices to win!');
   add(Camera().follow(player));
   const dragController = add(DragController(player));
-  add(PhysicsWorld());
   return {
     player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap,
   };

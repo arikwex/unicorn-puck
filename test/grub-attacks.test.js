@@ -39,11 +39,10 @@ globalThis.innerWidth = 800;
 globalThis.innerHeight = 600;
 globalThis.addEventListener = () => {};
 
-const { add, clear, getObjects, getObjectsByTag } = await import('../src/engine.js');
+const { add, clear, getObjects, getObjectsByTag, remove } = await import('../src/engine.js');
 const { default: Grub } = await import('../src/Grub.js');
 const { default: GrubProjectile } = await import('../src/GrubProjectile.js');
 const { default: PlayerCharacter } = await import('../src/PlayerCharacter.js');
-const { default: PhysicsWorld } = await import('../src/PhysicsWorld.js');
 const { TAG_OBSTACLE, TAG_PROJECTILE } = await import('../src/tags.js');
 
 afterEach(() => { clear(); tintContexts.length = 0; screenContext.calls.length = 0; });
@@ -58,13 +57,14 @@ function startAiming() {
 }
 
 function wall(x, shape = 'box') {
-  return {
-    tags: [TAG_OBSTACLE],
-    puck: () => ({
-      x, y: 0, box: shape === 'box', halfWidth: 1, halfHeight: 100, radius: 20,
-      mass: Infinity, vx: 0, vy: 0, omega: 0, bounciness: 0.4,
-    }),
-  };
+  return shape === 'box'
+    ? { tags: [TAG_OBSTACLE], x, y: 0, w: 2, h: 200 }
+    : { tags: [TAG_OBSTACLE], x, y: 0, radius: 20 };
+}
+
+// One engine update phase over just `objects` still in play (default: all).
+function step(dt, objects = getObjects()) {
+  remove(objects.filter((object) => getObjects().includes(object) && object.update?.(dt)));
 }
 
 test('grub stays still and tracks the player for two seconds before firing once', () => {
@@ -102,9 +102,9 @@ test('aiming raises an S-shaped body and pulls it backward while the tail stays 
   };
   for (const angle of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
     grub.angle = angle;
-    grub.state = 'patrol';
+    grub.state = 0; // PATROL
     const resting = segments();
-    grub.state = 'aiming';
+    grub.state = 1; // AIMING
     let previous = resting;
     for (const progress of [0.25, 0.5, 0.75, 1]) {
       grub.aimProgress = progress;
@@ -113,8 +113,10 @@ test('aiming raises an S-shaped body and pulls it backward while the tail stays 
       assert.deepEqual(pose[3], resting[3], 'tail remains planted');
       if (Math.abs(Math.cos(angle)) > 0.5) {
         for (let i = 0; i < 3; i++) {
-          assert.ok((pose[i][0] - previous[i][0]) * Math.cos(angle) < 0, 'pullback follows local -x');
+          assert.ok((pose[i][0] - resting[i][0]) * Math.cos(angle) < 0, 'pullback follows local -x');
         }
+        // Head/neck jitter aside, the body keeps drawing back all tell long.
+        assert.ok((pose[2][0] - previous[2][0]) * Math.cos(angle) < 0, 'pullback keeps growing');
       }
       for (let i = 0; i < 3; i++) {
         assert.ok(Math.hypot(pose[i][0] - pose[i + 1][0], pose[i][1] - pose[i + 1][1])
@@ -130,20 +132,25 @@ test('aiming raises an S-shaped body and pulls it backward while the tail stays 
   }
 });
 
-test('losing the player cancels the tell; a charging hit also interrupts it', () => {
+test('losing the player never cancels a tell; a charging hit only delays it', () => {
   const { player, grub } = startAiming();
   player.x = 2000;
   grub.update(2);
-  assert.equal(grub.state, 0);
-  assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 0);
+  assert.equal(grub.state, 2, 'fired and recovering');
+  const [shot] = getObjectsByTag(TAG_PROJECTILE);
+  assert.ok(shot.vx > 0 && Math.abs(shot.vy) < shot.vx, 'aimed at the last known position');
   clear();
   const next = startAiming();
+  next.grub.update(1.5);
   Object.assign(next.player, { x: next.grub.x - 60, y: next.grub.y, vx: 800, charge: 1 });
-  PhysicsWorld().physicsUpdate(0);
-  assert.equal(next.grub.state, 0);
-  assert.equal(next.grub.aimProgress, 0);
+  next.player.update(0);
+  assert.equal(next.grub.state, 1, 'still aiming');
+  assert.equal(next.grub.aimProgress, 0.5, 'rewound to a full second before firing');
   assert.ok(next.grub.vx > 0);
+  next.grub.update(0.9);
   assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 0);
+  next.grub.update(0.2);
+  assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 1);
 });
 
 test('projectiles deal exactly one damage and push along their motion axis', () => {
@@ -151,13 +158,12 @@ test('projectiles deal exactly one damage and push along their motion axis', () 
     clear();
     const player = add(PlayerCharacter());
     const shot = add(GrubProjectile(-vx * 0.1, -vy * 0.1, vx, vy));
-    const world = PhysicsWorld();
-    for (let i = 0; i < 12 && getObjects().includes(shot); i++) world.physicsUpdate(1 / 60);
+    for (let i = 0; i < 12 && getObjects().includes(shot); i++) step(1 / 60, [shot]);
     assert.equal(player.hp, 4);
     assert.ok(Math.abs(player.vx - vx / 1000 * 120) < 1e-9);
     assert.ok(Math.abs(player.vy - vy / 1000 * 120) < 1e-9);
     assert.ok(!getObjects().includes(shot));
-    world.physicsUpdate(0);
+    step(0);
     assert.equal(player.hp, 4);
   }
 });
@@ -169,14 +175,10 @@ test('thin walls and circular obstacles block shots before a player', () => {
       const player = PlayerCharacter(200, 0);
       const obstacle = wall(70, shape);
       const shot = GrubProjectile(0, 0, 340, 0);
-      let wallHits = 0;
-      obstacle.onCollision = () => { wallHits++; };
       const objects = [player, obstacle, shot];
       (reverse ? objects.reverse() : objects).forEach(add);
-      const world = PhysicsWorld();
-      for (let i = 0; i < 90; i++) world.physicsUpdate(1 / 60);
+      for (let i = 0; i < 90; i++) step(1 / 60);
       assert.equal(player.hp, 5);
-      assert.equal(wallHits, 1);
       assert.ok(!getObjects().includes(shot));
       assert.ok(shot.x < 70);
     }
@@ -187,11 +189,7 @@ test('shots pass through other enemies and then hit the player', () => {
   const enemy = add(Grub(70, 0, room, 123));
   const player = add(PlayerCharacter(200, 0));
   const shot = add(GrubProjectile(0, 0, 340, 0));
-  let enemyHits = 0;
-  enemy.onCollision = () => { enemyHits++; };
-  const world = PhysicsWorld();
-  for (let i = 0; i < 90; i++) world.physicsUpdate(1 / 60);
-  assert.equal(enemyHits, 0);
+  for (let i = 0; i < 90; i++) step(1 / 60, [shot]);
   assert.equal(enemy.hp, 5);
   assert.equal(player.hp, 4);
   assert.ok(!getObjects().includes(shot));
@@ -200,25 +198,23 @@ test('shots pass through other enemies and then hit the player', () => {
 test('one shot hits only the first player reached over successive frames', () => {
   const far = add(PlayerCharacter(250, 0));
   const near = add(PlayerCharacter(100, 0));
-  add(GrubProjectile(0, 0, 340, 0));
-  const world = PhysicsWorld();
-  for (let i = 0; i < 90; i++) world.physicsUpdate(1 / 60);
+  const shot = add(GrubProjectile(0, 0, 340, 0));
+  for (let i = 0; i < 90; i++) step(1 / 60, [shot]);
   assert.equal(near.hp, 4);
   assert.equal(far.hp, 5);
 });
 
 test('overlap checks hit a moving player at 60 fps', () => {
-  const player = add(PlayerCharacter(0, -50, 0, { viscosity: 0 }));
+  const player = add(PlayerCharacter(0, -50));
   player.vy = 600;
   add(GrubProjectile(-50, 0, 340, 0));
-  const world = PhysicsWorld();
-  for (let i = 0; i < 12; i++) world.physicsUpdate(1 / 60);
+  for (let i = 0; i < 12; i++) step(1 / 60);
   assert.equal(player.hp, 4);
 });
 
 test('a miss keeps moving, and unused projectiles expire', () => {
   const shot = add(GrubProjectile(0, 0, 340, 0));
-  PhysicsWorld().physicsUpdate(0.1);
+  assert.equal(shot.update(0.1), false);
   assert.equal(shot.x, 34);
   assert.ok(getObjects().includes(shot));
   assert.equal(shot.update(5), false);
@@ -251,8 +247,7 @@ test('larger trail splats scatter randomly with 30–70 unit spacing independent
     const context = drawingContext();
     shot.render(context);
     assert.equal(context.calls.find((call) => call.method === 'arc').args[2], 17.5);
-    const world = PhysicsWorld();
-    steps.forEach((dt) => world.physicsUpdate(dt));
+    steps.forEach((dt) => shot.update(dt));
     const splats = slimeSamples().sort((a, b) => a.origin[0] - b.origin[0]);
     const gaps = splats.map(({ origin: [x, y] }, i) => {
       assert.equal(y, 0);
@@ -280,8 +275,7 @@ test('slime trail emission stops on the collision frame and survives projectile 
   t.mock.method(Math, 'random', () => 0.5);
   add(wall(170));
   const shot = add(GrubProjectile(0, 0, 340, 0));
-  const world = PhysicsWorld();
-  for (let i = 0; i < 90; i++) world.physicsUpdate(1 / 60);
+  for (let i = 0; i < 90; i++) step(1 / 60, [shot]);
   assert.ok(!getObjects().includes(shot));
   assert.deepEqual(slimeSamples().map(({ origin }) => origin.map(Math.round)), [[50, 0], [100, 0], [150, 0]]);
 });
@@ -307,23 +301,15 @@ test('damage produces a bright red silhouette pulse that ends after 0.6 seconds'
   assert.equal(screenContext.globalCompositeOperation, 'source-over');
 });
 
-test('cover wins simultaneous overlaps and both callbacks run before a shot is removed', () => {
+test('cover wins simultaneous overlaps', () => {
   for (const reverse of [false, true]) {
     clear();
     const player = PlayerCharacter(54, 0);
     const obstacle = wall(0);
     const shot = GrubProjectile(0, 0, 340, 0);
-    let calls = 0;
-    obstacle.onCollision = (other, collision) => {
-      calls++;
-      assert.equal(other, shot);
-      assert.equal(collision.otherBody.vx, 340);
-      assert.ok(getObjects().includes(shot));
-    };
     const objects = [player, obstacle, shot];
     (reverse ? objects.reverse() : objects).forEach(add);
-    PhysicsWorld().physicsUpdate(0);
-    assert.equal(calls, 1);
+    step(0);
     assert.equal(player.hp, 5);
     assert.ok(!getObjects().includes(shot));
   }

@@ -26,7 +26,10 @@ const { TAG_PROJECTILE } = await import('../src/tags.js');
 
 afterEach(() => { clear(); soundStarts = 0; });
 const room = { x: 0, y: 0, w: 1000, h: 1000 };
-function make(type) { return Grub(0, 0, room, 123, { type }); }
+function make(type) { return Grub(0, 0, room, 123, { large: type === 'large' }); }
+// Grub.js/CombatRoom.js numeric state ids.
+const [PATROL, AIMING, RECOVERING] = [0, 1, 2];
+const [ACTIVE, CLEARED] = [1, 2];
 function draw(grub) {
   const calls = [];
   const context = new Proxy({ globalAlpha: 1 }, {
@@ -45,16 +48,16 @@ test('large type has 40% larger collision geometry, three extra HP, and costs tw
   const large = make('large');
   assert.equal(large.hp, small.hp + 3);
   assert.equal(large.maxHp, 8);
-  assert.equal(large.puck().radius, small.puck().radius * 1.4);
+  assert.equal(large.radius, small.radius * 1.4);
   assert.equal(small.enemyCost, 1);
   assert.equal(large.enemyCost, 2);
-  assert.equal(Grub(0, 0, room, 1).type, 'small');
+  assert.equal(Grub(0, 0, room, 1).large, false);
 });
 
 test('body, face, tell, and recovery scale together; large grubs add orange eyes and three spikes', () => {
   const small = make('small'); const large = make('large');
   for (const angle of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
-    for (const state of ['patrol', 'aiming', 'recovering']) {
+    for (const state of [PATROL, AIMING, RECOVERING]) {
       for (const grub of [small, large]) Object.assign(grub, { angle, anim: 0, state, aimProgress: 0.75 });
       const smallCalls = draw(small); const largeCalls = draw(large);
       const arcs = (calls) => calls.filter(({ method }) => method === 'arc').map(({ args }) => args);
@@ -80,8 +83,8 @@ test('large grubs fire a symmetric three-shot forward fan from their enlarged mo
     clear(); soundStarts = 0;
     const player = add(PlayerCharacter(200, 0));
     const grub = add(make(type));
-    for (let frame = 0; frame < 100 && grub.state !== 'aiming'; frame++) grub.update(0.05);
-    assert.equal(grub.state, 'aiming');
+    for (let frame = 0; frame < 100 && grub.state !== AIMING; frame++) grub.update(0.05);
+    assert.equal(grub.state, AIMING);
     const position = [grub.x, grub.y];
     grub.update(1.99);
     assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 0);
@@ -101,12 +104,11 @@ test('large grubs fire a symmetric three-shot forward fan from their enlarged mo
       assert.deepEqual(draw(shot).filter(({ method }) => method === 'fill').map(({ color }) => color),
         type === 'large' ? ['#f93', '#fdb'] : ['#4f5', '#dfd']);
     });
-    assert.equal(grub.state, 'recovering');
+    assert.equal(grub.state, RECOVERING);
     grub.update(0.1);
     assert.equal(getObjectsByTag(TAG_PROJECTILE).length, shots.length);
     const before = new Set(getObjects());
-    shots[0].x += 100;
-    shots[0].afterPhysics();
+    shots[0].update(100 / 340);
     const splats = getObjects().filter((object) => !before.has(object));
     assert.ok(splats.length > 0);
     for (const splat of splats) {
@@ -125,7 +127,7 @@ test('large grub hit and death splashes are orange while small grub colors are u
     const player = PlayerCharacter();
     player.charge = 1;
     player.impactDamageBonus = 100;
-    assert.equal(grub.onCollision(player, { otherBody: player }), true);
+    assert.equal(grub.hit(player), true);
     const colors = getObjects().flatMap((effect) => draw(effect)
       .filter(({ method }) => method === 'stroke').map(({ stroke }) => stroke));
     assert.equal(colors.length, 14);
@@ -137,9 +139,9 @@ test('large grubs retain hit cooldown, white outline flash and an eight-slot hea
   const grub = make('large');
   const player = PlayerCharacter();
   player.charge = 0.5;
-  grub.onCollision(player, { otherBody: player });
+  grub.hit(player);
   assert.equal(grub.hp, 7);
-  grub.onCollision(player, { otherBody: player });
+  grub.hit(player);
   assert.equal(grub.hp, 7, 'same-hit cooldown still applies');
   grub.update(0.1);
   const calls = draw(grub);
@@ -154,13 +156,13 @@ test('a large grub keeps combat locked until it dies, then clears once despite i
   const small = make('small'); const large = make('large');
   const encounter = add(CombatRoom(room, [{ x: -550, y: 0, w: 100, h: 200 }], [small, large]));
   encounter.update();
-  assert.equal(encounter.state, 'active');
+  assert.equal(encounter.state, ACTIVE);
   small.hp = 0;
   large.hp = 1;
   encounter.update();
-  assert.equal(encounter.state, 'active');
+  assert.equal(encounter.state, ACTIVE);
   large.hp = 0;
   encounter.update();
-  assert.equal(encounter.state, 'cleared');
+  assert.equal(encounter.state, CLEARED);
   assert.equal(soundStarts, 2, 'one start cue and one clear cue');
 });

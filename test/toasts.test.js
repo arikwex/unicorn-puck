@@ -22,8 +22,7 @@ globalThis.AudioContext = class {
 };
 
 const { add, clear } = await import('../src/engine.js');
-const bus = await import('../src/bus.js');
-const { default: ToastSystem } = await import('../src/ToastSystem.js');
+const { default: ToastSystem, showItemCollectedToast, showToast } = await import('../src/ToastSystem.js');
 const { default: HealthItem } = await import('../src/HealthItem.js');
 const { default: Chalice } = await import('../src/Chalice.js');
 const { chaliceProgress, resetChalices } = await import('../src/chaliceProgress.js');
@@ -31,7 +30,6 @@ const { TAG_PLAYER } = await import('../src/tags.js');
 
 afterEach(() => {
   clear();
-  bus.clear();
   soundStarts = 0;
   canvas.width = 800;
   canvas.height = 600;
@@ -39,8 +37,12 @@ afterEach(() => {
 
 function draw(toasts) {
   const result = { text: [], panels: [] };
+  const saved = [];
   toasts.renderHUD({
-    save() {}, restore() {}, strokeRect() {},
+    globalAlpha: 1,
+    save() { saved.push(this.globalAlpha); },
+    restore() { this.globalAlpha = saved.pop(); },
+    strokeRect() {},
     measureText: (text) => ({ width: text.length * 12 }),
     fillRect(...args) { result.panels.push(args); },
     fillText(text, x, y) { result.text.push({ text, x, y, alpha: this.globalAlpha }); },
@@ -48,10 +50,10 @@ function draw(toasts) {
   return result;
 }
 
-test('an item event shows a bottom-center toast for 3.5 seconds with one chime', () => {
+test('an item toast shows bottom-center for 3.5 seconds with one chime', () => {
   const toasts = add(ToastSystem());
   assert.equal(draw(toasts).text.length, 0);
-  bus.emit('item-collected', { name: 'Health Potion' });
+  showItemCollectedToast('Health Potion');
   assert.equal(soundStarts, 1);
   toasts.update(0.2);
   assert.deepEqual(draw(toasts).text, [
@@ -67,11 +69,11 @@ test('an item event shows a bottom-center toast for 3.5 seconds with one chime',
 
 test('new pickups immediately replace the toast and restart its duration with one chime', () => {
   const toasts = add(ToastSystem());
-  bus.emit('item-collected', { name: 'Health Potion' });
+  showItemCollectedToast('Health Potion');
   assert.equal(soundStarts, 1);
   assert.equal(draw(toasts).text[0].text, 'Health Potion Collected');
   toasts.update(3);
-  bus.emit('item-collected', { name: 'Pegacorn Blood Chalice' });
+  showItemCollectedToast('Pegacorn Blood Chalice');
   assert.equal(soundStarts, 2);
   assert.equal(draw(toasts).text[0].text, 'Pegacorn Blood Chalice Collected');
   toasts.update(3.4);
@@ -83,32 +85,29 @@ test('new pickups immediately replace the toast and restart its duration with on
   assert.equal(draw(toasts).text.length, 0, 'replaced toasts never reappear');
 });
 
-test('clearing a scene removes its subscription and current notification', () => {
-  const previous = add(ToastSystem());
-  bus.emit('item-collected', { name: 'First' });
-  bus.emit('item-collected', { name: 'Replacement' });
+test('a new run starts without the previous run\'s toast', () => {
+  add(ToastSystem());
+  showItemCollectedToast('First');
   clear();
-  bus.emit('item-collected', { name: 'While Cleared' });
-  assert.equal(soundStarts, 2);
-  assert.equal(draw(previous).text.length, 0);
   const next = add(ToastSystem());
-  bus.emit('item-collected', { name: 'New Run' });
-  assert.equal(soundStarts, 3);
+  assert.equal(draw(next).text.length, 0);
+  showItemCollectedToast('New Run');
+  assert.equal(soundStarts, 2);
   assert.equal(draw(next).text[0].text, 'New Run Collected');
 });
 
 test('long item names fit inside a narrow screen', () => {
   canvas.width = 320;
   const toasts = add(ToastSystem());
-  bus.emit('item-collected', { name: 'Pegacorn Blood Chalice' });
+  showItemCollectedToast('Pegacorn Blood Chalice');
   toasts.update(0.2);
   const result = draw(toasts);
   assert.deepEqual(result.panels, [[24, 532, 272, 44]]);
   assert.equal(result.text[0].x, 160);
 });
 
-test('health pickup emits once after spawn protection, including at full health', () => {
-  add(ToastSystem());
+test('health pickup toasts once after spawn protection, including at full health', () => {
+  const toasts = add(ToastSystem());
   const player = add({
     x: 0, y: 0, radius: 20, hp: 3, tags: [TAG_PLAYER],
     heal(amount) {
@@ -117,48 +116,41 @@ test('health pickup emits once after spawn protection, including at full health'
       return healed;
     },
   });
-  const events = [];
-  bus.on('item-collected', (event) => events.push(event));
   const item = HealthItem(0, 0);
   assert.equal(item.update(0.1), false);
-  assert.equal(events.length, 0);
+  assert.equal(draw(toasts).text.length, 0);
   assert.equal(item.update(0.21), true);
   assert.equal(player.hp, 5);
   assert.equal(item.update(0.1), true);
-  assert.deepEqual(events, [{ name: 'Health Potion' }]);
+  assert.equal(draw(toasts).text[0].text, 'Health Potion Collected');
   assert.equal(soundStarts, 1);
   assert.equal(HealthItem(0, 0).update(0.31), true);
   assert.equal(player.hp, 5);
-  assert.equal(events.length, 2);
+  assert.equal(soundStarts, 2);
 });
 
-test('chalice pickup emits once and uses only the toast chime', () => {
-  add(ToastSystem());
+test('chalice pickup toasts once and uses only the toast chime', () => {
+  const toasts = add(ToastSystem());
   add({ x: 0, y: 0, radius: 20, tags: [TAG_PLAYER] });
   resetChalices(2);
-  const events = [];
-  bus.on('item-collected', (event) => events.push(event));
   const item = Chalice(0, 0);
   assert.equal(item.update(0.1), true);
   assert.equal(item.update(0.1), true);
-  assert.deepEqual(events, [{ name: 'Pegacorn Blood Chalice' }]);
+  assert.equal(draw(toasts).text[0].text, 'Pegacorn Blood Chalice Collected');
   assert.equal(chaliceProgress().collected, 1);
   assert.equal(soundStarts, 1);
 });
 
 test('generic and pickup toasts replace each other immediately without replaying old messages', () => {
   const toasts = add(ToastSystem());
-  bus.emit('item-collected', { name: 'Health Potion' });
-  bus.emit('item-collected', { name: 'Pegacorn Blood Chalice' });
-  bus.emit('toast', { message: 'Defeat all enemies to exit room' });
+  showItemCollectedToast('Health Potion');
+  showItemCollectedToast('Pegacorn Blood Chalice');
+  showToast('Defeat all enemies to exit room');
   assert.equal(draw(toasts).text[0].text, 'Defeat all enemies to exit room');
   assert.equal(soundStarts, 2);
-  bus.emit('item-collected', { name: 'Bubble Shield' });
+  showItemCollectedToast('Bubble Shield');
   assert.equal(draw(toasts).text[0].text, 'Bubble Shield Collected');
   assert.equal(soundStarts, 3);
   toasts.update(3.5);
-  assert.equal(draw(toasts).text.length, 0);
-  clear();
-  bus.emit('toast', { message: 'After teardown' });
   assert.equal(draw(toasts).text.length, 0);
 });

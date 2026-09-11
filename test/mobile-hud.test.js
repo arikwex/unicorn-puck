@@ -37,9 +37,8 @@ const { default: PlayerCharacter } = await import('../src/PlayerCharacter.js');
 const { default: PlayerHealthHUD } = await import('../src/PlayerHealthHUD.js');
 const { default: ChaliceHUD } = await import('../src/ChaliceHUD.js');
 const { default: ItemAbilityHUD } = await import('../src/ItemAbilityHUD.js');
-const { default: ToastSystem } = await import('../src/ToastSystem.js');
+const { default: ToastSystem, showToast } = await import('../src/ToastSystem.js');
 const { default: StatusCard } = await import('../src/StatusCard.js');
-const { emit } = await import('../src/bus.js');
 
 afterEach(() => {
   stop(); clear(); draws = []; coarse = false;
@@ -87,7 +86,7 @@ test('health, counter, abilities, toasts and status cards all opt into anchored 
     PlayerHealthHUD(PlayerCharacter()), ChaliceHUD(), ItemAbilityHUD(),
     add(ToastSystem()), StatusCard(() => {}),
   ];
-  emit('toast', { message: 'Defeat all enemies to exit room' });
+  showToast('Defeat all enemies to exit room');
   for (const hud of huds) {
     const original = hud.renderHUD;
     let observed;

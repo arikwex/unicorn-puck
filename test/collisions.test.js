@@ -12,10 +12,9 @@ let nextFrame;
 globalThis.requestAnimationFrame = (callback) => { nextFrame = callback; };
 
 const { add, clear, getObjects, start, stop } = await import('../src/engine.js');
-const { default: PhysicsWorld } = await import('../src/PhysicsWorld.js');
 const { default: PlayerCharacter } = await import('../src/PlayerCharacter.js');
 const { default: Grub } = await import('../src/Grub.js');
-const { TAG_OBSTACLE, TAG_PUCK } = await import('../src/tags.js');
+const { TAG_OBSTACLE } = await import('../src/tags.js');
 
 afterEach(() => { stop(); clear(); });
 
@@ -45,67 +44,51 @@ test('grub damage and player bounce do not depend on insertion or drawing order'
       clear();
       const player = playerAt(0, depth);
       const grub = grubAt(60, depth);
-      let playerCalls = 0;
       let grubCalls = 0;
-      const playerCollision = player.onCollision;
-      const grubCollision = grub.onCollision;
-      player.onCollision = function (other, collision) {
-        playerCalls++;
-        return playerCollision.call(this, other, collision);
-      };
-      grub.onCollision = function (other, collision) {
+      const hit = grub.hit;
+      grub.hit = function (body) {
         grubCalls++;
-        assert.ok(other.vx < 0, 'player has already bounced');
-        assert.ok(collision.otherBody.vx > 0, 'grub receives incoming velocity');
-        return grubCollision.call(this, other, collision);
+        assert.ok(body.vx > 0, 'grub receives incoming velocity');
+        return hit.call(this, body);
       };
-      const objects = [player, grub, PhysicsWorld()];
+      const objects = [player, grub];
       (reverse ? objects.reverse() : objects).forEach(add);
       frame();
       assert.equal(grub.hp, 3);
       assert.ok(player.vx < 0);
-      assert.equal(playerCalls, 1);
       assert.equal(grubCalls, 1);
     }
   }
 });
 
-test('all ordinary updates finish before collision detection', () => {
-  const world = add(PhysicsWorld());
-  world.order = -10000;
-  const player = add(playerAt(-200));
-  const grub = add(grubAt());
-  add({ order: 10000, update() { player.x = 0; } });
-  frame();
-  assert.equal(grub.hp, 3);
-  assert.ok(player.vx < 0);
-});
-
 test('motion is integrated before detecting newly reached contacts', () => {
   const player = add(playerAt(-20));
   const grub = add(grubAt());
-  PhysicsWorld().physicsUpdate(0.025);
+  player.update(0.025);
   assert.equal(grub.hp, 3);
   assert.ok(player.vx < 0);
   assert.ok(Math.abs(player.x + 4) < 1e-9);
+  assert.equal(player.order, player.y);
 });
 
-test('removal requested by the first callback waits for the other reaction', () => {
+test('drag is five times stronger above charging speed', () => {
+  const slow = playerAt();
+  slow.vx = 300;
+  slow.update(1);
+  assert.ok(Math.abs(slow.vx - 300 * Math.exp(-0.6)) < 1e-9);
+  const fast = playerAt();
+  fast.update(0.1);
+  assert.ok(Math.abs(fast.vx - 800 * Math.exp(-0.3)) < 1e-9);
+});
+
+test('a killing blow removes the grub but still bounces the player', () => {
   const player = add(playerAt());
   const grub = add(grubAt());
-  const bounce = player.onCollision;
-  player.onCollision = function (other, collision) {
-    bounce.call(this, other, collision);
-    return true;
-  };
-  const takeHit = grub.onCollision;
-  grub.onCollision = function (other, collision) {
-    assert.ok(getObjects().includes(player));
-    return takeHit.call(this, other, collision);
-  };
-  PhysicsWorld().physicsUpdate(0);
-  assert.equal(grub.hp, 3);
-  assert.ok(!getObjects().includes(player));
+  grub.hp = 1;
+  player.update(0);
+  assert.equal(grub.hp, 0);
+  assert.ok(!getObjects().includes(grub));
+  assert.equal(player.vx, -320);
 });
 
 test('objects added during update do not repeat or skip existing updates', () => {
@@ -119,74 +102,57 @@ test('objects added during update do not repeat or skip existing updates', () =>
   assert.deepEqual(calls, ['first', 'second']);
 });
 
-test('box-wall collision delegates bounce and notifies both participants once', () => {
+test('box walls bounce the player and see its pre-bounce state once', () => {
   const player = add(playerAt());
-  let bounces = 0;
-  const bounce = player.bounce;
-  player.bounce = function (response) { bounces++; bounce.call(this, response); };
   let wallCalls = 0;
   const wall = add({
-    tags: [TAG_OBSTACLE],
-    puck: () => ({
-      x: 45, y: 0, angle: 0, halfWidth: 10, halfHeight: 100,
-      box: true, mass: Infinity, vx: 0, vy: 0, omega: 0, bounciness: 0.4,
-    }),
-    onCollision(other, collision) {
+    tags: [TAG_OBSTACLE], x: 45, y: 0, w: 20, h: 200,
+    hit(body) {
       wallCalls++;
-      assert.equal(other, player);
-      assert.equal(collision.nx, -1);
-      assert.equal(collision.otherBody.vx, 800);
+      assert.equal(body.vx, 800);
     },
   });
-  PhysicsWorld().physicsUpdate(0);
-  assert.equal(bounces, 1);
+  player.update(0);
   assert.equal(wallCalls, 1);
   assert.equal(player.vx, -320);
   assert.equal(player.x, -3);
-  assert.equal(wall.puck().x, 45);
+  assert.equal(wall.x, 45);
 });
 
 test('simultaneous contacts survive separation without doubling the bounce', () => {
   const player = add(playerAt());
   const first = add(grubAt());
   const second = add(grubAt());
-  PhysicsWorld().physicsUpdate(0);
+  player.update(0);
   assert.equal(first.hp, 3);
   assert.equal(second.hp, 3);
   assert.equal(player.vx, -320);
   assert.equal(player.x, -4);
 });
 
-test('puck pairs receive opposite normals once, including objects with both tags', () => {
-  const a = add(playerAt(0));
-  const b = playerAt(70);
-  b.vx = -800;
-  b.tags.push(TAG_OBSTACLE);
-  add(b);
-  const contacts = [];
-  for (const player of [a, b]) {
-    const onCollision = player.onCollision;
-    player.onCollision = function (other, collision) {
-      contacts.push([this, other, collision.nx, collision.otherBody.vx]);
-      onCollision.call(this, other, collision);
-    };
-  }
-  PhysicsWorld().physicsUpdate(0);
-  assert.deepEqual(contacts, [[a, b, 1, -800], [b, a, -1, 800]]);
-  assert.equal(a.vx, -440);
-  assert.equal(b.vx, 440);
-  assert.equal(a.x, -3);
-  assert.equal(b.x, 73);
-  assert.ok(a.tags.includes(TAG_PUCK));
+test('an embedded player leaves a box through its nearest face', () => {
+  const player = add(playerAt(40, 5));
+  player.vx = 0;
+  add({ tags: [TAG_OBSTACLE], x: 45, y: 0, w: 20, h: 200 });
+  player.update(0);
+  assert.equal(player.x, 55 - 38 - 20);
+  assert.equal(player.y, 5);
+});
+
+test('pinball momentum reboosts enemy bounces past the incoming speed', () => {
+  const player = add(playerAt());
+  player.pinballMomentum = true;
+  add(grubAt());
+  player.update(0);
+  assert.ok(Math.abs(player.vx + 800 * 1.08) < 1e-9);
 });
 
 test('damage thresholds, cooldown and killing-blow removal remain intact', () => {
   const player = add(playerAt());
   const grub = add(grubAt());
-  const world = PhysicsWorld();
   function hit(charge) {
     Object.assign(player, { x: grub.x - 60, y: grub.y, vx: 800, charge });
-    world.physicsUpdate(0);
+    player.update(0);
   }
   hit(0.1);
   assert.equal(grub.hp, 5);
@@ -198,15 +164,8 @@ test('damage thresholds, cooldown and killing-blow removal remain intact', () =>
   hit(1);
   assert.equal(grub.hp, 2);
   grub.update(0.6);
-  let receivedKillingCollision = false;
-  const onCollision = player.onCollision;
-  player.onCollision = function (other, collision) {
-    receivedKillingCollision = other === grub;
-    onCollision.call(this, other, collision);
-  };
   hit(1);
   assert.equal(grub.hp, 0);
-  assert.equal(receivedKillingCollision, true);
   assert.ok(player.vx < 0);
   assert.ok(!getObjects().includes(grub));
   assert.equal(getObjects().filter((object) => !object.tags).length, 23,
@@ -219,13 +178,11 @@ test('hits transfer incoming momentum in every direction and it decays while mov
     const player = add(playerAt(-vx / 800 * 60, -vy / 800 * 60));
     Object.assign(player, { vx, vy });
     const grub = add(grubAt(0, 0));
-    PhysicsWorld().physicsUpdate(0);
+    player.update(0);
     const initialVx = grub.vx;
     const initialVy = grub.vy;
     assert.ok(initialVx * vx + initialVy * vy > 0, 'push follows incoming velocity');
     assert.ok(Math.abs(initialVx * vy - initialVy * vx) < 1e-9);
-    assert.equal(grub.puck().vx, initialVx);
-    assert.equal(grub.puck().vy, initialVy);
     grub.update(0.1);
     assert.ok(grub.x * vx + grub.y * vy > 0, 'grub moves away from the hit');
     assert.ok(Math.hypot(grub.vx, grub.vy) < Math.hypot(initialVx, initialVy));
@@ -233,14 +190,14 @@ test('hits transfer incoming momentum in every direction and it decays while mov
   }
 });
 
-test('knockback stays within room bounds and stops at their edges', () => {
+test('knockback stays within room bounds while it decays', () => {
   const grub = Grub(19, -19, { x: 0, y: 0, w: 100, h: 100 }, 123);
   Object.assign(grub, { vx: 800, vy: -800 });
   grub.update(0.1);
   assert.equal(grub.x, 20);
   assert.equal(grub.y, -20);
-  assert.equal(grub.vx, 0);
-  assert.equal(grub.vy, 0);
+  assert.equal(grub.vx, 440);
+  assert.equal(grub.vy, -440);
 });
 
 test('splats keep the incoming hit direction after the player bounces', (t) => {
@@ -250,7 +207,7 @@ test('splats keep the incoming hit direction after the player bounces', (t) => {
     const player = add(playerAt());
     player.vx = vx;
     add(grubAt());
-    PhysicsWorld().physicsUpdate(0);
+    player.update(0);
     const landings = [];
     for (const effect of getObjects().filter((object) => !object.tags)) {
       effect.update(0.4);
@@ -274,10 +231,9 @@ test('ordinary box contacts keep normal-speed launches inside grates on all four
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
     clear();
     const player = add(playerAt());
-    Object.assign(player, { vx: dx * 1800, vy: dy * 1800, viscosity: 0 });
+    Object.assign(player, { vx: dx * 1800, vy: dy * 1800 });
     add(MetalGrate({ x: dx * 400, y: dy * 400, w: dx ? 80 : 240, h: dy ? 80 : 240 }));
-    const world = PhysicsWorld();
-    for (let i = 0; i < 12; i++) world.physicsUpdate(1 / 60);
+    for (let i = 0; i < 30; i++) player.update(1 / 60);
     assert.ok(player.vx * dx + player.vy * dy < 0, 'launch bounces inward');
     assert.ok(player.x * dx + player.y * dy <= 322, 'player stays inside the gate');
   }

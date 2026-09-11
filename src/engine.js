@@ -75,14 +75,11 @@ function tick(now) {
   });
   if (expired.length) remove(expired);
 
-  // Physics always runs after input and AI, independent of drawing depth.
-  [...objects].forEach((object) => object.physicsUpdate?.(dt));
-
   const camera = getObjectsByTag(TAG_CAMERA)[0];
   camera?.set(ctx);
   // Re-sorted fresh every frame (rather than reusing the add-time order
   // used for updates) so an object whose `order` it recomputes each update
-  // -- e.g. a puck keying it off its own y, for depth sorting -- is drawn
+  // -- e.g. the player keying it off its own y, for depth sorting -- is drawn
   // in its current order immediately, not just after its next add().
   [...objects].sort((a, b) => (a.order || 0) - (b.order || 0)).forEach((object) => object.render?.(ctx));
 
