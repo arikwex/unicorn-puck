@@ -5,7 +5,14 @@
 import { renderFlame } from './Pillar.js';
 
 const TAU = Math.PI * 2;
-const MOUNT_Y_OFFSET = 24; // drawn this far above the wall/floor seam, as if mounted partway up the wall
+// Shifts a decoration off its own wall cell and into the neighboring
+// room/hallway cell it's mounted to face -- along Y for a down-facing
+// wall, along X for a left/right one -- so it reads as sitting on that
+// wall's visible face instead of up on its roof. The two axes need
+// different magnitudes to look right, hence separate constants.
+const MOUNT_OFFSET_DOWN = 25;
+const MOUNT_OFFSET_SIDE = 50;
+const DECORATION_SCALE = 1.7;
 
 const METAL_COLOR = '#a9822a';
 const METAL_LIGHT_COLOR = '#e8c34a';
@@ -15,10 +22,13 @@ const CRYSTAL_DARK_COLOR = '#0d6e78';
 const STONE_COLOR = '#5a4a46';
 const RUNE_GLOW_COLOR = '#8fd6ff';
 
-// Every draw function works in the same local space, canonically oriented
-// for a "down" (horizontal, south-facing) wall -- Decoration's own render()
-// rotates the whole thing a quarter turn for a left/right (vertical) wall,
-// so the same art still reads as flush against whichever wall it's on.
+// Every draw function is always drawn in this same canonical upright
+// orientation, full stop -- this is a faux-3D top-down game, so "up" on
+// screen is always up regardless of which wall a piece is mounted on.
+// Rotating the art to match a left/right wall (as a true 3D engine might)
+// would tip the candle's flame sideways, which reads as broken rather than
+// mounted. What actually changes per facing is only *where* Decoration's
+// own render() places the mount point -- see MOUNT_SIDE_OFFSET below.
 function drawShield(context) {
   context.fillStyle = METAL_LIGHT_COLOR;
   context.beginPath();
@@ -82,25 +92,35 @@ const DRAW_FUNCTIONS = {
 };
 const DECORATION_TYPES = Object.keys(DRAW_FUNCTIONS);
 
-// `facing` is which way the mounted face points: 'down' for a horizontal,
-// south-facing wall (drawn as-is), or 'left'/'right' for a vertical wall
-// (rotated a quarter turn, mirrored per side).
+// `facing` is which way the wall's own visible face points -- 'down' for a
+// horizontal, south-facing wall, or 'left'/'right' for a vertical one --
+// found as a 1 (wall) -> 0 (no wall/floor) transition in the map's grid;
+// see mapCreator.js. It only ever shifts *where* the mount point sits
+// (toward whichever room the wall faces), never how the art is drawn.
 function Decoration(x, y, type, facing) {
   let anim = Math.random() * TAU;
   const draw = DRAW_FUNCTIONS[type];
+  const mountX = x + (facing === 'left' ? -MOUNT_OFFSET_SIDE : facing === 'right' ? MOUNT_OFFSET_SIDE : 0);
+  const mountY = y + (facing === 'down' ? MOUNT_OFFSET_DOWN : 0);
 
   return {
     x,
     y,
-    order: y + 1, // just after the wall it's mounted on, which shares this same y
+    // A wall's own `order` is its merged rect's *bottom* edge (see
+    // CubeObstacle), which for a wall cell anywhere but that exact edge
+    // sits well south of this cell -- so a naive y-based order here would
+    // often lose to (draw behind/under) the very wall it's mounted on.
+    // Always drawing last among world objects fixes that; it's safe
+    // because a decoration sits right in a wall's own footprint, a spot
+    // nothing else (player, grubs) can ever physically stand in.
+    order: Infinity,
     update(dt) {
       anim += dt;
     },
     render(context) {
       context.save();
-      context.translate(x, y - MOUNT_Y_OFFSET);
-      if (facing === 'left') context.rotate(-Math.PI / 2);
-      else if (facing === 'right') context.rotate(Math.PI / 2);
+      context.translate(mountX, mountY);
+      context.scale(DECORATION_SCALE, DECORATION_SCALE);
       draw(context, anim);
       context.restore();
     },

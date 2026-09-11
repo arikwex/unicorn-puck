@@ -87,6 +87,35 @@ test('staggered left walls have a visible gap, including their raised tops and f
       const upperFront = walls[2].args;
       const lowerTop = walls[5].args;
       assert.ok(upperFront[1] + upperFront[3] < lowerTop[1], `${width}x${height}: walls must not overlap`);
+      for (const face of walls.slice(0, 2)) {
+        assert.ok(face.args[0] + face.args[2] > width, 'right wall extends off screen');
+      }
+      for (const face of walls.slice(2)) {
+        assert.ok(face.args[0] < 0, 'left walls extend off screen');
+      }
+    }
+  } finally {
+    menu.destroy();
+  }
+});
+
+test('mobile props are larger while desktop sizing is unchanged', () => {
+  const menu = MainMenu(() => {});
+  try {
+    for (const [width, height] of [[320, 640], [390, 844], [800, 600], [1200, 500], [1920, 1080]]) {
+      canvas.width = width;
+      canvas.height = height;
+      const calls = render(menu);
+      const scaleAt = (x, y) => {
+        const index = calls.findIndex(({ method, args }) => method === 'translate' && args[0] === x && args[1] === y);
+        assert.equal(calls[index + 1].method, 'scale');
+        return calls[index + 1].args[0];
+      };
+      const oldScale = Math.min(width / 800, height / 600, 1.5);
+      const expected = width < 600 ? 0.75 : oldScale;
+      assert.equal(scaleAt(width * 0.2, height * 0.73), expected * 1.35);
+      assert.equal(scaleAt(width * 0.8, height * 0.65), expected * 3.4);
+      if (width < 600) assert.ok(expected > oldScale);
     }
   } finally {
     menu.destroy();

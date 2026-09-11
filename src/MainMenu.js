@@ -56,9 +56,9 @@ function MainMenu(onBegin) {
   // Render-only scenery: never added to the world or pickup/physics passes.
   const candelabra = Pillar(0, 0, { variant: 3 });
   const walls = [
-    { x: 0.9, y: 0.27, width: 220 },
-    { x: 0.12, y: 0.32, width: 180 },
-    { x: 0.03, y: 0.53, width: 140 },
+    { left: 0.7, right: 1.15, y: 0.27 },
+    { left: -0.15, right: 0.28, y: 0.32 },
+    { left: -0.15, right: 0.12, y: 0.53 },
   ].map((placement) => ({ ...placement, wall: CubeObstacle() }));
 
   function onPointerDown() {
@@ -82,12 +82,15 @@ function MainMenu(onBegin) {
     renderHUD(context) {
       const cx = canvas.width / 2;
       const sceneryScale = Math.min(canvas.width / 800, canvas.height / 600, 1.5);
+      // Keep the props legible on phones without enlarging desktop art
+      // or overrunning the available height in short landscape windows.
+      const propScale = Math.min(Math.max(canvas.width / 800, 0.75), canvas.height / 600, 1.5);
       context.save();
       context.globalAlpha = 0.45;
-      walls.forEach(({ x, y, width, wall }) => {
-        wall.x = canvas.width * x;
+      walls.forEach(({ left, right, y, wall }) => {
+        wall.x = canvas.width * (left + right) / 2;
         wall.y = canvas.height * y;
-        wall.w = width * sceneryScale;
+        wall.w = canvas.width * (right - left);
         wall.h = 45 * sceneryScale;
         wall.height = 65 * sceneryScale;
         wall.render(context);
@@ -96,12 +99,12 @@ function MainMenu(onBegin) {
 
       context.save();
       context.translate(canvas.width * 0.2, canvas.height * 0.73);
-      context.scale(sceneryScale * 1.35, sceneryScale * 1.35);
+      context.scale(propScale * 1.35, propScale * 1.35);
       candelabra.render(context);
       context.restore();
       renderChaliceIcon(context, canvas.width * 0.8,
-        canvas.height * 0.65 + Math.sin(anim * 2.2) * 4 * sceneryScale,
-        sceneryScale * 3.4);
+        canvas.height * 0.65 + Math.sin(anim * 2.2) * 4 * propScale,
+        propScale * 3.4);
 
       const titleFont = clamp(canvas.width * TITLE_FONT_RATIO, TITLE_FONT_MIN, TITLE_FONT_MAX);
       const font = `900 ${titleFont}px sans-serif`;
