@@ -15,6 +15,7 @@ import placePillars, { findEntranceCells } from './placePillars.js';
 import PlayerCharacter from './PlayerCharacter.js';
 import PlayerHealthHUD from './PlayerHealthHUD.js';
 import TreasureChest, { CHEST_RADIUS } from './TreasureChest.js';
+import ToastSystem from './ToastSystem.js';
 
 // GRUBS_PER_ROOM grubs per room, each scattered to its own spot within the
 // room (buildDungeon's own grubSeed offset by <room index> seeds that
@@ -309,6 +310,7 @@ function createMap(seed) {
   const player = add(PlayerCharacter(spawn.x, spawn.y));
   const playerHealthHUD = add(PlayerHealthHUD(player));
   const chaliceHUD = add(ChaliceHUD());
+  add(ToastSystem());
   add(Camera().follow(player));
   const dragController = add(DragController(player));
   add(PhysicsWorld());

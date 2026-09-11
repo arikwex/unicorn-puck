@@ -2,9 +2,9 @@ import { TAG_OBSTACLE } from './tags.js';
 
 function CubeObstacle(x = 0, y = 0, w = 60, h = 60, props = {}) {
   // Dark violet stone, matching the sanctuary reference art's wall/column
-  // blocks (sampled ~#3a3355/#403145) rather than the previous mossy green.
+  // blocks rather than the previous mossy green.
   const {
-    height = 26, bounciness = 0.4, topColor = '#3e3355', sideColor = '#241d30',
+    height = 26, bounciness = 0.4, topColor = '#7c6865', sideColor = '#453f5d',
   } = props;
   return {
     x, y, w, h, height, bounciness, topColor, sideColor,

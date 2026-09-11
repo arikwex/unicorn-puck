@@ -231,11 +231,12 @@ function Pillar(x = 0, y = 0, props = {}) {
     capHalfSize = radius + 6,
     capHeight = 8,
     bounciness = 0.5,
-    // Warm stone matching the sanctuary reference art's arch/pedestal
-    // accents -- deliberately distinct from CubeObstacle's own dark violet
-    // walls, so a pillar always reads as a separate, bounce-off obstacle.
-    stoneColor = '#c9a17e',
-    shadeColor = '#8f6b52',
+    // A lighter/darker tint of CubeObstacle's own wall tones (rgb(124,104,101)
+    // top / rgb(69,63,93) side) -- same muted tonal family as the room
+    // around it, but warmer and lighter than the walls so a pillar still
+    // reads as a separate, bounce-off obstacle rather than blending in.
+    stoneColor = '#a39593',
+    shadeColor = '#4a3e3d',
     variant = Math.floor(Math.random() * VARIANT_COUNT),
   } = props;
   let anim = Math.random() * TAU;

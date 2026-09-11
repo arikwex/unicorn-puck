@@ -3,6 +3,7 @@
 // get grabbed by the same swing that dropped it (see TreasureChest.js).
 
 import DamageCallout from './DamageCallout.js';
+import { emit } from './bus.js';
 import { add, getObjectsByTag } from './engine.js';
 import { TAG_PLAYER } from './tags.js';
 
@@ -47,6 +48,7 @@ function renderHeart(context, x, y, radius, heightScale, fillColor, outlineColor
 function HealthItem(x, y) {
   let anim = Math.random() * TAU;
   let protection = SPAWN_PROTECTION;
+  let collected = false;
 
   return {
     x,
@@ -54,6 +56,7 @@ function HealthItem(x, y) {
     order: y,
 
     update(dt) {
+      if (collected) return true;
       anim += dt;
       protection = Math.max(0, protection - dt);
       if (protection > 0) return false;
@@ -65,8 +68,10 @@ function HealthItem(x, y) {
 
       // Collectible even at maxHp -- heal() itself clamps, so this just
       // shows "+0 hp" rather than leaving the item sitting there uncollected.
+      collected = true;
       const healed = player.heal(HEAL_AMOUNT);
       add(DamageCallout(this.x, this.y - 20, `+${healed} hp`, HEAL_TEXT_COLOR));
+      emit('item-collected', { name: 'Health Potion' });
       return true;
     },
 

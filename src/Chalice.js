@@ -5,9 +5,9 @@
 // participation, just a proximity check), incrementing the shared
 // chaliceProgress counter GameFlow.js watches for the win condition.
 
+import { emit } from './bus.js';
 import { add, getObjectsByTag } from './engine.js';
 import { collectChalice } from './chaliceProgress.js';
-import { playChaliceCollect } from './sounds.js';
 import SplatEffect from './SplatEffect.js';
 import { TAG_PLAYER } from './tags.js';
 
@@ -81,6 +81,7 @@ function fireCollectSplats(x, y) {
 
 function Chalice(x, y) {
   let anim = Math.random() * TAU;
+  let collected = false;
 
   return {
     x,
@@ -88,6 +89,7 @@ function Chalice(x, y) {
     order: y,
 
     update(dt) {
+      if (collected) return true;
       anim += dt;
 
       const player = getObjectsByTag(TAG_PLAYER)[0];
@@ -95,9 +97,10 @@ function Chalice(x, y) {
       const distance = Math.hypot(player.x - this.x, player.y - this.y);
       if (distance > PICKUP_RADIUS + player.radius) return false;
 
+      collected = true;
       collectChalice();
       fireCollectSplats(this.x, this.y);
-      playChaliceCollect();
+      emit('item-collected', { name: 'Pegacorn Blood Chalice' });
       return true;
     },
 
