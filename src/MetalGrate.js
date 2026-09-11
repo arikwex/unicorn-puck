@@ -4,7 +4,6 @@ import CubeObstacle from './CubeObstacle.js';
 function MetalGrate({ x, y, w, h }) {
   return {
     ...CubeObstacle(x, y, w, h),
-    blocksSweptMotion: true,
     render(context) {
       const left = this.x - this.w / 2;
       const top = this.y - this.h / 2 - this.height;

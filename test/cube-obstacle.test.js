@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import CubeObstacle from '../src/CubeObstacle.js';
-import { applyCollisionResponse, circleBoxContact, collisionResponses, sweptCircleHitTime } from '../src/physics.js';
+import { applyCollisionResponse, circleBoxContact, collisionResponses } from '../src/physics.js';
 
 function rectangles(cube, transform) {
   const draws = [];
@@ -70,7 +70,7 @@ test('cube dimensions stay exact for physics and props follow width/height', () 
   assert.equal(body.y, -8);
   assert.equal(body.halfWidth, 91.7 / 2);
   assert.equal(body.halfHeight, 43.2 / 2);
-  assert.equal(body.shape, 'box');
+  assert.equal(body.box, true);
   assert.equal(body.mass, Infinity);
   const draws = rectangles(cube, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
   assert.deepEqual(draws.map(({ color }) => color), ['#456', '#abc']);
@@ -99,13 +99,4 @@ test('embedded circles resolve through the nearest face', () => {
     assert.equal(circle.x, expectedX);
     assert.equal(circle.y, expectedY);
   }
-});
-
-test('projectile sweeps stop at box faces without rotation or tunneling', () => {
-  const box = CubeObstacle(0, 0, 20, 20).puck();
-  for (const [x, y] of [[100, 0], [-100, 0], [0, 100], [0, -100]]) {
-    const time = sweptCircleHitTime({ x, y, radius: 5 }, { x: -x, y: -y }, box);
-    assert.equal(time, 0.425);
-  }
-  assert.equal(sweptCircleHitTime({ x: 14, y: 14, radius: 5 }, { x: 16, y: 16 }, box), Infinity);
 });

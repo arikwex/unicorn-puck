@@ -32,8 +32,8 @@ function GrubProjectile(x, y, vx, vy, props = {}) {
       return remaining <= 0;
     },
 
-    // Sample actual travel after the collision pass clips the path, so
-    // spacing is independent of frame rate and emission stops at impacts.
+    // Sample travel once per physics frame; spacing is independent of
+    // frame rate and emission ends on the frame the shot hits.
     afterPhysics() {
       const dx = this.x - lastX;
       const dy = this.y - lastY;
@@ -55,7 +55,7 @@ function GrubProjectile(x, y, vx, vy, props = {}) {
       lastY = this.y;
     },
 
-    // The collision pass selects the first wall, obstacle or player hit.
+    // Removed on the first overlapping wall, obstacle or player.
     onCollision() { return true; },
 
     render(context) {

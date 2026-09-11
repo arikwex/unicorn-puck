@@ -1,3 +1,4 @@
+import './helpers/audio.js';
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
@@ -128,7 +129,7 @@ test('box-wall collision delegates bounce and notifies both participants once', 
     tags: [TAG_OBSTACLE],
     puck: () => ({
       x: 45, y: 0, angle: 0, halfWidth: 10, halfHeight: 100,
-      shape: 'box', mass: Infinity, vx: 0, vy: 0, omega: 0, bounciness: 0.4,
+      box: true, mass: Infinity, vx: 0, vy: 0, omega: 0, bounciness: 0.4,
     }),
     onCollision(other, collision) {
       wallCalls++;
@@ -266,4 +267,18 @@ test('splats keep the incoming hit direction after the player bounces', (t) => {
     assert.ok(Math.abs(x - baseline[i][0] - 80) < 1e-9);
     assert.equal(y, baseline[i][1]);
   });
+});
+
+test('ordinary box contacts keep normal-speed launches inside grates on all four sides', async () => {
+  const { default: MetalGrate } = await import('../src/MetalGrate.js');
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+    clear();
+    const player = add(playerAt());
+    Object.assign(player, { vx: dx * 1800, vy: dy * 1800, viscosity: 0 });
+    add(MetalGrate({ x: dx * 400, y: dy * 400, w: dx ? 80 : 240, h: dy ? 80 : 240 }));
+    const world = PhysicsWorld();
+    for (let i = 0; i < 12; i++) world.physicsUpdate(1 / 60);
+    assert.ok(player.vx * dx + player.vy * dy < 0, 'launch bounces inward');
+    assert.ok(player.x * dx + player.y * dy <= 322, 'player stays inside the gate');
+  }
 });

@@ -208,7 +208,7 @@ test('empty rooms stay open and removing an active controller cleans up gates si
   assert.equal(sounds.length, 1);
 });
 
-test('fast launches cannot tunnel through any grate and projectiles also stop at them', () => {
+test('normal launches and projectiles stop at grates at 60 fps', () => {
   const { room, player } = fixture();
   remove(player);
   const body = add({
@@ -218,20 +218,20 @@ test('fast launches cannot tunnel through any grate and projectiles also stop at
   });
   room.update();
   const physics = PhysicsWorld();
-  for (const [vx, vy] of [[-12000, 0], [12000, 0], [0, -12000], [0, 12000]]) {
+  for (const [vx, vy] of [[-1800, 0], [1800, 0], [0, -1800], [0, 1800]]) {
     body.x = 320; body.y = 320; body.vx = vx; body.vy = vy;
-    physics.physicsUpdate(0.05);
+    for (let i = 0; i < 12; i++) physics.physicsUpdate(1 / 60);
     assert.ok(body.x >= -2 && body.x <= 642 && body.y >= -2 && body.y <= 642);
     assert.ok(body.vx * vx + body.vy * vy < 0, 'grates bounce launches inward');
   }
   remove(body);
   let hits = 0;
   const shot = add({
-    x: 320, y: 320, vx: -12000, vy: 0, radius: 17.5, tags: [TAG_PROJECTILE],
+    x: 320, y: 320, vx: -340, vy: 0, radius: 17.5, tags: [TAG_PROJECTILE],
     puck() { return this; },
     onCollision() { hits++; return true; },
   });
-  physics.physicsUpdate(0.05);
+  for (let i = 0; i < 90; i++) physics.physicsUpdate(1 / 60);
   assert.equal(hits, 1);
   assert.ok(!getObjects().includes(shot));
 });

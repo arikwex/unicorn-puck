@@ -6,7 +6,6 @@ import {
   circleCircleContact,
   collisionResponses,
   integratePuck,
-  sweptCircleHitTime,
 } from './physics.js';
 import { TAG_ENEMY, TAG_OBSTACLE, TAG_PLAYER, TAG_PROJECTILE, TAG_PUCK } from './tags.js';
 
@@ -21,7 +20,6 @@ function PhysicsWorld() {
       const obstacles = getObjectsByTag(TAG_OBSTACLE).filter((object) => !puckSet.has(object));
       const projectiles = getObjectsByTag(TAG_PROJECTILE);
       const participants = [...pucks, ...obstacles, ...projectiles];
-      const previousBodies = new Map(participants.map((object) => [object, { ...object.puck() }]));
 
       pucks.forEach((object) => {
         const puck = object.puck();
@@ -36,25 +34,15 @@ function PhysicsWorld() {
 
       const bodies = new Map(participants.map((object) => [object, { ...object.puck() }]));
       const contacts = [];
-      function detect(a, b) {
+      function contactBetween(a, b) {
         const bodyA = bodies.get(a);
         const bodyB = bodies.get(b);
-        let contact = bodyB.box
+        return bodyB.box
           ? circleBoxContact(bodyA, bodyB)
           : circleCircleContact(bodyA, bodyB);
-        // Grates must hold even when chained launches cross their entire
-        // thickness in a frame. Capture the entry face, not the far face.
-        if (b.blocksSweptMotion) {
-          const start = previousBodies.get(a);
-          const time = sweptCircleHitTime(start, bodyA, bodyB);
-          if (time > 0 && time <= 1) {
-            const hit = { ...bodyA, x: start.x + (bodyA.x - start.x) * time,
-              y: start.y + (bodyA.y - start.y) * time, radius: bodyA.radius + 0.001 };
-            const swept = circleBoxContact(hit, bodyB);
-            if (swept) contact = { ...swept, penetration: Math.max(0,
-              (bodyA.x - hit.x) * swept.nx + (bodyA.y - hit.y) * swept.ny) };
-          }
-        }
+      }
+      function detect(a, b) {
+        const contact = contactBetween(a, b);
         if (contact) contacts.push([a, b, contact]);
       }
 
@@ -79,40 +67,32 @@ function PhysicsWorld() {
         const [responseA, responseB] = collisionResponses(resolvedA, resolvedB, contact.nx, contact.ny, penetration);
         applyCollisionResponse(resolvedA, responseA);
         applyCollisionResponse(resolvedB, responseB);
-        // Each recipient's normal points toward the other body; otherBody
-        // is a snapshot, so impact velocity survives the other callback.
-        collisions.push([a, b, { ...contact, otherBody: bodyB, response: responseA }]);
-        collisions.push([b, a, {
-          nx: -contact.nx, ny: -contact.ny, penetration: contact.penetration,
-          otherBody: bodyA, response: responseB,
-        }]);
+        queue(a, b, contact, responseA, responseB);
       });
 
-      // Shots ignore enemies and stop at the first obstruction along their
-      // path, including moving players. They notify both objects without
-      // participating in the solid-body bounce solver.
+      // Both callbacks see the captured impact state, even if the first
+      // callback bounces or removes a participant.
+      function queue(a, b, contact, responseA, responseB) {
+        collisions.push([a, b, { ...contact, otherBody: bodies.get(b), response: responseA }]);
+        collisions.push([b, a, {
+          nx: -contact.nx, ny: -contact.ny, penetration: contact.penetration,
+          otherBody: bodies.get(a), response: responseB,
+        }]);
+      }
+
+      // Shots use the same overlaps as pucks, ignore enemies and hit once.
+      // Check obstacles before players so cover wins a simultaneous overlap.
       const shotTargets = [...obstacles, ...pucks].filter((object) =>
         !object.tags.includes(TAG_ENEMY)
         && (object.tags.includes(TAG_OBSTACLE) || object.tags.includes(TAG_PLAYER)));
       projectiles.forEach((projectile) => {
-        const start = previousBodies.get(projectile);
-        const end = bodies.get(projectile);
-        let hit;
-        let first = Infinity;
-        shotTargets.forEach((target) => {
-          const time = sweptCircleHitTime(start, end, bodies.get(target), previousBodies.get(target));
-          if (time < first) { first = time; hit = target; }
-        });
-        if (!hit) return;
-        projectile.x = start.x + (end.x - start.x) * first;
-        projectile.y = start.y + (end.y - start.y) * first;
-        const targetBody = bodies.get(hit);
-        const speed = Math.hypot(end.vx, end.vy) || 1;
-        const nx = end.vx / speed;
-        const ny = end.vy / speed;
-        const response = { dx: 0, dy: 0, dvx: 0, dvy: 0, domega: 0 };
-        collisions.push([projectile, hit, { nx, ny, penetration: 0, otherBody: targetBody, response }]);
-        collisions.push([hit, projectile, { nx: -nx, ny: -ny, penetration: 0, otherBody: end, response }]);
+        for (const target of shotTargets) {
+          const contact = contactBetween(projectile, target);
+          if (!contact) continue;
+          const response = { dx: 0, dy: 0, dvx: 0, dvy: 0, domega: 0 };
+          queue(projectile, target, contact, response, response);
+          break;
+        }
       });
 
       projectiles.forEach((projectile) => projectile.afterPhysics?.());

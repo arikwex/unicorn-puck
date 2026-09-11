@@ -53,8 +53,7 @@ function CombatRoom(bounds, doorways, enemies) {
       } else if (Math.abs(player.x - bounds.x) < bounds.w / 2 - inset
         && Math.abs(player.y - bounds.y) < bounds.h / 2 - inset) {
         // The entire player must clear the doorway plus a safety margin.
-        // Grates stay outside these bounds; swept collisions prevent even
-        // an immediate high-speed reversal from crossing the closed gate.
+        // Grates stay outside these bounds and use ordinary box contacts.
         this.state = ACTIVE;
         grates = doorways.map((door) => add(MetalGrate(door)));
         doorways.forEach(splash);
