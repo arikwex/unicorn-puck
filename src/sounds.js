@@ -86,16 +86,6 @@ function playPlayerDamage() {
   play(playerDamageBuffer(), 0.7, 1);
 }
 
-const shieldPopBuffer = lazySound(0.2, (t) => {
-  const phase = TAU * (180 * t + 12 * (1 - Math.exp(-t * 22)));
-  return 0.3 * Math.min(1, t / 0.003) * Math.exp(-t * 24)
-    * (Math.sin(phase) + noise() * 0.15);
-});
-
-function playShieldPop() {
-  play(shieldPopBuffer(), 0.65, 1);
-}
-
 // -- enemy fires an ooze projectile -----------------------------------------
 // A wet "blorp": a low-frequency wobble modulates the pitch of a falling
 // tone, plus a little noise grit for wetness -- reads as a squelchy launch
@@ -149,5 +139,5 @@ function playCombatImpact() {
 }
 
 export {
-  playCombatImpact, playItemCollected, playEnemyHit, playLaunch, playOozeShot, playPlayerDamage, playShieldPop, playWallBounce,
+  playCombatImpact, playItemCollected, playEnemyHit, playLaunch, playOozeShot, playPlayerDamage, playWallBounce,
 };

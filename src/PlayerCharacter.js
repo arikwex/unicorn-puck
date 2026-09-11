@@ -1,10 +1,10 @@
 import { add } from './engine.js';
-import { renderBubbleShield, SHIELD_COLOR } from './bubbleShield.js';
+import { renderBubbleShield } from './bubbleShield.js';
 import { fillCircle, fillEllipse } from './canvasShapes.js';
 import { applyCollisionResponse, applyImpulse, normalizeAngle } from './physics.js';
 import orbit3d from './orbit3d.js';
 import SplatEffect from './SplatEffect.js';
-import { playPlayerDamage, playShieldPop, playWallBounce } from './sounds.js';
+import { playPlayerDamage, playWallBounce } from './sounds.js';
 import { TAG_ENEMY, TAG_PLAYER, TAG_PROJECTILE, TAG_PUCK } from './tags.js';
 
 const TAU = Math.PI * 2;
@@ -64,7 +64,7 @@ const HEAD_BEHIND_BUFFER = (20 * Math.PI) / 180;
 
 // `charge` is a smoothed 0..1 read of how fast the player is currently
 // moving, driving every "charging forward" render tweak below (squish,
-// head/horn lean, wing sweep, rainbow horn, trail). It stays 0 below
+// head/horn lean, wing sweep, trail). It stays 0 below
 // CHARGE_MIN_SPEED (no pose change at a crawl), ramps linearly up to
 // CHARGE_MAX_SPEED, and holds at 1 beyond that. CHARGE_EASE_RATE then
 // smooths *that* target over time so a sudden speed change doesn't pop
@@ -101,11 +101,6 @@ const WING_DROP = 10;
 // the torso and only its far end streams outward.
 const TAIL_STRETCH = 0.5;
 
-// The horn's rainbow while charging shows the full hue spectrum along its
-// own length at once (see hornRainbowGradient), and that pattern scrolls
-// over time rather than sitting still. Both keyed off the character's own
-// running animation clock so it's always in motion, not just active/inactive.
-const HORN_HUE_SPEED = 220; // deg/s the gradient scrolls along the horn
 const TRAIL_DURATION = 0.5; // seconds a trail sample stays visible
 
 // The trail is 6 solid ROYGBV bands riding side by side (offset via
@@ -204,53 +199,19 @@ function traceHornStripe(context, halfWidth, y) {
   context.lineTo(-halfWidth, y + 3);
 }
 
-// Fills `trace` with `baseColor`, then -- if charge > 0 -- fills it again
-// with `rainbowStyle` (a color or gradient) at globalAlpha = charge, so
-// the rainbow fades smoothly in and out with charge instead of snapping on.
-function fillRainbowBlend(context, charge, baseColor, rainbowStyle, trace) {
-  fillShape(context, baseColor, trace);
-  if (charge > 0) {
-    context.globalAlpha = charge;
-    fillShape(context, rainbowStyle, trace);
-    context.globalAlpha = 1;
-  }
-}
-
-// The full hue spectrum spread along the horn's own length (base to tip)
-// at once, rather than one color at a time -- `hueOffset` shifts where
-// each hue sits along that length, so animating it scrolls the whole
-// rainbow pattern rather than just rotating a single flat color.
-function hornRainbowGradient(context, length, hueOffset) {
-  const gradient = context.createLinearGradient(0, 0, 0, -length);
-  const steps = 12;
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const hue = (t * 360 + hueOffset) % 360;
-    gradient.addColorStop(t, `hsl(${hue}, 85%, 65%)`);
-  }
-  return gradient;
-}
-
-function renderHorn(context, angle, headX, headY, charge, anim) {
+function renderHorn(context, angle, headX, headY, charge) {
   const baseX = headX + Math.cos(angle) * 8;
   const baseY = headY - 13 - Math.sin(angle) * 6;
   const dx = Math.cos(angle) * (14 + HORN_LEAN_FORWARD * charge);
   const dy = -20 + HORN_LEAN_FLATTEN * charge - Math.sin(angle) * 4;
   const length = Math.hypot(dx, dy);
   const halfWidth = 4;
-  const hueOffset = (anim * HORN_HUE_SPEED) % 360;
 
   context.save();
   context.translate(baseX, baseY);
   context.rotate(Math.atan2(dx, -dy));
   context.scale(2, 2);
-  fillRainbowBlend(
-    context,
-    charge,
-    '#ec6',
-    hornRainbowGradient(context, length, hueOffset),
-    () => traceHorn(context, halfWidth, length),
-  );
+  fillShape(context, '#ec6', () => traceHorn(context, halfWidth, length));
 
   context.beginPath();
   traceHorn(context, halfWidth, length);
@@ -258,8 +219,7 @@ function renderHorn(context, angle, headX, headY, charge, anim) {
   context.clip();
 
   for (let y = -4; y > -length; y -= 8) {
-    const hue = (Math.min(1, -y / length) * 360 + hueOffset) % 360;
-    fillRainbowBlend(context, charge, '#c94', `hsl(${hue}, 80%, 40%)`, () => traceHornStripe(context, halfWidth, y));
+    fillShape(context, '#c94', () => traceHornStripe(context, halfWidth, y));
   }
   context.restore();
 }
@@ -566,12 +526,12 @@ function renderTorso(context, player, anim, charge) {
   fillEllipse(context, player.x, player.y + 38 - radiusY, radiusX, radiusY, '#cce');
 }
 
-function renderHead(context, angle, headX, headY, snoutX, snoutY, charge, anim) {
+function renderHead(context, angle, headX, headY, snoutX, snoutY, charge) {
   const headRadius = 22;
   const snoutRadius = 13;
   const facesCamera = Math.sin(angle) <= 0;
 
-  if (!facesCamera) renderHorn(context, angle, headX, headY, charge, anim);
+  if (!facesCamera) renderHorn(context, angle, headX, headY, charge);
   renderConnector(context, headX, headY, headRadius, snoutX, snoutY, snoutRadius);
   renderEars(context, angle, headX, headY, false);
   fillCircle(context, headX, headY, headRadius, '#fff');
@@ -579,7 +539,7 @@ function renderHead(context, angle, headX, headY, snoutX, snoutY, charge, anim) 
   renderEyes(context, angle, headX, headY);
   renderNostrils(context, angle, snoutX, snoutY);
   renderEars(context, angle, headX, headY, true);
-  if (facesCamera) renderHorn(context, angle, headX, headY, charge, anim);
+  if (facesCamera) renderHorn(context, angle, headX, headY, charge);
 }
 
 // A fixed, uncharged head pose for the HUD, using the same face, ears,
@@ -591,7 +551,7 @@ function renderPlayerPortrait(context, x, y, scale = 1) {
   context.save();
   context.translate(x, y);
   context.scale(scale, scale);
-  renderHead(context, angle, 0, 0, snoutX, snoutY, 0, 0);
+  renderHead(context, angle, 0, 0, snoutX, snoutY, 0);
   context.restore();
 }
 
@@ -647,11 +607,11 @@ function renderPlayer(context, player, anim, charge, trail) {
   // overlap most, so the pop is at its most visible. HEAD_BEHIND_BUFFER
   // holds the previous order for a few degrees past each crossing instead.
   if (angle > HEAD_BEHIND_BUFFER && angle < Math.PI - HEAD_BEHIND_BUFFER) {
-    renderHead(context, angle, headX, headY, snoutX, snoutY, charge, anim);
+    renderHead(context, angle, headX, headY, snoutX, snoutY, charge);
     renderTorso(context, player, anim, charge);
   } else {
     renderTorso(context, player, anim, charge);
-    renderHead(context, angle, headX, headY, snoutX, snoutY, charge, anim);
+    renderHead(context, angle, headX, headY, snoutX, snoutY, charge);
   }
   renderWingsAndTail(context, player, angle, anim, true, charge);
 }
@@ -763,20 +723,15 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
       applyCollisionResponse(this, response);
     },
 
+    // A bubble shield absorbs the hit instead of hp (see addBubbleShield),
+    // but otherwise takes it exactly like a normal hit -- same flash, same
+    // splats, same sound. Stacking (bubbleShields--) and the protective
+    // bubble's own render() are the only things that make a shielded hit
+    // different from an ordinary one.
     takeDamage(amount = 1) {
       if (amount <= 0 || this.hp <= 0) return;
-      if (this.bubbleShields > 0) {
-        this.bubbleShields--;
-        for (let i = 0; i < 8; i++) {
-          const angle = Math.random() * TAU;
-          const speed = Math.sqrt(Math.random()) * 180;
-          add(SplatEffect(this.x, this.y, Math.cos(angle) * speed, Math.sin(angle) * speed,
-            SHIELD_COLOR, { size: 6 }));
-        }
-        playShieldPop();
-        return;
-      }
-      this.hp = Math.max(0, this.hp - Math.max(0, amount));
+      if (this.bubbleShields > 0) this.bubbleShields--;
+      else this.hp = Math.max(0, this.hp - amount);
       damageFlashTimer = DAMAGE_FLASH_DURATION;
       fireDamageSplats(this.x, this.y);
       playPlayerDamage();
