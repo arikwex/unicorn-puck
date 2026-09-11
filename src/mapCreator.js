@@ -1,4 +1,7 @@
 import Camera from './camera.js';
+import Chalice from './Chalice.js';
+import { resetChalices } from './chaliceProgress.js';
+import ChaliceHUD from './ChaliceHUD.js';
 import CubeObstacle from './CubeObstacle.js';
 import generateDungeon, { mulberry32 } from './donjonDungeon.js';
 import { add } from './engine.js';
@@ -26,9 +29,23 @@ const GRUB_ROOM_MARGIN = 50;
 // random spots in a row all land too close to something -- a small,
 // pillar-crowded room just goes without rather than overlapping a wall).
 const CHEST_ROOM_MARGIN = 50;
-const CHEST_MIN_OBSTACLE_GAP = 1; // world units of clearance required off every obstacle
-const CHEST_ENTRANCE_CLEARANCE = 3; // world units of clearance required off any room entrance/doorway
 const CHEST_PLACEMENT_ATTEMPTS = 30;
+// The level's required collectibles: winning means collecting *every*
+// chalice that spawns, not a fixed count -- each non-spawn room
+// independently rolls CHALICE_SPAWN_CHANCE for one, so a 12-room dungeon
+// (11 non-spawn rooms) nets roughly 8 chalices, not exactly 11. Unlike a
+// chest, placement within a chosen room never gives up (see the fallback
+// in buildDungeon) since a skipped chalice would shrink the required
+// total without actually placing the item, silently making the level
+// unwinnable.
+const CHALICE_SPAWN_CHANCE = 0.75;
+const CHALICE_RADIUS = 20;
+const CHALICE_ROOM_MARGIN = 40;
+const CHALICE_PLACEMENT_ATTEMPTS = 30;
+// Shared by both chest and chalice placement: never directly on a room
+// entrance/doorway, and never within 1 unit of any wall/pillar/grub/chest.
+const ENTRANCE_CLEARANCE = 3; // world units of clearance required off any room entrance/doorway
+const OBSTACLE_CLEARANCE = 1; // world units of clearance required off every wall/pillar/grub/chest
 // The raw generator's corridors are a single grid cell wide -- just barely
 // wider than the player puck, which feels awful to actually fly through.
 // Post-inflating by 2x guarantees every corridor and room is at least 2
@@ -86,17 +103,26 @@ function pickGrubSpawn(room, playerSpawn, rng) {
   return { x: clamp(x, minX, maxX, room.x), y: clamp(y, minY, maxY, room.y) };
 }
 
-// A chest's spawn point: just a random point scattered across the room's
-// own interior (inset by CHEST_ROOM_MARGIN), no player-distance push --
-// unlike a grub, a chest sitting near the player's spawn isn't a problem.
-function pickChestSpawn(room, rng) {
-  const minX = room.x - room.w / 2 + CHEST_ROOM_MARGIN;
-  const maxX = room.x + room.w / 2 - CHEST_ROOM_MARGIN;
-  const minY = room.y - room.h / 2 + CHEST_ROOM_MARGIN;
-  const maxY = room.y + room.h / 2 - CHEST_ROOM_MARGIN;
-  const x = minX <= maxX ? minX + rng() * (maxX - minX) : room.x;
-  const y = minY <= maxY ? minY + rng() * (maxY - minY) : room.y;
-  return { x, y };
+// Pulls a -1..1 sample toward 0 -- CENTER_BIAS_POWER > 1 means small
+// offsets stay small and only a minority of samples reach near the edges,
+// so a chest/chalice's random spot within its room prefers the center
+// without being deterministically stuck there.
+const CENTER_BIAS_POWER = 2.2;
+function centerBiasedUnit(rng) {
+  const t = rng() * 2 - 1;
+  return Math.sign(t) * Math.abs(t) ** CENTER_BIAS_POWER;
+}
+
+// A center-biased point within a room's own interior, inset by `margin`
+// off its walls -- shared by chest and chalice placement (a grub
+// additionally pushes away from the player's spawn; see pickGrubSpawn).
+function pickPointInRoom(room, margin, rng) {
+  const halfW = Math.max(0, room.w / 2 - margin);
+  const halfH = Math.max(0, room.h / 2 - margin);
+  return {
+    x: room.x + centerBiasedUnit(rng) * halfW,
+    y: room.y + centerBiasedUnit(rng) * halfH,
+  };
 }
 
 // Closest-point-on-AABB distance: 0 while inside/touching the box, the
@@ -113,22 +139,25 @@ function circleCircleGap(cx, cy, cr, other) {
   return Math.hypot(cx - other.x, cy - other.y) - cr - other.radius;
 }
 
-// True only once a candidate clears every known obstacle -- walls (boxes)
-// and pillars/grubs (circles) -- by at least CHEST_MIN_OBSTACLE_GAP, and
-// every room entrance (a point, radius 0) by CHEST_ENTRANCE_CLEARANCE.
-function chestSpotIsClear(x, y, walls, circles, entrances) {
-  return walls.every((wall) => circleBoxGap(x, y, CHEST_RADIUS, wall) >= CHEST_MIN_OBSTACLE_GAP)
-    && circles.every((circle) => circleCircleGap(x, y, CHEST_RADIUS, circle) >= CHEST_MIN_OBSTACLE_GAP)
-    && entrances.every((entrance) => circleCircleGap(x, y, CHEST_RADIUS, entrance) >= CHEST_ENTRANCE_CLEARANCE);
+// True once a candidate of the given radius clears every wall (box) and
+// pillar/grub/chest (circle) by at least OBSTACLE_CLEARANCE, and every
+// room entrance (a point, radius 0) by ENTRANCE_CLEARANCE.
+function isClearSpot(x, y, radius, walls, circles, entrances) {
+  return walls.every((wall) => circleBoxGap(x, y, radius, wall) >= OBSTACLE_CLEARANCE)
+    && circles.every((circle) => circleCircleGap(x, y, radius, circle) >= OBSTACLE_CLEARANCE)
+    && entrances.every((entrance) => circleCircleGap(x, y, radius, entrance) >= ENTRANCE_CLEARANCE);
 }
 
-// Resamples pickChestSpawn up to CHEST_PLACEMENT_ATTEMPTS times looking for
-// a spot clear of every obstacle; returns null (give up, no chest) if none
-// of them work out.
-function findChestSpawn(room, rng, walls, circles, entrances) {
-  for (let attempt = 0; attempt < CHEST_PLACEMENT_ATTEMPTS; attempt++) {
-    const candidate = pickChestSpawn(room, rng);
-    if (chestSpotIsClear(candidate.x, candidate.y, walls, circles, entrances)) return candidate;
+// Resamples pickPointInRoom up to `attempts` times looking for a spot
+// clear of every obstacle and entrance; returns null if none work out.
+// Shared by chest and chalice placement -- they only differ in radius,
+// margin, attempt budget, and what happens when this returns null (a
+// chest just goes without; a chalice must still be placed somewhere, see
+// its fallback in buildDungeon).
+function findClearSpot(room, margin, radius, attempts, rng, walls, circles, entrances) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const candidate = pickPointInRoom(room, margin, rng);
+    if (isClearSpot(candidate.x, candidate.y, radius, walls, circles, entrances)) return candidate;
   }
   return null;
 }
@@ -149,6 +178,12 @@ function buildDungeon(seed) {
   const dungeon = inflateDungeon(generateDungeon(seed), CORRIDOR_WIDTH_FACTOR);
   const toWorld = (x, y) => gridToWorld(x, y, dungeon.gridWidth, dungeon.gridHeight);
   const floorSet = new Set(dungeon.floor.map(({ x, y }) => `${x},${y}`));
+  // A room's entrance cells (grid) as world-space points, radius 0 -- fed
+  // into findClearSpot/isClearSpot's "circles" clearance check.
+  const roomEntrancePoints = (room) => findEntranceCells(room, floorSet).map((cell) => {
+    const world = toWorld(cell.x, cell.y);
+    return { x: world.x, y: world.y, radius: 0 };
+  });
 
   // Collected as chests are placed check clearance against them below --
   // walls as boxes, pillars/grubs as circles.
@@ -198,20 +233,65 @@ function buildDungeon(seed) {
       obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.puck().radius });
     }
 
-    // Every room gets a chest, kept at least CHEST_MIN_OBSTACLE_GAP off
-    // every wall/pillar/grub and CHEST_ENTRANCE_CLEARANCE off any doorway
-    // (same entrance-cell detection placePillars.js uses to keep its own
-    // pillars clear of doorways) -- a room too cluttered to fit one goes
-    // without rather than spawning it overlapping something or blocking
-    // the way in.
-    const entrancePoints = findEntranceCells(room, floorSet).map((cell) => {
-      const world = toWorld(cell.x, cell.y);
-      return { x: world.x, y: world.y, radius: 0 };
-    });
+    // Every room gets a chest, kept clear of every wall/pillar/grub and
+    // every doorway (see isClearSpot/findClearSpot, and findEntranceCells
+    // -- the same entrance-cell detection placePillars.js uses to keep its
+    // own pillars clear of doorways) -- a room too cluttered to fit one
+    // goes without rather than spawning it overlapping something or
+    // blocking the way in.
+    const entrancePoints = roomEntrancePoints(room);
     const chestRng = mulberry32(chestSeed + roomIndex);
-    const chestSpawn = findChestSpawn(worldRoom, chestRng, wallBoxes, obstacleCircles, entrancePoints);
-    if (chestSpawn) add(TreasureChest(chestSpawn.x, chestSpawn.y));
+    const chestSpawn = findClearSpot(worldRoom, CHEST_ROOM_MARGIN, CHEST_RADIUS, CHEST_PLACEMENT_ATTEMPTS, chestRng, wallBoxes, obstacleCircles, entrancePoints);
+    if (chestSpawn) {
+      add(TreasureChest(chestSpawn.x, chestSpawn.y));
+      // So a chalice placed afterward (see below) won't land on top of it.
+      obstacleCircles.push({ x: chestSpawn.x, y: chestSpawn.y, radius: CHEST_RADIUS });
+    }
   });
+
+  // The level's Chalices of Pegacorn Blood -- same placement rules as a
+  // chest (clear of every obstacle and doorway, biased toward room
+  // center). Every non-spawn room independently rolls CHALICE_SPAWN_CHANCE
+  // for one, so the total is dynamic (roughly 75% of non-spawn rooms, not
+  // a fixed count); winning means collecting all of whatever that turns
+  // out to be (see chaliceProgress.resetChalices below). Runs after the
+  // loop above so wallBoxes/obstacleCircles already reflect every wall,
+  // pillar, grub, and chest across the whole dungeon, not just whichever
+  // rooms happened to be processed first.
+  const chaliceRng = mulberry32(seed + 4);
+  let chaliceCount = 0;
+  dungeon.rooms.forEach((room, roomIndex) => {
+    if (roomIndex === 0) return; // never the player's own spawn room
+    if (chaliceRng() >= CHALICE_SPAWN_CHANCE) return;
+
+    const roomCenter = toWorld(room.x + room.w / 2, room.y + room.h / 2);
+    const worldRoom = {
+      x: roomCenter.x, y: roomCenter.y, w: room.w * TILE, h: room.h * TILE,
+    };
+    const entrancePoints = roomEntrancePoints(room);
+    // Chosen for a chalice, so unlike a chest this never gives up on the
+    // room -- it falls back to an unchecked point rather than skipping
+    // entirely and silently shrinking the required total.
+    const spawn = findClearSpot(worldRoom, CHALICE_ROOM_MARGIN, CHALICE_RADIUS, CHALICE_PLACEMENT_ATTEMPTS, chaliceRng, wallBoxes, obstacleCircles, entrancePoints)
+      || pickPointInRoom(worldRoom, CHALICE_ROOM_MARGIN, chaliceRng);
+    add(Chalice(spawn.x, spawn.y));
+    chaliceCount++;
+  });
+  // Vanishingly unlikely with a 75% per-room chance across any real
+  // dungeon, but a 0-chalice level would be unwinnable (chalicesComplete()
+  // requires a positive total) -- guarantee at least one.
+  if (chaliceCount === 0 && dungeon.rooms.length > 1) {
+    const room = dungeon.rooms[1];
+    const roomCenter = toWorld(room.x + room.w / 2, room.y + room.h / 2);
+    const worldRoom = {
+      x: roomCenter.x, y: roomCenter.y, w: room.w * TILE, h: room.h * TILE,
+    };
+    const spawn = findClearSpot(worldRoom, CHALICE_ROOM_MARGIN, CHALICE_RADIUS, CHALICE_PLACEMENT_ATTEMPTS, chaliceRng, wallBoxes, obstacleCircles, roomEntrancePoints(room))
+      || pickPointInRoom(worldRoom, CHALICE_ROOM_MARGIN, chaliceRng);
+    add(Chalice(spawn.x, spawn.y));
+    chaliceCount = 1;
+  }
+  resetChalices(chaliceCount);
 
   return playerSpawn;
 }
@@ -224,11 +304,12 @@ function createMap(seed) {
   const spawn = buildDungeon(seed);
   const player = add(PlayerCharacter(spawn.x, spawn.y));
   const playerHealthHUD = add(PlayerHealthHUD(player));
+  const chaliceHUD = add(ChaliceHUD());
   add(Camera().follow(player));
   const dragController = add(DragController(player));
   add(PhysicsWorld());
   return {
-    player, dragController, playerHealthHUD,
+    player, dragController, playerHealthHUD, chaliceHUD,
   };
 }
 

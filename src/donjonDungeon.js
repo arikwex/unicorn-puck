@@ -51,8 +51,14 @@ function shuffle(rng, list) {
 // therefore be odd, and the outermost ring (index 0 and WIDTH-1/HEIGHT-1,
 // both even) is never reachable by carving, which is what keeps the whole
 // dungeon enclosed with no gaps at the edge ("egress=no").
-const GRID_WIDTH = 41;
-const GRID_HEIGHT = 41;
+// Shrunk from 41: cuts the world's overall footprint (and, as a side
+// effect, the room count ~30%, since fewer rooms fit a smaller grid at the
+// same size) without changing individual room dimensions the way raising
+// ROOM_MAX_SIZE would have. ROOM_PLACEMENT_ATTEMPTS is already deep into
+// diminishing returns here -- the grid saturates with rooms well before
+// 300 attempts -- so a smaller attempt budget alone barely moves the count.
+const GRID_WIDTH = 33;
+const GRID_HEIGHT = 33;
 
 // -- "room layout=scattered", "room size=medium" -----------------------
 const ROOM_MIN_SIZE = 3; // odd

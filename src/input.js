@@ -160,8 +160,6 @@ function DragController(player) {
   addEventListener('pointercancel', onPointerUp);
 
   return {
-    order: 1000, // render the indicator above everything else in the scene
-
     // A fresh game (fresh player) gets a fresh DragController, so the
     // previous one's listeners must come off -- otherwise every restart
     // stacks another set of global pointer handlers onto a stale player.

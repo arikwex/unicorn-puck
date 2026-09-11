@@ -2,12 +2,13 @@
 // each transition doing a full engine.clear() so no state from the
 // previous screen (dungeon, grubs, drag input, HUD) leaks into the next.
 
+import { chalicesComplete } from './chaliceProgress.js';
 import { add, clear, remove } from './engine.js';
-import GameOverCard from './GameOverCard.js';
 import createMap from './mapCreator.js';
 import MainMenu from './MainMenu.js';
 import { playDungeonTheme } from './music.js';
 import SplatEffect from './SplatEffect.js';
+import StatusCard from './StatusCard.js';
 
 // Same ROYGBV set the player's own on-hit splats use (see
 // PlayerCharacter.js's fireDamageSplats) -- death gets a bigger burst of
@@ -32,20 +33,24 @@ function fireDeathSplats(x, y) {
   }
 }
 
-// Watches the live player and, once its hp runs out, fires the death
-// splats at its last position, tears down input and the HUD, and hands off
-// to the game-over card. Self-removes once it has fired.
-function GameWatcher(player, dragController, playerHealthHUD) {
+// Watches the live player for either end condition -- hp running out, or
+// every chalice collected -- and hands off to the matching status card.
+// Fires the death splats only for the loss case; both cases tear down
+// input and the HUD the same way (camera and dungeon stay put --
+// Camera.follow() keeps its target reference even after removal, so the
+// view stays frozen right where the run ended). Self-removes once fired.
+function GameWatcher(player, dragController, playerHealthHUD, chaliceHUD) {
   return {
     update() {
-      if (player.hp > 0) return;
-      fireDeathSplats(player.x, player.y);
-      // The camera and dungeon stay put -- Camera.follow() keeps its
-      // target reference even after removal, so the view stays frozen
-      // right where the player died, which is where the splats need to
-      // render. Only the player's own input/HUD come down.
-      remove([player, dragController, playerHealthHUD]);
-      add(GameOverCard(showMenu));
+      const won = chalicesComplete();
+      const lost = player.hp <= 0;
+      if (!won && !lost) return;
+
+      if (lost) fireDeathSplats(player.x, player.y);
+      remove([player, dragController, playerHealthHUD, chaliceHUD]);
+      add(won
+        ? StatusCard(showMenu, { lines: ['PEGACORN BLOOD', 'RECLAIMED'], color: '#fff' })
+        : StatusCard(showMenu));
       return true;
     },
   };
@@ -63,8 +68,10 @@ function startGame() {
   }
   clear();
   const seed = (Math.random() * 0xffffffff) >>> 0;
-  const { player, dragController, playerHealthHUD } = createMap(seed);
-  add(GameWatcher(player, dragController, playerHealthHUD));
+  const {
+    player, dragController, playerHealthHUD, chaliceHUD,
+  } = createMap(seed);
+  add(GameWatcher(player, dragController, playerHealthHUD, chaliceHUD));
 }
 
 function startGameFlow() {

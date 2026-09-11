@@ -109,6 +109,27 @@ function playOozeShot() {
   play(oozeShotBuffer(), 0.55, 1);
 }
 
+// -- collect a chalice --------------------------------------------------
+// Three quick ascending pings (a bright major-ish arpeggio), staggered so
+// each rings out over the next rather than all firing at once -- reads as
+// a celebratory chime for a key collectible, distinct from the health
+// pickup's single tone (that one's a heal, this one's real progress).
+const CHALICE_COLLECT_NOTES = [0, 0.08, 0.16];
+const CHALICE_COLLECT_FREQUENCIES = [659.25, 880, 1108.73]; // E5, A5, C#6
+const chaliceCollectBuffer = lazySound(0.4, (t) => {
+  let sample = 0;
+  for (let i = 0; i < CHALICE_COLLECT_NOTES.length; i++) {
+    const noteT = t - CHALICE_COLLECT_NOTES[i];
+    if (noteT < 0) continue;
+    sample += Math.sin(TAU * CHALICE_COLLECT_FREQUENCIES[i] * noteT) * Math.exp(-noteT * 10);
+  }
+  return sample * 0.18;
+});
+
+function playChaliceCollect() {
+  play(chaliceCollectBuffer(), 0.7, 1);
+}
+
 export {
-  playEnemyHit, playLaunch, playOozeShot, playPlayerDamage, playWallBounce,
+  playChaliceCollect, playEnemyHit, playLaunch, playOozeShot, playPlayerDamage, playWallBounce,
 };
