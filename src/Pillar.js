@@ -11,8 +11,7 @@ function fillEllipse(context, x, y, radiusX, radiusY, color) {
 
 // A small extruded square slab -- a flat top face sitting on a shaded side
 // face dropping down by `height` -- used for both the pillar's base and
-// its capital. Simpler than CubeObstacle's own version (no rotation, no
-// isometric basis) since a pillar is always upright and round.
+// its capital.
 function renderSlab(context, x, topY, halfSize, height, topColor, sideColor) {
   context.fillStyle = sideColor;
   context.fillRect(x - halfSize, topY, halfSize * 2, height);

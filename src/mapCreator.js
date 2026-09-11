@@ -46,9 +46,9 @@ const CHALICE_RADIUS = 20;
 const CHALICE_ROOM_MARGIN = 40;
 const CHALICE_PLACEMENT_ATTEMPTS = 30;
 // Shared by both chest and chalice placement: never directly on a room
-// entrance/doorway, and never within 1 unit of any wall/pillar/grub/chest.
+// entrance/doorway, and prefer at least OBSTACLE_CLEARANCE from obstacles.
 const ENTRANCE_CLEARANCE = 3; // world units of clearance required off any room entrance/doorway
-const OBSTACLE_CLEARANCE = 1; // world units of clearance required off every wall/pillar/grub/chest
+const OBSTACLE_CLEARANCE = 2; // world units of clearance required off every wall/pillar/grub/chest
 // The raw generator's corridors are a single grid cell wide -- just barely
 // wider than the player puck, which feels awful to actually fly through.
 // Post-inflating by 2x guarantees every corridor and room is at least 2

@@ -57,11 +57,11 @@ function startAiming() {
   return { player, grub };
 }
 
-function wall(x, shape = 'box', angle = 0) {
+function wall(x, shape = 'box') {
   return {
     tags: [TAG_OBSTACLE],
     puck: () => ({
-      x, y: 0, angle, shape, halfWidth: 1, halfHeight: 100, radius: 20,
+      x, y: 0, shape, halfWidth: 1, halfHeight: 100, radius: 20,
       mass: Infinity, vx: 0, vy: 0, omega: 0, bounciness: 0.4,
     }),
   };
@@ -162,12 +162,12 @@ test('projectiles deal exactly one damage and push along their motion axis', () 
   }
 });
 
-test('thin walls, rotated walls and circular obstacles block shots before a player', () => {
-  for (const [shape, angle] of [['box', 0], ['box', Math.PI / 4], ['circle', 0]]) {
+test('thin walls and circular obstacles block shots before a player', () => {
+  for (const shape of ['box', 'circle']) {
     for (const reverse of [false, true]) {
       clear();
       const player = PlayerCharacter(200, 0);
-      const obstacle = wall(70, shape, angle);
+      const obstacle = wall(70, shape);
       const shot = GrubProjectile(0, 0, 4000, 0);
       let wallHits = 0;
       obstacle.onCollision = () => { wallHits++; };

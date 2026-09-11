@@ -54,50 +54,24 @@ function circleCircleContact(a, b) {
   return { nx: dx / distance, ny: dy / distance, penetration };
 }
 
-// Circle-vs-oriented-box contact. `circlePuck` needs { x, y, radius },
-// `boxPuck` needs { x, y, angle, halfWidth, halfHeight }. Normal points
-// from the circle toward the box, matching circleCircleContact's a-to-b
-// convention.
-function circleBoxContact(circlePuck, boxPuck) {
-  const cos = Math.cos(-boxPuck.angle);
-  const sin = Math.sin(-boxPuck.angle);
-  const dx = circlePuck.x - boxPuck.x;
-  const dy = circlePuck.y - boxPuck.y;
-  const localX = dx * cos - dy * sin;
-  const localY = dx * sin + dy * cos;
-  const halfWidth = boxPuck.halfWidth;
-  const halfHeight = boxPuck.halfHeight;
-  const clampedX = Math.max(-halfWidth, Math.min(halfWidth, localX));
-  const clampedY = Math.max(-halfHeight, Math.min(halfHeight, localY));
-
-  let localNx;
-  let localNy;
-  let penetration;
-
-  if (clampedX === localX && clampedY === localY) {
-    // Circle center is inside the box: escape through the closest face.
-    const distances = [halfWidth - localX, localX + halfWidth, halfHeight - localY, localY + halfHeight];
-    const nearest = Math.min(...distances);
-    localNx = nearest === distances[0] ? 1 : nearest === distances[1] ? -1 : 0;
-    localNy = nearest === distances[2] ? 1 : nearest === distances[3] ? -1 : 0;
-    penetration = nearest + circlePuck.radius;
-  } else {
-    const towardBoxX = clampedX - localX;
-    const towardBoxY = clampedY - localY;
-    const distance = Math.hypot(towardBoxX, towardBoxY);
-    penetration = circlePuck.radius - distance;
-    if (penetration <= 0) return null;
-    localNx = towardBoxX / distance;
-    localNy = towardBoxY / distance;
+// Circle against an axis-aligned box. Normal points toward the box;
+// an embedded circle is pushed out through its nearest face.
+function circleBoxContact(circle, box) {
+  const dx = circle.x - box.x;
+  const dy = circle.y - box.y;
+  const nx = Math.max(-box.halfWidth, Math.min(box.halfWidth, dx)) - dx;
+  const ny = Math.max(-box.halfHeight, Math.min(box.halfHeight, dy)) - dy;
+  const distance = Math.hypot(nx, ny);
+  if (distance > 0) {
+    return distance < circle.radius
+      ? { nx: nx / distance, ny: ny / distance, penetration: circle.radius - distance }
+      : null;
   }
-
-  const boxCos = Math.cos(boxPuck.angle);
-  const boxSin = Math.sin(boxPuck.angle);
-  return {
-    nx: localNx * boxCos - localNy * boxSin,
-    ny: localNx * boxSin + localNy * boxCos,
-    penetration,
-  };
+  const gapX = box.halfWidth - Math.abs(dx);
+  const gapY = box.halfHeight - Math.abs(dy);
+  return gapX <= gapY
+    ? { nx: dx >= 0 ? -1 : 1, ny: 0, penetration: circle.radius + gapX }
+    : { nx: 0, ny: dy >= 0 ? -1 : 1, penetration: circle.radius + gapY };
 }
 
 // Compute both bodies' reactions from their captured impact state without
@@ -166,7 +140,7 @@ function segmentCircleTime(x, y, dx, dy, radius) {
   return time >= 0 && time <= 1 ? time : Infinity;
 }
 
-// Sweep a circular projectile against a moving circle or a static rotated
+// Sweep a circular projectile against a moving circle or an axis-aligned
 // box. Box faces plus rounded corners account for the projectile's radius.
 function sweptCircleHitTime(start, end, body, previousBody = body) {
   const x = start.x - previousBody.x;
@@ -177,32 +151,26 @@ function sweptCircleHitTime(start, end, body, previousBody = body) {
     return segmentCircleTime(x, y, dx, dy, start.radius + body.radius);
   }
 
-  const cos = Math.cos(body.angle);
-  const sin = Math.sin(body.angle);
-  const localX = x * cos + y * sin;
-  const localY = -x * sin + y * cos;
-  const localDx = dx * cos + dy * sin;
-  const localDy = -dx * sin + dy * cos;
   const { halfWidth, halfHeight } = body;
   const radius = start.radius;
-  const outsideX = Math.max(0, Math.abs(localX) - halfWidth);
-  const outsideY = Math.max(0, Math.abs(localY) - halfHeight);
+  const outsideX = Math.max(0, Math.abs(x) - halfWidth);
+  const outsideY = Math.max(0, Math.abs(y) - halfHeight);
   if (outsideX * outsideX + outsideY * outsideY <= radius * radius) return 0;
 
   let first = Infinity;
   for (const sign of [-1, 1]) {
-    if (localDx !== 0) {
-      const time = (sign * (halfWidth + radius) - localX) / localDx;
-      if (time >= 0 && time <= 1 && Math.abs(localY + localDy * time) <= halfHeight) first = Math.min(first, time);
+    if (dx !== 0) {
+      const time = (sign * (halfWidth + radius) - x) / dx;
+      if (time >= 0 && time <= 1 && Math.abs(y + dy * time) <= halfHeight) first = Math.min(first, time);
     }
-    if (localDy !== 0) {
-      const time = (sign * (halfHeight + radius) - localY) / localDy;
-      if (time >= 0 && time <= 1 && Math.abs(localX + localDx * time) <= halfWidth) first = Math.min(first, time);
+    if (dy !== 0) {
+      const time = (sign * (halfHeight + radius) - y) / dy;
+      if (time >= 0 && time <= 1 && Math.abs(x + dx * time) <= halfWidth) first = Math.min(first, time);
     }
     for (const otherSign of [-1, 1]) {
       first = Math.min(first, segmentCircleTime(
-        localX - sign * halfWidth, localY - otherSign * halfHeight,
-        localDx, localDy, radius,
+        x - sign * halfWidth, y - otherSign * halfHeight,
+        dx, dy, radius,
       ));
     }
   }
