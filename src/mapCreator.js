@@ -390,7 +390,7 @@ function buildDungeon(seed) {
     const chestRng = mulberry32(chestSeed + roomIndex);
     const chestSpawn = findClearSpot(worldRoom, CHEST_ROOM_MARGIN, CHEST_RADIUS, CHEST_PLACEMENT_ATTEMPTS, chestRng, wallBoxes, obstacleCircles, entrancePoints);
     if (chestSpawn) {
-      add(TreasureChest(chestSpawn.x, chestSpawn.y, { contents: chestContentsFor(roomIndex) }));
+      add(TreasureChest(chestSpawn.x, chestSpawn.y, chestContentsFor(roomIndex)));
       // So a chalice placed afterward (see below) won't land on top of it.
       obstacleCircles.push({ x: chestSpawn.x, y: chestSpawn.y, radius: CHEST_RADIUS });
     }

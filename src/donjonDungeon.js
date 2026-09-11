@@ -9,12 +9,13 @@
 //
 // The specific settings requested of the real generator (size=medium,
 // layout=rect, egress=no, room layout=scattered, room size=medium,
-// polymorph rooms=yes, doors=standard, corridors=errant, remove
-// deadends=all, stairs=no) are baked in below as constants rather than
-// exposed as options, since this game only ever wants the one
-// configuration. `stairs`, `style`, and `grid` (visual/output settings on
-// the real generator) have no equivalent here -- we render with our own
-// CubeObstacle style, and this is a single-level dungeon.
+// polymorph rooms=yes -- a no-op here, see carveRoom -- doors=standard,
+// corridors=errant, remove deadends=all, stairs=no) are baked in below as
+// constants rather than exposed as options, since this game only ever
+// wants the one configuration. `stairs`, `style`, and `grid`
+// (visual/output settings on the real generator) have no equivalent here
+// -- we render with our own CubeObstacle style, and this is a single-level
+// dungeon.
 //
 // Works entirely in integer grid coordinates; turning that into
 // world-space obstacles is the caller's job (see mapCreator.js).
@@ -67,10 +68,6 @@ const ROOM_PLACEMENT_ATTEMPTS = 300;
 // Minimum gap (in cells) enforced between rooms -- looser than a packed
 // layout, which is what makes it read as "scattered" rather than dense.
 const ROOM_SPACING = 2;
-
-// -- "polymorph rooms=yes" ----------------------------------------------
-const POLYMORPH_CHANCE = 0.35;
-const POLYMORPH_MAX_BITE = 0.4; // fraction of a room's own width/height a corner notch can remove
 
 // -- "corridors=errant" --------------------------------------------------
 // Probability the maze carver continues in the same direction rather than
@@ -142,29 +139,12 @@ function placeRooms(rng) {
   return rooms;
 }
 
-// Notches a random corner out of a room, for "polymorph rooms=yes" --
-// gives some rooms an L/T-shaped silhouette instead of a plain rectangle.
-function polymorphBite(rng, room) {
-  if (rng() >= POLYMORPH_CHANCE) return null;
-  const biteW = Math.max(1, Math.floor(room.w * POLYMORPH_MAX_BITE * rng()));
-  const biteH = Math.max(1, Math.floor(room.h * POLYMORPH_MAX_BITE * rng()));
-  if (biteW >= room.w || biteH >= room.h) return null;
-  const corner = randInt(rng, 0, 3);
-  const fromLeft = corner === 0 || corner === 2;
-  const fromTop = corner < 2;
-  return {
-    x0: fromLeft ? room.x : room.x + room.w - biteW,
-    y0: fromTop ? room.y : room.y + room.h - biteH,
-    w: biteW,
-    h: biteH,
-  };
-}
-
-function carveRoom(grid, rng, room, regionId) {
-  const bite = polymorphBite(rng, room);
+// Rooms are always plain rectangles. (Donjon's "polymorph rooms" corner
+// notches used to be cut here, but the maze pass always carved them back
+// in, so they never survived to the final map.)
+function carveRoom(grid, room, regionId) {
   for (let x = room.x; x < room.x + room.w; x++) {
     for (let y = room.y; y < room.y + room.h; y++) {
-      if (bite && x >= bite.x0 && x < bite.x0 + bite.w && y >= bite.y0 && y < bite.y0 + bite.h) continue;
       grid.carve(x, y, regionId, true);
     }
   }
@@ -358,7 +338,7 @@ function generateDonjonDungeon(seed) {
   const grid = Grid();
 
   const rooms = placeRooms(rng);
-  rooms.forEach((room, i) => carveRoom(grid, rng, room, i));
+  rooms.forEach((room, i) => carveRoom(grid, room, i));
 
   const regionCount = fillMaze(grid, rng, rooms.length);
   connectRegions(grid, rng, regionCount);

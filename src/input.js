@@ -51,14 +51,14 @@ function renderDragIndicator(context, start, end, hue) {
   for (let i = 0; i < segments; i++) {
     const t0 = i / segments;
     const t1 = (i + 1) / segments;
-    context.strokeStyle = `hsl(${length * ((t0 + t1) / 2) * HUE_PER_DISTANCE + hue}, 90%, 60%)`;
+    context.strokeStyle = `hsl(${length * ((t0 + t1) / 2) * HUE_PER_DISTANCE + hue},90%,60%)`;
     context.beginPath();
     context.moveTo(start.x + dx * t0, start.y + dy * t0);
     context.lineTo(start.x + dx * t1, start.y + dy * t1);
     context.stroke();
   }
 
-  context.strokeStyle = `hsl(${length * HUE_PER_DISTANCE + hue}, 90%, 60%)`;
+  context.strokeStyle = `hsl(${length * HUE_PER_DISTANCE + hue},90%,60%)`;
   [ARROW_ANGLE, -ARROW_ANGLE].forEach((angle) => {
     const [backX, backY] = rotate(-ux, -uy, angle);
     context.beginPath();
@@ -92,9 +92,9 @@ function DragController(player) {
     };
   }
 
+  // The camera is always added alongside this controller (see createMap).
   function currentZoom() {
-    const camera = getObjectsByTag(TAG_CAMERA)[0];
-    return camera ? camera.zoom : 1;
+    return getObjectsByTag(TAG_CAMERA)[0].zoom;
   }
 
   function onPointerDown(event) {
@@ -186,12 +186,9 @@ function DragController(player) {
       // translate/scale/translate (see Camera.set()) is replicated by hand
       // instead of reading it off the context.
       const camera = getObjectsByTag(TAG_CAMERA)[0];
-      const zoom = camera ? camera.zoom : 1;
-      const cameraX = camera ? camera.x : 0;
-      const cameraY = camera ? camera.y : 0;
       const origin = {
-        x: canvas.width / 2 + (player.x - cameraX) * zoom,
-        y: canvas.height / 2 + (player.y - cameraY) * zoom,
+        x: canvas.width / 2 + (player.x - camera.x) * camera.zoom,
+        y: canvas.height / 2 + (player.y - camera.y) * camera.zoom,
       };
       const end = {
         x: origin.x + current.x - start.x,

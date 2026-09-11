@@ -19,14 +19,14 @@ const PUDDLE_ASPECT = 0.55; // radiusY / radiusX -- flattened into an oval on th
 
 // `vx` and `vy` are ground-plane velocity in world units per second; `size` is
 // the puddle's base radius. Both the arc and the puddle are filled/stroked
-// with `color`. `arcHeight` overrides the default distance-proportional
+// with `color`. An `arcHeight` overrides the default distance-proportional
 // peak height -- callers firing off a burst of splats can randomize this
 // per-splat for some vertical variety instead of every arc peaking at
 // exactly the same fraction of its own distance.
-function SplatEffect(x, y, vx, vy, color, props = {}) {
+function SplatEffect(x, y, vx, vy, color, size, arcHeight) {
   const flightDuration = Math.random() * (FLIGHT_DURATION_MAX - FLIGHT_DURATION_MIN) + FLIGHT_DURATION_MIN;
   const distance = Math.hypot(vx, vy) * flightDuration;
-  const { size = 10, arcHeight = distance * ARC_HEIGHT_RATIO } = props;
+  arcHeight ??= distance * ARC_HEIGHT_RATIO;
 
   let elapsed = 0;
   let landed = false;
@@ -93,7 +93,7 @@ function fireSplatBurst(x, y, count, colors, speedMax, sizeMin, sizeMax, rng = M
     const angle = rng() * TAU;
     const speed = Math.sqrt(rng()) * speedMax;
     const size = sizeMin + rng() * (sizeMax - sizeMin);
-    add(SplatEffect(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, colors[i % colors.length], { size }));
+    add(SplatEffect(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, colors[i % colors.length], size));
   }
 }
 

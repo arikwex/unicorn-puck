@@ -62,7 +62,6 @@ function renderChaliceIcon(context, x, y, scale) {
 
 function Chalice(x, y) {
   let anim = Math.random() * TAU;
-  let collected = false;
 
   return {
     x,
@@ -70,7 +69,6 @@ function Chalice(x, y) {
     order: y,
 
     update(dt) {
-      if (collected) return true;
       anim += dt;
 
       const player = getObjectsByTag(TAG_PLAYER)[0];
@@ -78,7 +76,6 @@ function Chalice(x, y) {
       const distance = Math.hypot(player.x - this.x, player.y - this.y);
       if (distance > PICKUP_RADIUS + player.radius) return false;
 
-      collected = true;
       collectChalice();
       fireSplatBurst(this.x, this.y, COLLECT_SPLAT_COUNT, COLLECT_SPLAT_COLORS, COLLECT_SPLAT_SPEED_MAX, COLLECT_SPLAT_SIZE_MIN, COLLECT_SPLAT_SIZE_MAX);
       showItemCollectedToast('Pegacorn Blood Chalice');

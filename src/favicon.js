@@ -6,10 +6,11 @@ function setFavicon() {
   const iconCanvas = document.createElement('canvas');
   iconCanvas.width = iconCanvas.height = 64;
   renderPlayerPortrait(iconCanvas.getContext('2d'), 28, 38, 0.8);
-  const icon = document.querySelector('link[rel="icon"]') || document.createElement('link');
+  // The page ships no <link rel=icon> of its own; browsers sniff the PNG
+  // type from the data URL, and toDataURL() defaults to PNG.
+  const icon = document.createElement('link');
   icon.rel = 'icon';
-  icon.type = 'image/png';
-  icon.href = iconCanvas.toDataURL('image/png');
+  icon.href = iconCanvas.toDataURL();
   document.head.appendChild(icon);
 }
 

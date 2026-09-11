@@ -290,7 +290,7 @@ function Grub(x, y, room, seed, props = {}) {
       const vy = Math.sin(angle) * speed + impactVy * SPLAT_IMPACT_TRANSFER;
       const splatSize = randRange(rng, SPLAT_SIZE_MIN, SPLAT_SIZE_MAX);
       const splatArcHeight = Math.hypot(vx, vy) * randRange(rng, SPLAT_ARC_HEIGHT_TIME_MIN, SPLAT_ARC_HEIGHT_TIME_MAX);
-      add(SplatEffect(originX, originY, vx, vy, splatColor, { size: splatSize, arcHeight: splatArcHeight }));
+      add(SplatEffect(originX, originY, vx, vy, splatColor, splatSize, splatArcHeight));
     }
   }
 

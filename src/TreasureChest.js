@@ -5,12 +5,9 @@
 
 import { fillRect } from './canvasShapes.js';
 import { add } from './engine.js';
-import BubbleShieldItem from './BubbleShieldItem.js';
-import HealthItem from './HealthItem.js';
 import { fireSplatBurst } from './SplatEffect.js';
 import { TAG_OBSTACLE } from './tags.js';
 
-const SHIELD_DROP_CHANCE = 0.5;
 const HITS_REQUIRED = 2;
 // Exported so mapCreator.js's placement check uses the exact same radius
 // rather than a duplicated magic number.
@@ -70,14 +67,10 @@ function renderChest(context, flash) {
   fillRect(context, left, lidTop, CHEST_WIDTH, BASE_HEIGHT + LID_HEIGHT, '#fff', flash);
 }
 
-function TreasureChest(x, y, props = {}) {
-  // What pops out when it finally breaks -- a (cx, cy) => gameObject
-  // factory, so the caller (mapCreator.js) decides at map-generation time
-  // rather than this chest rolling it itself the moment it breaks. Default
-  // keeps the old random 50/50 for any caller that doesn't care to specify.
-  const {
-    contents = (cx, cy) => (Math.random() < SHIELD_DROP_CHANCE ? BubbleShieldItem(cx, cy) : HealthItem(cx, cy)),
-  } = props;
+// `contents` is what pops out when it finally breaks -- a (cx, cy) =>
+// gameObject factory, so the caller (mapCreator.js) decides at
+// map-generation time rather than this chest rolling it the moment it breaks.
+function TreasureChest(x, y, contents) {
   let hitsRemaining = HITS_REQUIRED;
   let flashTimer = 0;
   let hitCooldown = 0;

@@ -17,41 +17,32 @@ function healthColor(fraction) {
   return RED;
 }
 
-// (x, y) is the bar's center. `props` lets a caller nudge the look without
-// forking the function: outlineColor/outlineWidth, backgroundColor (shows
-// through empty ticks), tickGap, padding (inside the outline).
-function renderHealthBar(context, x, y, width, height, currentHp, maxHp, props = {}) {
-  const {
-    outlineColor = '#fff',
-    outlineWidth = 2,
-    backgroundColor = '#000',
-    tickGap = 2,
-    padding = 2,
-    shields = 0,
-  } = props;
+// (x, y) is the bar's center: a white 2px outline around translucent black,
+// with `shields` extra blue ticks after the health ticks.
+function renderHealthBar(context, x, y, width, height, currentHp, maxHp, shields = 0) {
 
   const fraction = Math.max(0, Math.min(1, currentHp / maxHp));
   const color = healthColor(fraction);
   const left = x - width / 2;
   const top = y - height / 2;
 
-  fillRect(context, left, top, width, height, backgroundColor, 0.55);
+  fillRect(context, left, top, width, height, '#000', 0.55);
 
-  // The outline straddles the rectangle edge; measure padding from its
-  // inner edge so the full gap remains visible beside the colored ticks.
-  const inset = outlineWidth / 2 + padding;
+  // The 2px outline straddles the rectangle edge; measure the 2px padding
+  // from its inner edge so the full gap stays visible beside the ticks.
+  const inset = 3;
   const slots = Math.max(maxHp, currentHp + shields);
   // Dense stacks still get one visible-width tick each, never a zero-width
   // bar because fixed gaps consumed all the available space.
-  const gap = Math.min(tickGap, Math.max(0, width - inset * 2) / slots * 0.25);
+  const gap = Math.min(2, Math.max(0, width - inset * 2) / slots * 0.25);
   const tickWidth = Math.max(0, (width - inset * 2 - gap * (slots - 1)) / slots);
   const tickHeight = Math.max(0, height - inset * 2);
   for (let i = 0; i < currentHp + shields; i++) {
     fillRect(context, left + inset + i * (tickWidth + gap), top + inset, tickWidth, tickHeight, i < currentHp ? color : SHIELD_COLOR);
   }
 
-  context.strokeStyle = outlineColor;
-  context.lineWidth = outlineWidth;
+  context.strokeStyle = '#fff';
+  context.lineWidth = 2;
   context.strokeRect(left, top, width, height);
 }
 

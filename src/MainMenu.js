@@ -35,11 +35,12 @@ function MainMenu(onBegin) {
   let anim = 0;
   // Render-only scenery: never added to the world or pickup/physics passes.
   const candelabra = Pillar(0, 0, { variant: 3 });
+  // [left, right, y] as fractions of the canvas, plus each wall's cube.
   const walls = [
-    { left: 0.7, right: 1.15, y: 0.27 },
-    { left: -0.15, right: 0.28, y: 0.32 },
-    { left: -0.15, right: 0.12, y: 0.53 },
-  ].map((placement) => ({ ...placement, wall: CubeObstacle() }));
+    [0.7, 1.15, 0.27],
+    [-0.15, 0.28, 0.32],
+    [-0.15, 0.12, 0.53],
+  ].map((placement) => [...placement, CubeObstacle()]);
 
   canvas.addEventListener('pointerdown', onBegin, { once: true });
 
@@ -57,7 +58,7 @@ function MainMenu(onBegin) {
       const propScale = Math.min(Math.max(canvas.width / 800, 0.75), canvas.height / 600, 1.5);
       context.save();
       context.globalAlpha = 0.45;
-      walls.forEach(({ left, right, y, wall }) => {
+      walls.forEach(([left, right, y, wall]) => {
         wall.x = canvas.width * (left + right) / 2;
         wall.y = canvas.height * y;
         wall.w = canvas.width * (right - left);
@@ -90,7 +91,7 @@ function MainMenu(onBegin) {
       const widths = [...TITLE_TOP].map((c) => context.measureText(c).width);
       let x = cx - widths.reduce((a, b) => a + b, 0) / 2;
       [...TITLE_TOP].forEach((c, i) => {
-        context.fillStyle = `hsl(${i * 34}, 100%, 65%)`;
+        context.fillStyle = `hsl(${i * 34},100%,65%)`;
         context.fillText(c, x, topY);
         x += widths[i];
       });

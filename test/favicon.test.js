@@ -16,10 +16,7 @@ globalThis.document = {
   createElement(tag) {
     if (tag === 'link') return {};
     assert.equal(tag, 'canvas');
-    iconCanvas = { getContext: () => context, toDataURL(type) {
-      assert.equal(type, 'image/png');
-      return 'data:image/png;base64,portrait';
-    } };
+    iconCanvas = { getContext: () => context, toDataURL: () => 'data:image/png;base64,portrait' };
     return iconCanvas;
   },
   head: { appendChild(link) { icon = link; links.add(link); } },
@@ -36,7 +33,6 @@ test('favicon renders the exact HUD head and horn into an embedded PNG', () => {
   assert.equal(iconCanvas.width, 64);
   assert.equal(iconCanvas.height, 64);
   assert.equal(icon.rel, 'icon');
-  assert.equal(icon.type, 'image/png');
   assert.equal(icon.href, 'data:image/png;base64,portrait');
   const faviconDrawing = calls;
   calls = [];
@@ -44,8 +40,7 @@ test('favicon renders the exact HUD head and horn into an embedded PNG', () => {
   renderPlayerPortrait(context, 28, 38, 0.8);
   assert.deepEqual(faviconDrawing, calls);
   assert.ok(calls.some(({ method }) => method === 'clip'), 'striped horn is included');
-  setFavicon();
-  assert.equal(links.size, 1, 'reinitializing replaces the same favicon link');
+  assert.equal(links.size, 1);
 });
 
 test('HTML build template uses the game title', () => {

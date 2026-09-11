@@ -21,7 +21,7 @@ function PlayerHealthHUD(player) {
       // the screen for large stacks. Actual maxHp is never modified.
       const width = Math.min(BAR_WIDTH * slots / player.maxHp, Math.max(1, canvas.width - BAR_LEFT - 16));
       renderHealthBar(context, BAR_LEFT + width / 2, BAR_Y,
-        width, BAR_HEIGHT, player.hp, player.maxHp, { shields });
+        width, BAR_HEIGHT, player.hp, player.maxHp, shields);
     },
   };
 }

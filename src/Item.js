@@ -23,7 +23,6 @@ const COLLECT_SPLAT_SIZE_MAX = 12;
 
 function Item(x, y, abilityId) {
   let anim = Math.random() * TAU;
-  let collected = false;
   const ability = ITEM_ABILITY_CATALOG[abilityId];
 
   return {
@@ -33,7 +32,6 @@ function Item(x, y, abilityId) {
     abilityId,
 
     update(dt) {
-      if (collected) return true;
       anim += dt;
 
       const player = getObjectsByTag(TAG_PLAYER)[0];
@@ -41,7 +39,6 @@ function Item(x, y, abilityId) {
       const distance = Math.hypot(player.x - this.x, player.y - this.y);
       if (distance > PICKUP_RADIUS + player.radius) return false;
 
-      collected = true;
       collectItemAbility(abilityId, player);
       fireSplatBurst(this.x, this.y, COLLECT_SPLAT_COUNT, COLLECT_SPLAT_COLORS, COLLECT_SPLAT_SPEED_MAX, COLLECT_SPLAT_SIZE_MIN, COLLECT_SPLAT_SIZE_MAX);
       showItemCollectedToast(ability.name);

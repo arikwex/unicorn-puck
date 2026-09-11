@@ -46,10 +46,8 @@ function GrubProjectile(x, y, vx, vy, props = {}) {
         const angle = Math.random() * TAU;
         const speed = 20 + Math.random() * 50;
         add(SplatEffect(lastX + dx * t, lastY + dy * t,
-          Math.cos(angle) * speed, Math.sin(angle) * speed, color, {
-          size: 6 + Math.random() * 3,
-          arcHeight: 6 + Math.random() * 6,
-        }));
+          Math.cos(angle) * speed, Math.sin(angle) * speed, color,
+          6 + Math.random() * 3, 6 + Math.random() * 6));
         distanceToNextSplat += trailSpacing();
       }
       distanceToNextSplat -= distance;

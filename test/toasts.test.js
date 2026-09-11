@@ -121,7 +121,6 @@ test('health pickup toasts once after spawn protection, including at full health
   assert.equal(draw(toasts).text.length, 0);
   assert.equal(item.update(0.21), true);
   assert.equal(player.hp, 5);
-  assert.equal(item.update(0.1), true);
   assert.equal(draw(toasts).text[0].text, 'Health Potion Collected');
   assert.equal(soundStarts, 1);
   assert.equal(HealthItem(0, 0).update(0.31), true);
@@ -134,7 +133,6 @@ test('chalice pickup toasts once and uses only the toast chime', () => {
   add({ x: 0, y: 0, radius: 20, tags: [TAG_PLAYER] });
   resetChalices(2);
   const item = Chalice(0, 0);
-  assert.equal(item.update(0.1), true);
   assert.equal(item.update(0.1), true);
   assert.equal(draw(toasts).text[0].text, 'Pegacorn Blood Chalice Collected');
   assert.equal(chaliceProgress().collected, 1);

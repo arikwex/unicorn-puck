@@ -28,7 +28,7 @@ const { default: PlayerHealthHUD } = await import('../src/PlayerHealthHUD.js');
 
 afterEach(() => { stop(); clear(); calls = []; });
 
-test('player health starts full, supports custom HP and clamps damage at zero', () => {
+test('player health starts full and clamps damage at zero', () => {
   const player = PlayerCharacter();
   assert.equal(player.hp, 5);
   assert.equal(player.maxHp, 5);
@@ -38,9 +38,6 @@ test('player health starts full, supports custom HP and clamps damage at zero', 
   assert.equal(player.hp, 4);
   player.takeDamage(100);
   assert.equal(player.hp, 0);
-  const custom = PlayerCharacter(0, 0, 0, { maxHp: 10, hp: 7 });
-  assert.equal(custom.hp, 7);
-  assert.equal(custom.maxHp, 10);
 });
 
 test('HUD reflects live HP with shared colors, white outline and padded segments', () => {

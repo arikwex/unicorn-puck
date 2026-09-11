@@ -48,7 +48,6 @@ function ToastSystem() {
       context.font = 'bold 20px sans-serif';
       const textWidth = context.measureText(message).width;
       const width = Math.min(maxWidth, textWidth + 32);
-      const fontSize = 20 * Math.min(1, (maxWidth - 32) / textWidth);
       const x = canvas.width / 2;
       const y = canvas.height - MARGIN - HEIGHT + (1 - enter) ** 2 * HEIGHT;
       context.globalAlpha = Math.min(enter, (DURATION - elapsed) / FADE_OUT);
@@ -56,11 +55,11 @@ function ToastSystem() {
       context.strokeStyle = '#fff';
       context.lineWidth = 2;
       context.strokeRect(x - width / 2, y, width, HEIGHT);
-      context.font = `bold ${fontSize}px sans-serif`;
       context.textAlign = 'center';
       context.textBaseline = 'middle';
       context.fillStyle = '#fff';
-      context.fillText(message, x, y + HEIGHT / 2);
+      // maxWidth squeezes a message too long for a narrow screen to fit.
+      context.fillText(message, x, y + HEIGHT / 2, maxWidth - 32);
       context.restore();
     },
   };

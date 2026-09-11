@@ -6,7 +6,7 @@ const MOBILE_WIDTH = 600;
 function hudScale() {
   // Coarse pointers include phones/tablets in landscape; the width check
   // also supports narrow desktop windows and mobile viewport previews.
-  return canvas.width <= MOBILE_WIDTH || globalThis.matchMedia?.('(pointer: coarse)').matches
+  return canvas.width <= MOBILE_WIDTH || matchMedia('(pointer:coarse)').matches
     ? MOBILE_HUD_SCALE : 1;
 }
 

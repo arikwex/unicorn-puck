@@ -34,6 +34,7 @@ const { add, clear, getObjects, remove } = await import('../src/engine.js');
 const { default: PlayerCharacter } = await import('../src/PlayerCharacter.js');
 const { default: PlayerHealthHUD } = await import('../src/PlayerHealthHUD.js');
 const { default: BubbleShieldItem } = await import('../src/BubbleShieldItem.js');
+const { default: HealthItem } = await import('../src/HealthItem.js');
 const { default: TreasureChest } = await import('../src/TreasureChest.js');
 const { default: GrubProjectile } = await import('../src/GrubProjectile.js');
 const { default: ToastSystem } = await import('../src/ToastSystem.js');
@@ -79,8 +80,7 @@ test('pickup respects spawn protection and distance, stacks at full HP, and toas
   player.x = 300;
   assert.equal(pickup.update(0.21), false);
   player.x = 0;
-  assert.equal(pickup.update(0), true);
-  assert.equal(pickup.update(0), true);
+  assert.equal(pickup.update(0), true, 'collected (the engine then removes it)');
   assert.equal(player.bubbleShields, 1);
   assert.equal(player.hp, 5);
   renderToast();
@@ -136,7 +136,7 @@ test('blue HUD ticks use empty health slots before expanding, without changing m
 
 test('large stacks fit a mobile screen with positive-width blue ticks and padded white outline', () => {
   canvas.width = 320;
-  const player = PlayerCharacter(0, 0, 0, { bubbleShields: 1000 });
+  const player = Object.assign(PlayerCharacter(), { bubbleShields: 1000 });
   PlayerHealthHUD(player).renderHUD(context);
   const ticks = draws.filter(({ method, color }) => method === 'fillRect' && color === SHIELD_COLOR);
   const outline = draws.find(({ method }) => method === 'strokeRect');
@@ -148,7 +148,7 @@ test('large stacks fit a mobile screen with positive-width blue ticks and padded
 });
 
 test('projectiles consume one shield once, still knock back, and damage HP only after charges run out', () => {
-  const player = add(PlayerCharacter(0, 0, 0, { bubbleShields: 1 }));
+  const player = add(Object.assign(PlayerCharacter(), { bubbleShields: 1 }));
   const shot = add(GrubProjectile(-100, 0, 1000, 0));
   if (shot.update(0.1)) remove(shot);
   assert.equal(player.bubbleShields, 0);
@@ -161,7 +161,7 @@ test('projectiles consume one shield once, still knock back, and damage HP only 
 });
 
 test('battle armor and healing preserve shield charges without making them permanent max health', () => {
-  const player = PlayerCharacter(0, 0, 0, { hp: 2, bubbleShields: 3 });
+  const player = Object.assign(PlayerCharacter(), { hp: 2, bubbleShields: 3 });
   collectItemAbility(0, player); // BATTLE ARMOR
   assert.equal(player.hp, 4); assert.equal(player.maxHp, 7);
   player.heal(100);
@@ -170,20 +170,19 @@ test('battle armor and healing preserve shield charges without making them perma
   assert.equal(player.maxHp, 7); assert.equal(player.hp, 7);
 });
 
-test('chests can drop either a bubble shield or the existing health pickup', () => {
-  for (const roll of [0.1, 0.9]) {
+test('chests drop their assigned bubble shield or health pickup when they break', () => {
+  for (const contents of [BubbleShieldItem, HealthItem]) {
     clear();
-    Math.random = () => roll;
-    const player = add(PlayerCharacter(0, 0, 0, { hp: 1 }));
+    const player = add(Object.assign(PlayerCharacter(), { hp: 1 }));
     player.charge = 1;
-    const chest = TreasureChest(0, 0);
+    const chest = TreasureChest(0, 0, contents);
     chest.hit(player);
     chest.update(0.7);
     assert.equal(chest.hit(player), true);
     const pickup = getObjects().find((object) => object !== player && object.x === 0 && object.y === 0);
     assert.ok(pickup);
     assert.equal(pickup.update(0.31), true);
-    assert.equal(player.bubbleShields, roll < 0.5 ? 1 : 0);
-    assert.equal(player.hp, roll < 0.5 ? 1 : 3);
+    assert.equal(player.bubbleShields, contents === BubbleShieldItem ? 1 : 0);
+    assert.equal(player.hp, contents === BubbleShieldItem ? 1 : 3);
   }
 });

@@ -51,7 +51,7 @@ function fireDamageSplats(x, y) {
     const arcHeightTime = DAMAGE_SPLAT_ARC_HEIGHT_TIME_MIN
       + Math.random() * (DAMAGE_SPLAT_ARC_HEIGHT_TIME_MAX - DAMAGE_SPLAT_ARC_HEIGHT_TIME_MIN);
     const arcHeight = Math.hypot(vx, vy) * arcHeightTime;
-    add(SplatEffect(x, y, vx, vy, color, { size, arcHeight }));
+    add(SplatEffect(x, y, vx, vy, color, size, arcHeight));
   });
 }
 
@@ -584,16 +584,11 @@ function renderPlayer(context, player, anim, charge, trail) {
   renderWingsAndTail(context, player, angle, anim, true, charge);
 }
 
-function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
+function PlayerCharacter(x = 0, y = 0, angle = 0) {
   let anim = 0;
   let damageFlashTimer = 0;
   let damageCanvas;
   let trail = []; // recent { x, y, t, charge } samples, for renderTrail -- see update()
-  const {
-    maxHp = 5,
-    hp = maxHp,
-    bubbleShields = 0,
-  } = props;
 
   return {
     x,
@@ -601,9 +596,9 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     angle,
     vx: 0,
     vy: 0,
-    hp: Math.max(0, Math.min(maxHp, hp)),
-    maxHp,
-    bubbleShields: Math.max(0, Math.floor(bubbleShields)),
+    hp: 5,
+    maxHp: 5,
+    bubbleShields: 0,
     // Driven by DragController while the player is aiming a launch.
     aiming: false,
     targetAngle: angle,
