@@ -102,7 +102,7 @@ const oozeShotBuffer = lazySound(0.28, (t) => {
   const wobble = Math.sin(TAU * 14 * t) * 35;
   const freq = 220 + wobble - 150 * (t / 0.28);
   const tone = Math.sin(TAU * freq * t);
-  return 0.2 * envelope * (tone * 0.85 + noise() * 0.15);
+  return 0.8 * envelope * (tone * 0.85 + noise() * 0.15);
 });
 
 function playOozeShot() {

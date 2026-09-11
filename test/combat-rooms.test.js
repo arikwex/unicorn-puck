@@ -126,7 +126,7 @@ test('entering locks once; only that room’s final kill opens all gates with ei
   room.update();
   assert.equal(room.state, 'ready');
   assert.equal(sounds.length, 0);
-  player.x = 0;
+  player.x = 320;
   const before = getObjects().length;
   room.update();
   assert.equal(room.state, 'active');
@@ -150,11 +150,36 @@ test('entering locks once; only that room’s final kill opens all gates with ei
   assert.equal(sounds.length, 2, 'cleared rooms do not reactivate');
 });
 
-test('threshold closure resolves the player inward on every side through the collision pass', () => {
+test('activation waits for full player clearance plus padding at every edge and corner', () => {
+  for (const radius of [38, 60]) {
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) {
+      const { room, player, doors } = fixture();
+      player.radius = radius;
+      function enter(depth) {
+        player.x = 320 + dx * (360 - depth);
+        player.y = 320 + dy * (360 - depth);
+        room.update();
+      }
+      for (const depth of [-10, 0, 1, radius - 1, radius, radius + 15]) {
+        enter(depth);
+        assert.equal(room.state, 'ready', 'touching or partially entering the room must not lock it');
+        assert.equal(getObjectsByTag(TAG_OBSTACLE).length, 0);
+      }
+      enter(radius + 17);
+      assert.equal(room.state, 'active');
+      for (const door of doors) {
+        assert.equal(circleBoxContact(player, MetalGrate(door).puck()), null, 'closure never overlaps the player');
+      }
+      clear();
+    }
+  }
+});
+
+test('active grates resolve player overlap inward on every side through the collision pass', () => {
   const { room, player, doors } = fixture();
   remove(player);
   const body = add({
-    x: -39, y: 320, radius: 38, hp: 5, mass: 1, vx: 0, vy: 0, omega: 0,
+    x: 320, y: 320, radius: 38, hp: 5, mass: 1, vx: 0, vy: 0, omega: 0,
     viscosity: 0, angularViscosity: 0, bounciness: 0.4, tags: [TAG_PLAYER, TAG_PUCK],
     puck() { return this; },
   });
@@ -172,7 +197,7 @@ test('threshold closure resolves the player inward on every side through the col
 test('empty rooms stay open and removing an active controller cleans up gates silently', () => {
   const { room, player, enemies } = fixture();
   enemies.forEach((enemy) => { enemy.hp = 0; });
-  player.x = 0; room.update();
+  player.x = 320; room.update();
   assert.equal(room.state, 'cleared');
   assert.equal(sounds.length, 0);
   const second = add(CombatRoom(room.bounds, [{ x: -80, y: 320, w: 80, h: 240 }], [{ hp: 1 }]));
@@ -213,7 +238,7 @@ test('fast launches cannot tunnel through any grate and projectiles also stop at
 
 test('combat cue has a strong onset, a long decaying tail, and finite unclipped samples', () => {
   const { room, player } = fixture();
-  player.x = 0; room.update();
+  player.x = 320; room.update();
   const samples = sounds[0].getChannelData(0);
   assert.equal(samples.length, 3200);
   assert.ok(samples.every((sample) => Number.isFinite(sample) && Math.abs(sample) < 1));

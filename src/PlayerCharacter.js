@@ -14,6 +14,7 @@ const PROJECTILE_KNOCKBACK = 120;
 const PLAYER_RADIUS = 38;
 const WALL_BOUNCE_SOUND_MIN_SPEED = 30; // world units/s of velocity change -- below this, a resting/sliding contact stays silent
 const DAMAGE_CANVAS_SIZE = 320;
+const PINBALL_BOOST_FACTOR = 1.08; // Chromatic Hoof: fraction of pre-bounce speed an enemy bounce reboosts back up to (and past)
 
 // -- damage splats -----------------------------------------------------------
 // Red, orange, yellow, green, blue, violet -- one splat of each, always all
@@ -702,6 +703,14 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     // Smoothed 0..1 "how fast am I currently going" -- see the
     // CHARGE_SPEED_REF/CHARGE_EASE_RATE comment above.
     charge: 0,
+    // Item-ability stats -- see ItemAbility.js for what grants each of
+    // these. Plain defaults so every reader (input.js, Grub.js, this
+    // file's own onCollision) can use the field directly, no `|| default`
+    // fallback needed anywhere.
+    boostPower: 1, // multiplies a drag-launch's impulse magnitude (Valkyrie Wings)
+    impactDamageBonus: 0, // added to every charging-hit damage roll (Mithril Horn)
+    pinballMomentum: false, // enemy bounces reboost speed instead of losing it (Chromatic Hoof)
+    oracleEyes: false, // reveals MiniMap.js's HUD (Oracle Eyes)
     // Draw order keyed off y, recomputed every update -- see CubeObstacle.js
     // for why (same painter's-algorithm depth illusion), but a moving puck
     // needs it refreshed every frame rather than set once.
@@ -732,12 +741,30 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
         }
         return;
       }
+      const isEnemy = other.tags?.includes(TAG_ENEMY);
       // Grub's own onCollision plays its hit sound when a charging hit
       // actually lands, so a plain bump into an enemy that does no damage
       // stays silent here rather than doubling up on the wall-bounce sound.
-      if (!other.tags?.includes(TAG_ENEMY)) {
+      if (!isEnemy) {
         const impactSpeed = Math.hypot(collision.response.dvx, collision.response.dvy);
         if (impactSpeed >= WALL_BOUNCE_SOUND_MIN_SPEED) playWallBounce(impactSpeed);
+      }
+
+      if (isEnemy && this.pinballMomentum) {
+        // Chromatic Hoof: a normal bounce's restitution still loses some
+        // energy (bounciness < 1) -- reboost back up to (and a bit past)
+        // whatever speed we had going in, pinball-bumper style, instead of
+        // letting the collision decay it.
+        const preSpeed = Math.hypot(this.vx, this.vy);
+        this.bounce(collision.response);
+        const postSpeed = Math.hypot(this.vx, this.vy);
+        if (postSpeed > 0) {
+          const targetSpeed = Math.max(preSpeed, postSpeed) * PINBALL_BOOST_FACTOR;
+          const scale = targetSpeed / postSpeed;
+          this.vx *= scale;
+          this.vy *= scale;
+        }
+        return;
       }
       this.bounce(collision.response);
     },

@@ -6,10 +6,12 @@
 - [x] basic combat instance room (kill all enemies to continue?)
 - [x] tresure chest -> Bump to damage / crack open
 - [x] toast system -> item collected should show momentary toast "Health Potion Collected" or "Pegacorn Blood Chalice Collected" etc. (momentary 2 seconds from bottom of screen). use even bus to trigger. small sfx "du-ding" when invoked. (use the same sound that is currently the "chalice collected" sound, but use it for all toast events. rename it to "item collected" and it's always used one-to-one with toast=item-collected.)
+- [x] level end mechanics (exit gateway / flag / unicorn key)
 - pinball style dingers
 - crystal -> Bump to damage / recharge unicorn power
 - lever + gateway
-- level end mechanics (exit gateway / flag / unicorn key)
+
+- new collectable (like the HealthItem): bubble shield (single use health shield). Visually shown as semi-transparent circle bubble around player. Takes exactly one hit of damage and never comes back. while present, the player's HP bar should show one BLUE tick for each bubble shield the player has. If the bubble shield exceeds the players max health, just increase the max health bar meter temporarily to accomodate the bubble shield. Bubble shields stack and you can have as many as you find. Render a single bubble around the player until the play has no bubble shields remaining.
 
 Item abilities (All very simple solid color with 6px thick outline shapes. Hieroglyph/iconographs of the intended item).
 - BATTLE ARMOR: increase max health by 2 (grant +2 health at the moment it is gained)

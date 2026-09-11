@@ -143,7 +143,9 @@ function DragController(player) {
       // camera only translates and scales, never rotates or flips), so
       // only the magnitude needs the /zoom correction.
       const worldDistance = screenDistance / zoom;
-      const magnitude = linearImpulseMagnitude(worldDistance);
+      // Valkyrie Wings raises player.boostPower above its default 1,
+      // scaling the whole launch curve (including its cap) proportionally.
+      const magnitude = linearImpulseMagnitude(worldDistance) * player.boostPower;
       const impulseX = (dx / screenDistance) * magnitude;
       const impulseY = (dy / screenDistance) * magnitude;
       applyImpulse(player.puck(), impulseX, impulseY, 0);

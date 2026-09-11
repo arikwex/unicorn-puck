@@ -5,6 +5,8 @@ import { playCombatImpact } from './sounds.js';
 import SplatEffect from './SplatEffect.js';
 import { TAG_COMBAT_ROOM, TAG_PLAYER } from './tags.js';
 
+const ACTIVATION_PADDING = 16; // extra clearance beyond the player's collision radius
+
 function splash(door) {
   for (let i = 0; i < 8; i++) {
     const angle = Math.random() * Math.PI * 2;
@@ -30,6 +32,7 @@ function CombatRoom(bounds, doorways, enemies) {
       if (this.state === 'cleared') return;
       const player = getObjectsByTag(TAG_PLAYER)[0];
       if (!player || player.hp <= 0) return;
+      const inset = player.radius + ACTIVATION_PADDING;
       const alive = enemies.some((enemy) => enemy.hp > 0);
       if (this.state === 'active') {
         if (alive) return;
@@ -41,8 +44,11 @@ function CombatRoom(bounds, doorways, enemies) {
       } else if (!alive) {
         // A room cleared from outside must never lock an empty encounter.
         this.state = 'cleared';
-      } else if (Math.abs(player.x - bounds.x) < bounds.w / 2
-        && Math.abs(player.y - bounds.y) < bounds.h / 2) {
+      } else if (Math.abs(player.x - bounds.x) < bounds.w / 2 - inset
+        && Math.abs(player.y - bounds.y) < bounds.h / 2 - inset) {
+        // The entire player must clear the doorway plus a safety margin.
+        // Grates stay outside these bounds; swept collisions prevent even
+        // an immediate high-speed reversal from crossing the closed gate.
         this.state = 'active';
         grates = doorways.map((door) => add(MetalGrate(door)));
         doorways.forEach(splash);

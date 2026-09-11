@@ -416,7 +416,8 @@ function Grub(x, y, room, seed, props = {}) {
       const player = collision.otherBody;
       if (player.charge <= CHARGING_THRESHOLD) return;
 
-      const damage = player.charge >= HIGH_CHARGE_DAMAGE_THRESHOLD ? 2 : 1;
+      // Mithril Horn adds a flat bonus on top of the usual charge-based roll.
+      const damage = (player.charge >= HIGH_CHARGE_DAMAGE_THRESHOLD ? 2 : 1) + player.impactDamageBonus;
       this.hp = Math.max(0, this.hp - damage);
       playEnemyHit(damage);
       flashTimer = FLASH_DURATION;

@@ -40,7 +40,7 @@ function fireDeathSplats(x, y) {
 // input and the HUD the same way (camera and dungeon stay put --
 // Camera.follow() keeps its target reference even after removal, so the
 // view stays frozen right where the run ended). Self-removes once fired.
-function GameWatcher(player, dragController, playerHealthHUD, chaliceHUD) {
+function GameWatcher(player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap) {
   return {
     update() {
       const won = chalicesComplete()
@@ -49,7 +49,7 @@ function GameWatcher(player, dragController, playerHealthHUD, chaliceHUD) {
       if (!won && !lost) return;
 
       if (lost) fireDeathSplats(player.x, player.y);
-      remove([player, dragController, playerHealthHUD, chaliceHUD]);
+      remove([player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap]);
       add(won
         ? StatusCard(showMenu, { lines: ['PEGACORN BLOOD', 'RECLAIMED'], color: '#fff' })
         : StatusCard(showMenu));
@@ -71,9 +71,9 @@ function startGame() {
   clear();
   const seed = (Math.random() * 0xffffffff) >>> 0;
   const {
-    player, dragController, playerHealthHUD, chaliceHUD,
+    player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap,
   } = createMap(seed);
-  add(GameWatcher(player, dragController, playerHealthHUD, chaliceHUD));
+  add(GameWatcher(player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap));
 }
 
 function startGameFlow() {

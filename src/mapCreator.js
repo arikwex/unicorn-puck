@@ -11,7 +11,11 @@ import { add } from './engine.js';
 import Grub from './Grub.js';
 import inflateDungeon from './inflateDungeon.js';
 import DragController from './input.js';
+import Item from './Item.js';
+import { ITEM_ABILITY_CATALOG, resetItemAbilities } from './ItemAbility.js';
+import ItemAbilityHUD from './ItemAbilityHUD.js';
 import mergeWallsIntoRects from './mergeWalls.js';
+import MiniMap from './MiniMap.js';
 import PhysicsWorld from './PhysicsWorld.js';
 import Pillar from './Pillar.js';
 import placePillars, { findEntranceCells } from './placePillars.js';
@@ -53,6 +57,13 @@ const CHALICE_PLACEMENT_ATTEMPTS = 30;
 // entrance/doorway, and prefer at least OBSTACLE_CLEARANCE from obstacles.
 const ENTRANCE_CLEARANCE = 3; // world units of clearance required off any room entrance/doorway
 const OBSTACLE_CLEARANCE = 2; // world units of clearance required off every wall/pillar/grub/chest
+// One of each item ability, in up to that many distinct non-spawn rooms
+// (fewer if the dungeon doesn't have that many) -- best-effort like a
+// chest, not guaranteed like a chalice, since these are bonuses rather
+// than required to win.
+const ITEM_ROOM_MARGIN = 45;
+const ITEM_RADIUS = 24;
+const ITEM_PLACEMENT_ATTEMPTS = 30;
 // Wall decorations: a flat per-wall-cell chance, no clearance-checking
 // machinery like chest/chalice/pillar get -- they're purely cosmetic and
 // mounted right on the wall, a spot nothing else ever wants anyway.
@@ -315,6 +326,21 @@ function buildDungeon(seed) {
   });
   resetChalices(chaliceRoomIndices.length);
 
+  // One of each item ability (see ItemAbility.js), each in its own
+  // distinct non-spawn room -- best-effort placement like a chest, since
+  // these are bonuses rather than something the level requires to win.
+  const itemRng = mulberry32(seed + 7);
+  resetItemAbilities();
+  shuffled(nonSpawnRoomIndices, itemRng).slice(0, ITEM_ABILITY_CATALOG.length).forEach((roomIndex, i) => {
+    const room = dungeon.rooms[roomIndex];
+    const roomCenter = toWorld(room.x + room.w / 2, room.y + room.h / 2);
+    const worldRoom = {
+      x: roomCenter.x, y: roomCenter.y, w: room.w * TILE, h: room.h * TILE,
+    };
+    const spawn = findClearSpot(worldRoom, ITEM_ROOM_MARGIN, ITEM_RADIUS, ITEM_PLACEMENT_ATTEMPTS, itemRng, wallBoxes, obstacleCircles, roomEntrancePoints(room));
+    if (spawn) add(Item(spawn.x, spawn.y, ITEM_ABILITY_CATALOG[i].id));
+  });
+
   // Wall decorations (shield/candle/crystal/rune), sprinkled at random
   // along hallway and room walls -- everywhere a wall cell actually
   // borders floor (so it's visible) except above (an "up"-facing wall's
@@ -349,12 +375,14 @@ function createMap(seed) {
   const player = add(PlayerCharacter(spawn.x, spawn.y));
   const playerHealthHUD = add(PlayerHealthHUD(player));
   const chaliceHUD = add(ChaliceHUD());
+  const itemAbilityHUD = add(ItemAbilityHUD());
+  const miniMap = add(MiniMap(player));
   add(ToastSystem());
   add(Camera().follow(player));
   const dragController = add(DragController(player));
   add(PhysicsWorld());
   return {
-    player, dragController, playerHealthHUD, chaliceHUD,
+    player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap,
   };
 }
 
