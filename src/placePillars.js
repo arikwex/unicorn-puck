@@ -14,10 +14,12 @@ const LARGE_ROOM_SPAN = 12; // either axis at least this big always gets a pilla
 const MIN_PILLAR_SPACING = 2; // min cells between two pillars placed in the same room
 const SKIP_ROOM_CHANCE = 0.08; // even an eligible small/medium room sometimes just goes without, for variety
 const COLONNADE_COUNT = 3; // pillars per row in a colonnade pattern
+
+/* Pillar.js retired its 3 extra visual variants (see its own VARIANT_COUNT
+   comment) down to just the classic column, so a room no longer needs a
+   variant pool at all -- kept here commented rather than deleted.
 const PILLAR_VARIANT_COUNT = 4; // see Pillar.js -- classic column, crystal, flame square, candelabra
 const ROOM_TWO_VARIANT_CHANCE = 0.5; // otherwise the room's pillars are all one variant
-
-const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 // A room's pillars draw from either one variant or, half the time, an even
 // mix of two -- never 3+ different looks scattered through the same room.
@@ -28,6 +30,9 @@ function pickRoomVariantPool(rng) {
   if (second >= first) second += 1; // skip over `first` so the two are always distinct
   return [first, second];
 }
+*/
+
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 function key(x, y) {
   return `${x},${y}`;
@@ -116,10 +121,9 @@ function placeInRoom(rng, room, floorSet) {
   const floorCells = roomFloorCells(room, floorSet);
   const entrances = findEntranceCells(room, floorSet);
   const pattern = PATTERNS[Math.floor(rng() * PATTERNS.length)];
-  // Every pillar in this room draws from the same 1-or-2-variant pool,
-  // rather than each independently rolling among all four.
-  const variantPool = pickRoomVariantPool(rng);
-  const pickVariant = () => variantPool[Math.floor(rng() * variantPool.length)];
+  // `variant` used to draw from a per-room 1-or-2-variant pool (see the
+  // commented-out pickRoomVariantPool above) back when Pillar.js had more
+  // than one look; now there's only ever variant 0.
 
   const placed = [];
   pattern.forEach(([fx, fy]) => {
@@ -131,7 +135,7 @@ function placeInRoom(rng, room, floorSet) {
     if (!cell) return;
     if (entrances.some((entrance) => manhattan(entrance, cell) < ENTRANCE_CLEARANCE)) return;
     if (placed.some((other) => manhattan(other, cell) < MIN_PILLAR_SPACING)) return;
-    placed.push({ ...cell, variant: pickVariant() });
+    placed.push({ ...cell, variant: 0 });
   });
 
   // A large room reads as too bare without at least one pillar -- if the
@@ -144,16 +148,16 @@ function placeInRoom(rng, room, floorSet) {
       y: Math.round(innerY0 + (innerY1 - innerY0) / 2),
     };
     const cell = nearestFloorCell(center, floorCells);
-    if (cell) placed.push({ ...cell, variant: pickVariant() });
+    if (cell) placed.push({ ...cell, variant: 0 });
   }
 
   return placed;
 }
 
-// Returns every pillar's { x, y, variant } (grid cells, variant an index
-// into Pillar.js's four render variants) across the whole dungeon.
-// Deterministic for a given seed, independent of whatever seed the
-// dungeon layout itself used.
+// Returns every pillar's { x, y, variant } (grid cells; variant is always 0
+// now that Pillar.js has just the one render look, see its own
+// VARIANT_COUNT comment) across the whole dungeon. Deterministic for a
+// given seed, independent of whatever seed the dungeon layout itself used.
 function placePillars(dungeon, seed) {
   const rng = mulberry32(seed);
   const floorSet = new Set(dungeon.floor.map(({ x, y }) => key(x, y)));

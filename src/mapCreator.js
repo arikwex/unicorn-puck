@@ -7,9 +7,6 @@ import ChaliceHUD from './ChaliceHUD.js';
 import CombatRoom from './CombatRoom.js';
 import { findRoomDoorways, selectCombatRooms } from './combatRoomLayout.js';
 import CubeObstacle from './CubeObstacle.js';
-import Decoration, {
-  DECORATION_TYPE_COUNT, DOWN as DECORATION_DOWN, LEFT as DECORATION_LEFT, RIGHT as DECORATION_RIGHT,
-} from './Decoration.js';
 import generateDungeon, { mulberry32 } from './donjonDungeon.js';
 import { add } from './engine.js';
 import Grub from './Grub.js';
@@ -82,10 +79,6 @@ const CHALICE_PLACEMENT_ATTEMPTS = 30;
 // entrance/doorway, and prefer at least OBSTACLE_CLEARANCE from obstacles.
 const ENTRANCE_CLEARANCE = 3; // world units of clearance required off any room entrance/doorway
 const OBSTACLE_CLEARANCE = 2; // world units of clearance required off every wall/pillar/grub/chest
-// Wall decorations: a flat per-wall-cell chance, no clearance-checking
-// machinery like chest/chalice/pillar get -- they're purely cosmetic and
-// mounted right on the wall, a spot nothing else ever wants anyway.
-const DECORATION_CHANCE = 0.05;
 // The raw generator's corridors are a single grid cell wide -- just barely
 // wider than the player puck, which feels awful to actually fly through.
 // Post-inflating by 2x guarantees every corridor and room is at least 2
@@ -501,28 +494,6 @@ function buildDungeon(seed) {
     add(Chalice(spawn.x, spawn.y));
   });
   resetChalices(chaliceRoomIndices.length);
-
-  // Wall decorations (shield/candle/crystal/rune), sprinkled at random
-  // along hallway and room walls -- everywhere a wall cell actually
-  // borders floor (so it's visible) except above (an "up"-facing wall's
-  // face points away from the camera and is never seen in this engine's
-  // rendering, so decorating it would be pointless). Deliberately simple:
-  // one flat chance per eligible cell, no attempts/clearance-checking like
-  // chest/chalice/pillar placement gets -- decorations sit right on the
-  // wall face, a spot nothing else ever competes for anyway.
-  const decorationRng = mulberry32(seed + 5);
-  dungeon.walls.forEach(({ x: wx, y: wy }) => {
-    let facing;
-    if (floorSet.has(`${wx},${wy + 1}`)) facing = DECORATION_DOWN;
-    else if (floorSet.has(`${wx - 1},${wy}`)) facing = DECORATION_LEFT;
-    else if (floorSet.has(`${wx + 1},${wy}`)) facing = DECORATION_RIGHT;
-    else return;
-    if (decorationRng() >= DECORATION_CHANCE) return;
-
-    const type = Math.floor(decorationRng() * DECORATION_TYPE_COUNT);
-    const world = toWorld(wx, wy);
-    add(Decoration(world.x, world.y, type, facing));
-  });
 
   return playerSpawn;
 }

@@ -2,7 +2,12 @@ import { fillEllipse } from './canvasShapes.js';
 import { TAG_OBSTACLE } from './tags.js';
 
 const TAU = Math.PI * 2;
-const VARIANT_COUNT = 4;
+// Was 4 while every pillar rolled one of 4 visual variants (see the
+// commented-out crystal/square/candelabra code and placePillars.js's own
+// commented-out variant-pool logic below) -- simplified down to just the
+// classic column to cut size; left commented rather than deleted in case
+// the variety is worth bringing back later.
+const VARIANT_COUNT = 1;
 
 // A small extruded square slab -- a flat top face sitting on a shaded side
 // face dropping down by `height` -- used for both the pillar's base and
@@ -40,9 +45,12 @@ function renderClassicPillar(context, obstacle) {
   renderSlab(context, x, capTopY, capHalfSize, capHeight, stoneColor, shadeColor);
 }
 
-// -- variant 1: crystal on a squat plinth --------------------------------
-// Base and shaft radius match the classic pillar's own (see obstacle.base*/
-// radius below) -- only the shaft height is halved, so the plinth reads as
+/* -- variant 1: crystal on a squat plinth, variant 2: square pillar with a
+   flame on top, variant 3: 3-prong candelabra -- retired to cut size (see
+   VARIANT_COUNT above); kept here commented rather than deleted.
+
+// Base and shaft radius match the classic pillar's own (see obstacle.base
+// fields / radius below) -- only the shaft height is halved, so the plinth reads as
 // a shorter version of the same column rather than its own thinner one.
 const CRYSTAL_BASE_SIZE = 16; // half-diagonal of the diamond, pre-scale
 const CRYSTAL_OVERALL_SCALE = 1.3; // 30% larger
@@ -135,7 +143,7 @@ function renderFlame(context, x, topY, anim) {
 
 // -- variant 2: square pillar with a flame on top ------------------------
 // Base, cap, and shaft width match the classic pillar's own (see
-// obstacle.base*/cap*/radius below) -- only the shaft height is halved.
+// obstacle.base/cap/radius fields below) -- only the shaft height is halved.
 const SQUARE_FLAME_SCALE = 2.5;
 
 function renderSquarePillar(context, obstacle, anim) {
@@ -211,11 +219,12 @@ function renderCandelabra(context, obstacle, anim) {
   });
 }
 
-// Four purely visual variants -- classic Roman column, a floating crystal
-// on a squat plinth, a square column with a flame, a 3-prong candelabra --
-// sharing the exact same puck() (a static circle of `radius`), so which
-// one a given pillar draws as never changes how the player bounces off
-// it. See placePillars.js for how `variant` gets assigned.
+*/
+
+// Simplified down to the one classic-Roman-column look (see VARIANT_COUNT
+// above) -- still shares the exact same puck() (a static circle of
+// `radius`) the retired variants did, so this never changes how the
+// player bounces off it.
 function Pillar(x = 0, y = 0, props = {}) {
   const {
     radius = 26,
@@ -279,13 +288,16 @@ function Pillar(x = 0, y = 0, props = {}) {
     },
 
     render(context) {
-      if (this.variant === 1) renderCrystalPillar(context, this, anim);
-      else if (this.variant === 2) renderSquarePillar(context, this, anim);
-      else if (this.variant === 3) renderCandelabra(context, this, anim);
-      else renderClassicPillar(context, this);
+      // Branched on `this.variant` back when renderCrystalPillar/
+      // renderSquarePillar/renderCandelabra existed (see the commented-out
+      // block above) -- VARIANT_COUNT === 1 now means `variant` is always
+      // 0, so this is the only reachable case.
+      renderClassicPillar(context, this);
     },
   };
 }
 
 export default Pillar;
-export { renderFlame };
+// renderFlame's own export retired along with the commented-out variants
+// above (Decoration.js's candle was its only other consumer, and
+// mapCreator.js no longer places decorations at all).
