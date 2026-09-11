@@ -1,3 +1,4 @@
+import BubbleShieldItem from './BubbleShieldItem.js';
 import Camera from './camera.js';
 import Chalice from './Chalice.js';
 import { resetChalices } from './chaliceProgress.js';
@@ -9,6 +10,7 @@ import Decoration, { DECORATION_TYPES } from './Decoration.js';
 import generateDungeon, { mulberry32 } from './donjonDungeon.js';
 import { add } from './engine.js';
 import Grub from './Grub.js';
+import HealthItem from './HealthItem.js';
 import inflateDungeon from './inflateDungeon.js';
 import DragController from './input.js';
 import Item from './Item.js';
@@ -57,13 +59,6 @@ const CHALICE_PLACEMENT_ATTEMPTS = 30;
 // entrance/doorway, and prefer at least OBSTACLE_CLEARANCE from obstacles.
 const ENTRANCE_CLEARANCE = 3; // world units of clearance required off any room entrance/doorway
 const OBSTACLE_CLEARANCE = 2; // world units of clearance required off every wall/pillar/grub/chest
-// One of each item ability, in up to that many distinct non-spawn rooms
-// (fewer if the dungeon doesn't have that many) -- best-effort like a
-// chest, not guaranteed like a chalice, since these are bonuses rather
-// than required to win.
-const ITEM_ROOM_MARGIN = 45;
-const ITEM_RADIUS = 24;
-const ITEM_PLACEMENT_ATTEMPTS = 30;
 // Wall decorations: a flat per-wall-cell chance, no clearance-checking
 // machinery like chest/chalice/pillar get -- they're purely cosmetic and
 // mounted right on the wall, a spot nothing else ever wants anyway.
@@ -214,12 +209,43 @@ function buildDungeon(seed) {
   const combatRoomIndices = selectCombatRooms(dungeon.rooms.length, seed + 6);
   const toWorld = (x, y) => gridToWorld(x, y, dungeon.gridWidth, dungeon.gridHeight);
   const floorSet = new Set(dungeon.floor.map(({ x, y }) => `${x},${y}`));
+  const nonSpawnRoomIndices = dungeon.rooms.map((_, i) => i).filter((i) => i !== 0);
   // A room's entrance cells (grid) as world-space points, radius 0 -- fed
   // into findClearSpot/isClearSpot's "circles" clearance check.
   const roomEntrancePoints = (room) => findEntranceCells(room, floorSet).map((cell) => {
     const world = toWorld(cell.x, cell.y);
     return { x: world.x, y: world.y, radius: 0 };
   });
+
+  // Every chest's contents are decided right here, all at once -- not
+  // rolled the moment a chest actually breaks. The spawn room's own chest
+  // (a "starter crate") is 50/50 a bubble shield or one specific,
+  // uniformly-chosen ability item. Every *other* ability -- all 5, minus
+  // whichever one (if any) the crate just claimed -- gets assigned to its
+  // own distinct non-spawn room's chest. Every remaining non-spawn room's
+  // chest is a predetermined 50/50 health-or-shield, same odds as the old
+  // roll-it-when-it-breaks behavior, just decided up front instead.
+  const contentsRng = mulberry32(seed + 8);
+  const starterGivesAbility = contentsRng() < 0.5;
+  const starterAbilityId = ITEM_ABILITY_CATALOG[Math.floor(contentsRng() * ITEM_ABILITY_CATALOG.length)].id;
+  const remainingAbilityIds = ITEM_ABILITY_CATALOG.map((ability) => ability.id)
+    .filter((id) => !starterGivesAbility || id !== starterAbilityId);
+  const abilityRoomIndices = shuffled(nonSpawnRoomIndices, contentsRng).slice(0, remainingAbilityIds.length);
+  const roomAbilityId = new Map(abilityRoomIndices.map((roomIndex, i) => [roomIndex, remainingAbilityIds[i]]));
+  resetItemAbilities();
+
+  function chestContentsFor(roomIndex) {
+    if (roomIndex === 0) {
+      return starterGivesAbility
+        ? (cx, cy) => Item(cx, cy, starterAbilityId)
+        : (cx, cy) => BubbleShieldItem(cx, cy);
+    }
+    const abilityId = roomAbilityId.get(roomIndex);
+    if (abilityId) return (cx, cy) => Item(cx, cy, abilityId);
+    return contentsRng() < 0.5
+      ? (cx, cy) => BubbleShieldItem(cx, cy)
+      : (cx, cy) => HealthItem(cx, cy);
+  }
 
   // Collected as chests are placed check clearance against them below --
   // walls as boxes, pillars/grubs as circles.
@@ -289,7 +315,7 @@ function buildDungeon(seed) {
     const chestRng = mulberry32(chestSeed + roomIndex);
     const chestSpawn = findClearSpot(worldRoom, CHEST_ROOM_MARGIN, CHEST_RADIUS, CHEST_PLACEMENT_ATTEMPTS, chestRng, wallBoxes, obstacleCircles, entrancePoints);
     if (chestSpawn) {
-      add(TreasureChest(chestSpawn.x, chestSpawn.y));
+      add(TreasureChest(chestSpawn.x, chestSpawn.y, { contents: chestContentsFor(roomIndex) }));
       // So a chalice placed afterward (see below) won't land on top of it.
       obstacleCircles.push({ x: chestSpawn.x, y: chestSpawn.y, radius: CHEST_RADIUS });
     }
@@ -306,7 +332,6 @@ function buildDungeon(seed) {
   // reflect every wall, pillar, grub, and chest across the whole dungeon,
   // not just whichever rooms happened to be processed first.
   const chaliceRng = mulberry32(seed + 4);
-  const nonSpawnRoomIndices = dungeon.rooms.map((_, i) => i).filter((i) => i !== 0);
   const chaliceRoomCount = Math.round(nonSpawnRoomIndices.length * CHALICE_ROOM_FRACTION);
   const chaliceRoomIndices = shuffled(nonSpawnRoomIndices, chaliceRng).slice(0, chaliceRoomCount);
 
@@ -325,21 +350,6 @@ function buildDungeon(seed) {
     add(Chalice(spawn.x, spawn.y));
   });
   resetChalices(chaliceRoomIndices.length);
-
-  // One of each item ability (see ItemAbility.js), each in its own
-  // distinct non-spawn room -- best-effort placement like a chest, since
-  // these are bonuses rather than something the level requires to win.
-  const itemRng = mulberry32(seed + 7);
-  resetItemAbilities();
-  shuffled(nonSpawnRoomIndices, itemRng).slice(0, ITEM_ABILITY_CATALOG.length).forEach((roomIndex, i) => {
-    const room = dungeon.rooms[roomIndex];
-    const roomCenter = toWorld(room.x + room.w / 2, room.y + room.h / 2);
-    const worldRoom = {
-      x: roomCenter.x, y: roomCenter.y, w: room.w * TILE, h: room.h * TILE,
-    };
-    const spawn = findClearSpot(worldRoom, ITEM_ROOM_MARGIN, ITEM_RADIUS, ITEM_PLACEMENT_ATTEMPTS, itemRng, wallBoxes, obstacleCircles, roomEntrancePoints(room));
-    if (spawn) add(Item(spawn.x, spawn.y, ITEM_ABILITY_CATALOG[i].id));
-  });
 
   // Wall decorations (shield/candle/crystal/rune), sprinkled at random
   // along hallway and room walls -- everywhere a wall cell actually

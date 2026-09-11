@@ -5,7 +5,7 @@ import { collectedItemAbilities } from './ItemAbility.js';
 const START_Y = 175;
 const ROW_HEIGHT = 56;
 const ICON_X = 40;
-const ICON_SCALE = 1.1;
+const ICON_SCALE = 1.1 * 0.75; // 25% smaller than its original 1.1
 const TEXT_X = 68;
 const NAME_OFFSET_Y = -9;
 const DESCRIPTION_OFFSET_Y = 11;

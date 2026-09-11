@@ -1,11 +1,11 @@
 // The 5 permanent item abilities: id, display name, a 3-5 word description
-// of the buff, a simple flat-color + 6px-outline hieroglyph icon (drawn at
+// of the buff, a simple flat-color + 4px-outline hieroglyph icon (drawn at
 // local (0, 0)), and what picking one up actually does to the player.
 // `collected` is a small ordered-list singleton (reset per run, like
 // chaliceProgress.js) read by ItemAbilityHUD for its stack and by
 // Item.js/mapCreator.js to avoid spawning the same ability twice.
 
-const OUTLINE_WIDTH = 6;
+const OUTLINE_WIDTH = 4; // 2px thinner than its original 6
 
 function fillOutlined(context, fillColor, outlineColor) {
   context.fillStyle = fillColor;

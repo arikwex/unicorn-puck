@@ -91,7 +91,14 @@ function renderChest(context, flash) {
 }
 
 function TreasureChest(x, y, props = {}) {
-  const { bounciness = 0.3 } = props;
+  // What pops out when it finally breaks -- a (cx, cy) => gameObject
+  // factory, so the caller (mapCreator.js) decides at map-generation time
+  // rather than this chest rolling it itself the moment it breaks. Default
+  // keeps the old random 50/50 for any caller that doesn't care to specify.
+  const {
+    bounciness = 0.3,
+    contents = (cx, cy) => (Math.random() < SHIELD_DROP_CHANCE ? BubbleShieldItem(cx, cy) : HealthItem(cx, cy)),
+  } = props;
   let hitsRemaining = HITS_REQUIRED;
   let flashTimer = 0;
   let hitCooldown = 0;
@@ -143,8 +150,7 @@ function TreasureChest(x, y, props = {}) {
 
       if (hitsRemaining > 0) return;
       fireBurst(this.x, this.y, BREAK_SPLAT_COUNT, BREAK_SPLAT_COLORS, BREAK_SPLAT_SPEED_MAX, BREAK_SPLAT_SIZE_MIN, BREAK_SPLAT_SIZE_MAX);
-      add(Math.random() < SHIELD_DROP_CHANCE
-        ? BubbleShieldItem(this.x, this.y) : HealthItem(this.x, this.y));
+      add(contents(this.x, this.y));
       return true;
     },
 
