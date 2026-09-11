@@ -29,9 +29,9 @@ let musicStarted = false;
 // Watches the live player for either end condition -- hp running out, or
 // every chalice collected -- and hands off to the matching status card.
 // Fires the death splats only for the loss case; both cases tear down
-// input and the HUD the same way (camera and dungeon stay put --
-// Camera.follow() keeps its target reference even after removal, so the
-// view stays frozen right where the run ended). Self-removes once fired.
+// input and the HUD the same way (camera and dungeon stay put -- with
+// the player gone the camera holds still, so the view stays frozen right
+// where the run ended). Self-removes once fired.
 function GameWatcher(player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap) {
   return {
     update() {

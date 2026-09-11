@@ -486,7 +486,7 @@ function createMap(seed) {
   // Shown instantly (not after any delay) since it's establishing the
   // whole game's premise, not reacting to something the player just did.
   showToast('Collect all Pegacorn Blood Chalices to win!');
-  add(Camera().follow(player));
+  add(Camera());
   const dragController = add(DragController(player));
   return {
     player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap,

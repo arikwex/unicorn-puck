@@ -72,7 +72,7 @@ test('minimap is bottom-left on desktop and mobile, with a white player dot', ()
     canvas.width = width; canvas.height = height; draws = [];
     renderScreenHUD(map, context);
     const panel = draws.find(({ method }) => method === 'fillRect');
-    const expected = [16 * scale, height - 176 * scale, 160 * scale, 160 * scale];
+    const expected = [10 * scale, height - 170 * scale, 160 * scale, 160 * scale];
     screenRect(panel).forEach((value, i) => assert.ok(Math.abs(value - expected[i]) < 1e-8));
     const dot = draws.find(({ method }) => method === 'arc');
     assert.equal(dot.color, '#fff');
