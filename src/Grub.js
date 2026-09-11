@@ -96,8 +96,8 @@ const SPLAT_ARC_HEIGHT_TIME_MAX = 0.28;
 
 // -- patrol -----------------------------------------------------------------
 const PATROL_SPEED = 45;
-const PATROL_MARGIN = 30; // world units kept clear of the room's own walls
-const WAYPOINT_ARRIVE_DIST = 8;
+const PATROL_MARGIN = 60; // world units kept clear of the room's own walls
+const WAYPOINT_ARRIVE_DIST = 10;
 const PAUSE_MIN = 0.4;
 const PAUSE_MAX = 1.6;
 
