@@ -191,12 +191,13 @@ test('hits transfer incoming momentum in every direction and it decays while mov
 });
 
 test('knockback stays within room bounds while it decays', () => {
-  // Patrol margin (30) plus the grub's own collision radius (26).
-  const grub = Grub(43, -43, { x: 0, y: 0, w: 200, h: 200 }, 123);
+  // Bounds: half the room (100) less the patrol margin (60) and the
+  // grub's own collision radius (26).
+  const grub = Grub(13, -13, { x: 0, y: 0, w: 200, h: 200 }, 123);
   Object.assign(grub, { vx: 800, vy: -800 });
   grub.tick(0.1);
-  assert.equal(grub.x, 44);
-  assert.equal(grub.y, -44);
+  assert.equal(grub.x, 14);
+  assert.equal(grub.y, -14);
   assert.equal(grub.vx, 440);
   assert.equal(grub.vy, -440);
 });
