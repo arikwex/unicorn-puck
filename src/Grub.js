@@ -422,16 +422,10 @@ function Grub(x, y, room, seed, props = {}) {
         }
       }
 
-      // Integrate exponential drag exactly so knockback travel is stable
-      // across frame rates, then stop momentum at the room's inner bounds.
-      const decay = Math.exp(-KNOCKBACK_DECAY * dt);
-      const travelTime = (1 - decay) / KNOCKBACK_DECAY;
-      const nextX = this.x + this.vx * travelTime;
-      const nextY = this.y + this.vy * travelTime;
-      this.x = Math.max(Math.min(minX, room.x), Math.min(Math.max(maxX, room.x), nextX));
-      this.y = Math.max(Math.min(minY, room.y), Math.min(Math.max(maxY, room.y), nextY));
-      this.vx = this.x === nextX ? this.vx * decay : 0;
-      this.vy = this.y === nextY ? this.vy * decay : 0;
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+      this.vx -= this.vx * 4.5 * dt;
+      this.vy -= this.vy * 4.5 * dt;
       this.order = this.y;
 
       flashTimer = Math.max(0, flashTimer - dt);
