@@ -7,33 +7,21 @@ import { TAU } from './mathUtils.js';
 // A small extruded square slab -- a flat top face sitting on a shaded side
 // face dropping down by `height` -- used for both the pillar's base and
 // its capital.
-function renderSlab(context, x, topY, halfSize, height, topColor, sideColor) {
-  fillRect(context, x - halfSize, topY, halfSize * 2, height, sideColor);
-  fillRect(context, x - halfSize, topY - halfSize * 0.6, halfSize * 2, halfSize * 0.6, topColor);
-}
-
-// The cylindrical shaft: a body rectangle capped with a foreshortened
-// ellipse (its round cross-section, seen from above), plus a shading
-// stripe down one side to hint at the curve.
-function renderShaft(context, x, topY, bottomY, radius, color, shadeColor) {
-  fillRect(context, x - radius, topY, radius * 2, bottomY - topY, color);
-  fillRect(context, x + radius * 0.15, topY, radius * 0.55, bottomY - topY, shadeColor);
-  fillEllipse(context, x, topY, radius, radius * 0.5, color);
+function renderSlab(context, topY) {
+  fillRect(context, -32, topY, 64, 8, '#444');
+  fillRect(context, -32, topY - 19.2, 64, 19.2, '#a99');
 }
 
 // -- variant 0: classic Roman column -----------------------------------
 // Small extruded square base, tall cylindrical shaft, small extruded
-// square capital.
-function renderClassicPillar(context, obstacle) {
-  const {
-    x, y, r: radius, baseHalfSize, baseHeight, shaftHeight, capHalfSize, capHeight, stoneColor, shadeColor,
-  } = obstacle;
-  const shaftTopY = y - shaftHeight;
-  const capTopY = shaftTopY - capHeight;
-
-  renderSlab(context, x, y, baseHalfSize, baseHeight, stoneColor, shadeColor);
-  renderShaft(context, x, shaftTopY, y, radius, stoneColor, shadeColor);
-  renderSlab(context, x, capTopY, capHalfSize, capHeight, stoneColor, shadeColor);
+// square capital. The shaft's ellipse and side stripe give it depth.
+function renderClassicPillar(context) {
+  // Every placed column uses these dimensions and wall-toned colors.
+  renderSlab(context, 0);
+  fillRect(context, -26, -110, 52, 110, '#a99');
+  fillRect(context, 3.9, -110, 14.3, 110, '#444');
+  fillEllipse(context, 0, -110, 26, 13, '#a99');
+  renderSlab(context, -118);
 }
 
 /* -- variant 1: crystal on a squat plinth -- retired to cut size;
@@ -110,10 +98,10 @@ const FLAME_HEIGHT = 22;
 const FLAME_WIDTH = 12;
 const FLAME_FLICKER_SPEED = 9; // rad/s
 
-// A small flickering flame, its tip sitting at (x, topY) and body hanging
-// below/around it. Two off-ratio sine waves (no per-frame rng needed)
+// A small flame drawn two local pixels above its candle cup.
+// Two off-ratio sine waves (no per-frame rng needed)
 // wobble its height/width and sideways sway so it never looks static.
-function renderFlame(context, x, topY, anim) {
+function renderFlame(context, anim) {
   const flicker = Math.sin(anim * FLAME_FLICKER_SPEED) * 0.15 + Math.sin(anim * FLAME_FLICKER_SPEED * 1.7 + 1) * 0.08;
   const sway = Math.sin(anim * FLAME_FLICKER_SPEED * 0.6) * 2;
   const h = FLAME_HEIGHT * (1 + flicker);
@@ -122,9 +110,9 @@ function renderFlame(context, x, topY, anim) {
   function teardrop(color, scale) {
     context.fillStyle = color;
     context.beginPath();
-    context.moveTo(x + sway, topY - h * scale);
-    context.quadraticCurveTo(x + (w * scale) / 2 + sway, topY - h * scale * 0.4, x + sway * 0.5, topY);
-    context.quadraticCurveTo(x - (w * scale) / 2 + sway, topY - h * scale * 0.4, x + sway, topY - h * scale);
+    context.moveTo(sway, -2 - h * scale);
+    context.quadraticCurveTo((w * scale) / 2 + sway, -2 - h * scale * 0.4, sway * 0.5, -2);
+    context.quadraticCurveTo(-(w * scale) / 2 + sway, -2 - h * scale * 0.4, sway, -2 - h * scale);
     context.closePath();
     context.fill();
   }
@@ -178,8 +166,8 @@ const CANDELABRA_ARM_LENGTH = 22;
 const CANDELABRA_ARM_RISE = 14; // above the stem's own top, where the side arms end up
 const CANDELABRA_FLAME_SCALE = 0.7;
 
-function renderCandelabra(context, obstacle, anim) {
-  const { x, y } = obstacle;
+function renderCandelabra(context, anim) {
+  const x = 0, y = 0;
   const stemTop = y - CANDELABRA_STEM_HEIGHT;
   const branchY = y - CANDELABRA_BRANCH_Y_OFFSET;
 
@@ -200,49 +188,28 @@ function renderCandelabra(context, obstacle, anim) {
   });
 
   [-1, 0, 1].forEach((side) => {
-    const tipX = side === 0 ? x : x + side * CANDELABRA_ARM_LENGTH;
+    const tipX = x + side * CANDELABRA_ARM_LENGTH;
     const tipY = side === 0 ? stemTop : stemTop + CANDELABRA_ARM_RISE;
     fillEllipse(context, tipX, tipY, 5, 2.5, CANDELABRA_METAL_DARK_COLOR);
     context.save();
     context.translate(tipX, tipY);
     context.scale(CANDELABRA_FLAME_SCALE, CANDELABRA_FLAME_SCALE);
     // Phase-offset per arm so the three flames don't flicker in lockstep.
-    renderFlame(context, 0, -2, anim + side * 0.7);
+    renderFlame(context, anim + side * 0.7);
     context.restore();
   });
 }
 
-// Both looks share the same static collision circle of radius `r`.
+// Both looks share a 26-unit collision radius. Only the variant is configurable;
+// fixed drawing dimensions avoid storing unused per-instance style properties.
 function Pillar(x = 0, y = 0, props = {}) {
-  const {
-    r: radius = 26,
-    baseHalfSize = radius + 6,
-    baseHeight = 8,
-    shaftHeight = 110, // 2.5x its original 44, so the column actually reads as tall next to the small base/capital
-    capHalfSize = radius + 6,
-    capHeight = 8,
-    // A lighter/darker tint of CubeObstacle's own wall tones (#766
-    // top / #445 side) -- same muted tonal family as the room
-    // around it, but warmer and lighter than the walls so a pillar still
-    // reads as a separate, bounce-off obstacle rather than blending in.
-    stoneColor = '#a99',
-    shadeColor = '#444',
-    variant = 0,
-  } = props;
+  const { variant = 0 } = props;
   let anim = Math.random() * TAU;
 
   return {
     x,
     y,
-    r: radius,
-    baseHalfSize,
-    baseHeight,
-    shaftHeight,
-    capHalfSize,
-    capHeight,
-    stoneColor,
-    shadeColor,
-    variant,
+    r: 26,
     tags: [TAG_OBSTACLE],
     // Same painter's-algorithm depth sort as CubeObstacle -- see its
     // `z` comment.
@@ -253,8 +220,11 @@ function Pillar(x = 0, y = 0, props = {}) {
     },
 
     render(context) {
-      if (this.variant === 3) renderCandelabra(context, this, anim);
-      else renderClassicPillar(context, this);
+      // Local coordinates let both renderers share one world translation.
+      context.save();
+      context.translate(this.x, this.y);
+      (variant === 3 ? renderCandelabra : renderClassicPillar)(context, anim);
+      context.restore();
     },
   };
 }
