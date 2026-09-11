@@ -1,14 +1,8 @@
+import { fillEllipse } from './canvasShapes.js';
 import { TAG_OBSTACLE } from './tags.js';
 
 const TAU = Math.PI * 2;
 const VARIANT_COUNT = 4;
-
-function fillEllipse(context, x, y, radiusX, radiusY, color) {
-  context.fillStyle = color;
-  context.beginPath();
-  context.ellipse(x, y, radiusX, radiusY, 0, 0, TAU);
-  context.fill();
-}
 
 // A small extruded square slab -- a flat top face sitting on a shaded side
 // face dropping down by `height` -- used for both the pillar's base and
@@ -266,14 +260,13 @@ function Pillar(x = 0, y = 0, props = {}) {
     // Consistent puck-like accessor (see CubeObstacle.js and physics.js):
     // a static, circular puck with mass: Infinity, always this same
     // radius regardless of `variant` -- collision never depends on which
-    // one a pillar happens to render as. `shape: 'circle'` is how
-    // PhysicsWorld tells it apart from CubeObstacle's boxes.
+    // one a pillar happens to render as. No `box` flag is how PhysicsWorld
+    // tells it apart from CubeObstacle's boxes (see PhysicsWorld.js).
     puck() {
       return {
         x: this.x,
         y: this.y,
         radius: this.radius,
-        shape: 'circle',
         mass: Infinity,
         vx: 0,
         vy: 0,

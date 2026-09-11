@@ -39,7 +39,7 @@ function PhysicsWorld() {
       function detect(a, b) {
         const bodyA = bodies.get(a);
         const bodyB = bodies.get(b);
-        let contact = bodyB.shape === 'box'
+        let contact = bodyB.box
           ? circleBoxContact(bodyA, bodyB)
           : circleCircleContact(bodyA, bodyB);
         // Grates must hold even when chained launches cross their entire

@@ -1,4 +1,6 @@
+import { fillCircle } from './canvasShapes.js';
 import DamageCallout from './DamageCallout.js';
+import { mulberry32 } from './donjonDungeon.js';
 import { add, getObjectsByTag } from './engine.js';
 import GrubProjectile from './GrubProjectile.js';
 import renderHealthBar from './HealthBar.js';
@@ -9,28 +11,14 @@ import { TAG_ENEMY, TAG_OBSTACLE, TAG_PLAYER } from './tags.js';
 
 const TAU = Math.PI * 2;
 
-// mulberry32: the same tiny deterministic PRNG used elsewhere in this
-// project (see donjonDungeon.js) -- each grub gets its own instance seeded
-// off its own spawn seed, so its patrol is reproducible run to run.
-function mulberry32(seed) {
-  let state = seed >>> 0;
-  return function rng() {
-    state = (state + 0x6d2b79f5) | 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+// Numeric state ids instead of string names -- cheaper to compare and to
+// ship (a bare digit minifies far smaller than a repeated quoted word).
+const PATROL = 0;
+const AIMING = 1;
+const RECOVERING = 2;
 
 function randRange(rng, min, max) {
   return min + rng() * (max - min);
-}
-
-function fillCircle(context, x, y, radius, color) {
-  context.fillStyle = color;
-  context.beginPath();
-  context.arc(x, y, radius, 0, TAU);
-  context.fill();
 }
 
 // -- body -----------------------------------------------------------------
@@ -123,7 +111,7 @@ function segmentPosition(grub, index) {
   let along = (1.5 - index) * SEGMENT_SPACING;
   let lift = 0;
   let jitterX = 0;
-  if (grub.state === 'aiming') {
+  if (grub.state === AIMING) {
     // Rise smoothly during the first part of the tell, then keep drawing
     // backward along local -x as the spit winds up. Height is screen-up,
     // while the bend rotates with the grub's facing direction below.
@@ -141,7 +129,7 @@ function segmentPosition(grub, index) {
       const shake = Math.sin(t * 41 + index * 5) + Math.sin(t * 67 + index * 2.3) * 0.5;
       jitterX = shake / 1.5 * AIM_SEGMENT_JITTER[index] * progress * progress;
     }
-  } else if (grub.state === 'recovering') {
+  } else if (grub.state === RECOVERING) {
     // aimProgress counts back down from 1 (the instant of firing, still in
     // the fully pulled-back pose) to 0 (idle). Smoothstep it directly --
     // no plateau this time -- so the body eases toward idle across the
@@ -225,7 +213,7 @@ function renderGrub(context, grub, flashTimer) {
   const facingIntoPage = Math.sin(grub.angle) > 0;
   for (let step = 0; step < segments.length; step++) {
     const i = facingIntoPage ? step : segments.length - 1 - step;
-    if (grub.type === 'large' && i > 0) renderBackSpike(context, segments[i], grub.size, flash);
+    if (grub.large && i > 0) renderBackSpike(context, segments[i], grub.size, flash);
     fillCircle(context, segments[i].x, segments[i].y, segments[i].radius, BODY_COLORS[i % BODY_COLORS.length]);
     if (flash > 0) {
       context.globalAlpha = flash;
@@ -241,7 +229,7 @@ function renderGrubFace(context, grub, head) {
   // way PlayerCharacter's own eyes ride off its facing angle. Draw with
   // the head so nearer body segments can cover the face when facing away.
   const sway = Math.sin(grub.anim * 7) * 0.3;
-  const color = grub.type === 'large' ? LARGE_COLOR : FACE_GLOW_COLOR;
+  const color = grub.large ? LARGE_COLOR : FACE_GLOW_COLOR;
   [-1, 1].forEach((side) => {
     if (Math.sin(grub.angle - side * 0.6) > 0.22) {
       return;
@@ -270,9 +258,9 @@ function mouthPosition(grub, head = segmentPosition(grub, 0)) {
 // walls), which is what keeps the grub "generally within its room" rather
 // than wandering the whole dungeon.
 function Grub(x, y, room, seed, props = {}) {
-  const { bounciness = 0.4, type = 'small' } = props;
-  const size = type === 'large' ? LARGE_SCALE : 1;
-  const maxHp = MAX_HP + (type === 'large' ? 3 : 0);
+  const { bounciness = 0.4, large = false } = props;
+  const size = large ? LARGE_SCALE : 1;
+  const maxHp = MAX_HP + (large ? 3 : 0);
   const rng = mulberry32(seed);
   let pauseTimer = randRange(rng, PAUSE_MIN, PAUSE_MAX);
   let flashTimer = 0;
@@ -288,7 +276,7 @@ function Grub(x, y, room, seed, props = {}) {
   // fraction of the player's hit velocity. The seeded rng keeps the
   // launch pattern reproducible.
   function fireSplats(originX, originY, count, color, impactVx, impactVy) {
-    const splatColor = type === 'large' ? LARGE_COLOR : color;
+    const splatColor = large ? LARGE_COLOR : color;
     for (let i = 0; i < count; i++) {
       const angle = rng() * TAU;
       const speed = Math.sqrt(rng()) * SPLAT_SPEED_MAX;
@@ -313,16 +301,16 @@ function Grub(x, y, room, seed, props = {}) {
   return {
     x,
     y,
-    type,
+    large,
     size,
     maxHp,
-    enemyCost: type === 'large' ? 2 : 1,
+    enemyCost: large ? 2 : 1,
     vx: 0,
     vy: 0,
     angle: Math.random() * TAU,
     anim: Math.random() * 7,
     target: null,
-    state: 'patrol',
+    state: PATROL,
     aimProgress: 0,
     hp: maxHp,
     order: y,
@@ -337,7 +325,6 @@ function Grub(x, y, room, seed, props = {}) {
         x: this.x,
         y: this.y,
         radius: COLLISION_RADIUS * size,
-        shape: 'circle',
         mass: Infinity,
         vx: this.vx,
         vy: this.vy,
@@ -366,18 +353,18 @@ function Grub(x, y, room, seed, props = {}) {
       }
       hadAimTarget = Boolean(canAim);
 
-      if (this.state === 'recovering') {
+      if (this.state === RECOVERING) {
         // Ease aimProgress back down to 0 instead of zeroing it outright --
         // segmentPosition plays the aim pose's own curve in reverse off it.
         recoverElapsed += dt;
         this.aimProgress = Math.max(0, 1 - recoverElapsed / RECOVER_DURATION);
         if (recoverElapsed >= RECOVER_DURATION) {
-          this.state = 'patrol';
+          this.state = PATROL;
           this.aimProgress = 0;
         }
-      } else if (this.state === 'aiming') {
+      } else if (this.state === AIMING) {
         if (!canAim) {
-          this.state = 'patrol';
+          this.state = PATROL;
           this.aimProgress = 0;
           attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
         } else {
@@ -389,18 +376,18 @@ function Grub(x, y, room, seed, props = {}) {
             const dx = player.x - mouth.x;
             const dy = player.y - mouth.y;
             const heading = Math.atan2(dy, dx);
-            const spread = this.type === 'large' ? [-LARGE_SPREAD_ANGLE, 0, LARGE_SPREAD_ANGLE] : [0];
-            const palette = this.type === 'large' ? { color: LARGE_COLOR, highlightColor: '#ffe1b3' } : undefined;
+            const spread = this.large ? [-LARGE_SPREAD_ANGLE, 0, LARGE_SPREAD_ANGLE] : [0];
+            const palette = this.large ? { color: LARGE_COLOR, highlightColor: '#ffe1b3' } : undefined;
             spread.forEach((offset) => add(GrubProjectile(mouth.x, mouth.y,
               Math.cos(heading + offset) * PROJECTILE_SPEED, Math.sin(heading + offset) * PROJECTILE_SPEED, palette)));
             playOozeShot();
-            this.state = 'recovering';
+            this.state = RECOVERING;
             recoverElapsed = 0;
             attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
           }
         }
       } else if (canAim && attackCooldown <= 0) {
-        this.state = 'aiming';
+        this.state = AIMING;
         this.target = null;
         this.vx = this.vy = 0;
         this.angle = Math.atan2(this.y - player.y, player.x - this.x);
@@ -459,7 +446,7 @@ function Grub(x, y, room, seed, props = {}) {
       healthBarTimer = HEALTH_BAR_SHOW_DURATION;
       hitCooldown = HIT_COOLDOWN;
       // A charging hit interrupts the tell so knockback can move the grub.
-      this.state = 'patrol';
+      this.state = PATROL;
       this.aimProgress = 0;
       attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
       this.vx += player.vx * KNOCKBACK_TRANSFER;

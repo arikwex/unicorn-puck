@@ -6,6 +6,7 @@
 // chaliceProgress counter GameFlow.js watches for the win condition.
 
 import { emit } from './bus.js';
+import { fillEllipse } from './canvasShapes.js';
 import { getObjectsByTag } from './engine.js';
 import { collectChalice } from './chaliceProgress.js';
 import { fireSplatBurst } from './SplatEffect.js';
@@ -27,13 +28,6 @@ const COLLECT_SPLAT_COLORS = [METAL_COLOR, WINE_COLOR];
 const COLLECT_SPLAT_SPEED_MAX = 200;
 const COLLECT_SPLAT_SIZE_MIN = 6;
 const COLLECT_SPLAT_SIZE_MAX = 12;
-
-function fillEllipse(context, x, y, radiusX, radiusY, color) {
-  context.fillStyle = color;
-  context.beginPath();
-  context.ellipse(x, y, radiusX, radiusY, 0, 0, TAU);
-  context.fill();
-}
 
 // Drawn in local coordinates centered on (0, 0) at scale 1 -- callers
 // translate/scale around that origin, the same convention

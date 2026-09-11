@@ -92,9 +92,11 @@ function drawOracleEyes(context) {
 
 const VALKYRIE_BOOST_MULTIPLIER = 1.3; // +30% to the whole launch-power curve, including its cap
 
+// No string `id` field -- an ability's id is just its own index into this
+// array (see collectItemAbility/mapCreator.js), which minifies far smaller
+// than a repeated quoted name and needs no separate lookup.
 const ITEM_ABILITY_CATALOG = [
   {
-    id: 'battleArmor',
     name: 'BATTLE ARMOR',
     description: '+2 max health',
     draw: drawBattleArmor,
@@ -104,7 +106,6 @@ const ITEM_ABILITY_CATALOG = [
     },
   },
   {
-    id: 'valkyrieWings',
     name: 'VALKYRIE WINGS',
     description: 'higher max boost speed',
     draw: drawValkyrieWings,
@@ -113,7 +114,6 @@ const ITEM_ABILITY_CATALOG = [
     },
   },
   {
-    id: 'mithrilHorn',
     name: 'MITHRIL HORN',
     description: '+1 impact damage',
     draw: drawMithrilHorn,
@@ -122,7 +122,6 @@ const ITEM_ABILITY_CATALOG = [
     },
   },
   {
-    id: 'chromaticHoof',
     name: 'CHROMATIC HOOF',
     description: 'bounces reboost momentum',
     draw: drawChromaticHoof,
@@ -131,7 +130,6 @@ const ITEM_ABILITY_CATALOG = [
     },
   },
   {
-    id: 'oracleEyes',
     name: 'ORACLE EYES',
     description: 'reveals the minimap',
     draw: drawOracleEyes,
@@ -152,7 +150,7 @@ function resetItemAbilities() {
 // only ever spawns once per dungeon, see mapCreator.js, so the latter
 // should never actually happen).
 function collectItemAbility(id, player) {
-  const ability = ITEM_ABILITY_CATALOG.find((candidate) => candidate.id === id);
+  const ability = ITEM_ABILITY_CATALOG[id];
   if (!ability || collected.includes(ability)) return null;
   ability.apply(player);
   collected.push(ability);

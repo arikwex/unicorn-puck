@@ -1,4 +1,5 @@
 import { canvas } from './canvas.js';
+import { clamp } from './mathUtils.js';
 
 const DEFAULT_DURATION = 3; // seconds on screen before handing back to the main menu
 const FADE_IN = 0.25;
@@ -12,10 +13,6 @@ const TITLE_FONT_RATIO = 0.07;
 const TITLE_FONT_MIN = 30;
 const TITLE_FONT_MAX = 58;
 const DEFAULT_COLOR = '#ff2020'; // matches the damage-flash red used elsewhere
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
 
 // A brief centered status card -- one or more lines of bold text, fading
 // in then out over `duration` seconds, then calling `onDone` (and

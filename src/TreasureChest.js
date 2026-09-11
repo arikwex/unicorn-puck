@@ -108,7 +108,6 @@ function TreasureChest(x, y, props = {}) {
         x: this.x,
         y: this.y,
         radius: CHEST_RADIUS,
-        shape: 'circle',
         mass: Infinity,
         vx: 0,
         vy: 0,

@@ -14,6 +14,12 @@ const MOUNT_OFFSET_DOWN = 25;
 const MOUNT_OFFSET_SIDE = 50;
 const DECORATION_SCALE = 1.7;
 
+// Numeric facing ids (exported so mapCreator.js's wall-scan assigns the
+// exact same values) instead of string names -- cheaper to compare and ship.
+const DOWN = 0;
+const LEFT = 1;
+const RIGHT = 2;
+
 const METAL_COLOR = '#a9822a';
 const METAL_LIGHT_COLOR = '#e8c34a';
 const WAX_COLOR = '#e8ddc0';
@@ -87,21 +93,20 @@ function drawRune(context) {
   context.stroke();
 }
 
-const DRAW_FUNCTIONS = {
-  shield: drawShield, candle: drawCandle, crystal: drawCrystal, rune: drawRune,
-};
-const DECORATION_TYPES = Object.keys(DRAW_FUNCTIONS);
+// Index-picked rather than keyed by name -- see DECORATION_TYPE_COUNT below.
+const DRAW_FUNCTIONS = [drawShield, drawCandle, drawCrystal, drawRune];
+const DECORATION_TYPE_COUNT = DRAW_FUNCTIONS.length;
 
-// `facing` is which way the wall's own visible face points -- 'down' for a
-// horizontal, south-facing wall, or 'left'/'right' for a vertical one --
-// found as a 1 (wall) -> 0 (no wall/floor) transition in the map's grid;
-// see mapCreator.js. It only ever shifts *where* the mount point sits
-// (toward whichever room the wall faces), never how the art is drawn.
+// `facing` is which way the wall's own visible face points -- DOWN for a
+// horizontal, south-facing wall, or LEFT/RIGHT for a vertical one -- found
+// as a 1 (wall) -> 0 (no wall/floor) transition in the map's grid; see
+// mapCreator.js. It only ever shifts *where* the mount point sits (toward
+// whichever room the wall faces), never how the art is drawn.
 function Decoration(x, y, type, facing) {
   let anim = Math.random() * TAU;
   const draw = DRAW_FUNCTIONS[type];
-  const mountX = x + (facing === 'left' ? -MOUNT_OFFSET_SIDE : facing === 'right' ? MOUNT_OFFSET_SIDE : 0);
-  const mountY = y + (facing === 'down' ? MOUNT_OFFSET_DOWN : 0);
+  const mountX = x + (facing === LEFT ? -MOUNT_OFFSET_SIDE : facing === RIGHT ? MOUNT_OFFSET_SIDE : 0);
+  const mountY = y + (facing === DOWN ? MOUNT_OFFSET_DOWN : 0);
 
   return {
     x,
@@ -128,4 +133,6 @@ function Decoration(x, y, type, facing) {
 }
 
 export default Decoration;
-export { DECORATION_TYPES };
+export {
+  DECORATION_TYPE_COUNT, DOWN, LEFT, RIGHT,
+};

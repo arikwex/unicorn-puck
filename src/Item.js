@@ -24,7 +24,7 @@ const COLLECT_SPLAT_SIZE_MAX = 12;
 function Item(x, y, abilityId) {
   let anim = Math.random() * TAU;
   let collected = false;
-  const ability = ITEM_ABILITY_CATALOG.find((candidate) => candidate.id === abilityId);
+  const ability = ITEM_ABILITY_CATALOG[abilityId];
 
   return {
     x,

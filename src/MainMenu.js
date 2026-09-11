@@ -1,6 +1,7 @@
 import { canvas } from './canvas.js';
 import { renderChaliceIcon } from './Chalice.js';
 import CubeObstacle from './CubeObstacle.js';
+import { clamp } from './mathUtils.js';
 import Pillar from './Pillar.js';
 import { renderPlayer } from './PlayerCharacter.js';
 
@@ -24,10 +25,6 @@ const PROMPT_BOTTOM_MARGIN = 48;
 const PROMPT_PULSE_SPEED = 3; // rad/s
 
 const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
 
 // Draws `text` centered on (cx, y), each glyph colored by its own hue --
 // `hueAt(index)` lets the title cycle continuously while a caller wanting a

@@ -147,7 +147,7 @@ function sweptCircleHitTime(start, end, body, previousBody = body) {
   const y = start.y - previousBody.y;
   const dx = end.x - start.x - (body.x - previousBody.x);
   const dy = end.y - start.y - (body.y - previousBody.y);
-  if (body.shape !== 'box') {
+  if (!body.box) {
     return segmentCircleTime(x, y, dx, dy, start.radius + body.radius);
   }
 

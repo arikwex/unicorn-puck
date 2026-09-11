@@ -7,16 +7,9 @@
 // music(), which sets AudioBufferSourceNode.loop = true.
 
 import { init, music } from './audio.js';
+import { clamp, noise } from './mathUtils.js';
 
 const TAU = Math.PI * 2;
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function noise() {
-  return Math.random() * 2 - 1;
-}
 
 // -- tempo/timing -----------------------------------------------------------
 const BPM = 120;
@@ -111,14 +104,14 @@ function writeLead(data, sampleRate, startSample, freq, duration, amplitude) {
 // rather than 8 identical repeats, before AudioBufferSourceNode.loop wraps
 // it back to the sparse intro and the whole thing vamps forever.
 const ARRANGEMENT = [
-  { drums: 'sparse', lead: false, harmony: false },
-  { drums: 'full', lead: true, harmony: false },
-  { drums: 'full', lead: true, harmony: false },
-  { drums: 'full', lead: true, harmony: false },
-  { drums: 'full', lead: true, harmony: true },
-  { drums: 'full', lead: true, harmony: true },
-  { drums: 'full', lead: true, harmony: false },
-  { drums: 'sparse', lead: false, harmony: false },
+  { fullDrums: false, lead: false, harmony: false },
+  { fullDrums: true, lead: true, harmony: false },
+  { fullDrums: true, lead: true, harmony: false },
+  { fullDrums: true, lead: true, harmony: false },
+  { fullDrums: true, lead: true, harmony: true },
+  { fullDrums: true, lead: true, harmony: true },
+  { fullDrums: true, lead: true, harmony: false },
+  { fullDrums: false, lead: false, harmony: false },
 ];
 
 function buildTheme(context) {
@@ -127,7 +120,7 @@ function buildTheme(context) {
   const data = buffer.getChannelData(0);
 
   for (let rep = 0; rep < PHRASE_REPEATS; rep++) {
-    const { drums, lead, harmony } = ARRANGEMENT[rep];
+    const { fullDrums, lead, harmony } = ARRANGEMENT[rep];
     const repStart = rep * PHRASE_DURATION;
 
     for (let bar = 0; bar < BARS_PER_PHRASE; bar++) {
@@ -137,7 +130,7 @@ function buildTheme(context) {
       for (let slot = 0; slot < 8; slot++) writeHat(data, sampleRate, slotSample(slot), slot % 2 === 0 ? 1 : 0.6);
       writeKick(data, sampleRate, slotSample(0));
       writeKick(data, sampleRate, slotSample(4));
-      if (drums === 'full') {
+      if (fullDrums) {
         writeSnare(data, sampleRate, slotSample(2));
         writeSnare(data, sampleRate, slotSample(6));
       }

@@ -7,6 +7,12 @@ import { TAG_COMBAT_ROOM, TAG_PLAYER } from './tags.js';
 
 const ACTIVATION_PADDING = 16; // extra clearance beyond the player's collision radius
 
+// Numeric state ids (exported so GameFlow.js's own read of `room.state`
+// stays in sync) instead of string names -- cheaper to compare and ship.
+const READY = 0;
+const ACTIVE = 1;
+const CLEARED = 2;
+
 function splash(door) {
   for (let i = 0; i < 8; i++) {
     const angle = Math.random() * Math.PI * 2;
@@ -24,32 +30,32 @@ function CombatRoom(bounds, doorways, enemies) {
     // collision pass handle any newly closed doorway contacts.
     order: -1e6,
     tags: [TAG_COMBAT_ROOM],
-    state: 'ready',
+    state: READY,
     bounds,
     enemies,
 
     update() {
-      if (this.state === 'cleared') return;
+      if (this.state === CLEARED) return;
       const player = getObjectsByTag(TAG_PLAYER)[0];
       if (!player || player.hp <= 0) return;
       const inset = player.radius + ACTIVATION_PADDING;
       const alive = enemies.some((enemy) => enemy.hp > 0);
-      if (this.state === 'active') {
+      if (this.state === ACTIVE) {
         if (alive) return;
-        this.state = 'cleared';
+        this.state = CLEARED;
         remove(grates);
         grates = [];
         doorways.forEach(splash);
         playCombatImpact();
       } else if (!alive) {
         // A room cleared from outside must never lock an empty encounter.
-        this.state = 'cleared';
+        this.state = CLEARED;
       } else if (Math.abs(player.x - bounds.x) < bounds.w / 2 - inset
         && Math.abs(player.y - bounds.y) < bounds.h / 2 - inset) {
         // The entire player must clear the doorway plus a safety margin.
         // Grates stay outside these bounds; swept collisions prevent even
         // an immediate high-speed reversal from crossing the closed gate.
-        this.state = 'active';
+        this.state = ACTIVE;
         grates = doorways.map((door) => add(MetalGrate(door)));
         doorways.forEach(splash);
         playCombatImpact();
@@ -65,3 +71,4 @@ function CombatRoom(bounds, doorways, enemies) {
 }
 
 export default CombatRoom;
+export { ACTIVE };

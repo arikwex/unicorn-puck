@@ -3,6 +3,7 @@
 // previous screen (dungeon, grubs, drag input, HUD) leaks into the next.
 
 import { chalicesComplete } from './chaliceProgress.js';
+import { ACTIVE as COMBAT_ROOM_ACTIVE } from './CombatRoom.js';
 import { add, clear, getObjectsByTag, remove } from './engine.js';
 import createMap from './mapCreator.js';
 import MainMenu from './MainMenu.js';
@@ -34,7 +35,7 @@ function GameWatcher(player, dragController, playerHealthHUD, chaliceHUD, itemAb
   return {
     update() {
       const won = chalicesComplete()
-        && !getObjectsByTag(TAG_COMBAT_ROOM).some((room) => room.state === 'active');
+        && !getObjectsByTag(TAG_COMBAT_ROOM).some((room) => room.state === COMBAT_ROOM_ACTIVE);
       const lost = player.hp <= 0;
       if (!won && !lost) return;
 

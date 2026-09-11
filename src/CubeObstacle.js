@@ -17,7 +17,7 @@ function CubeObstacle(x = 0, y = 0, w = 60, h = 60, props = {}) {
       return {
         x: this.x, y: this.y,
         halfWidth: this.w / 2, halfHeight: this.h / 2,
-        shape: 'box', mass: Infinity,
+        box: true, mass: Infinity,
         vx: 0, vy: 0, omega: 0,
         bounciness: this.bounciness,
       };

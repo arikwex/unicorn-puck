@@ -1,5 +1,6 @@
 import { add } from './engine.js';
 import { renderBubbleShield, SHIELD_COLOR } from './bubbleShield.js';
+import { fillCircle, fillEllipse } from './canvasShapes.js';
 import { applyCollisionResponse, applyImpulse, normalizeAngle } from './physics.js';
 import orbit3d from './orbit3d.js';
 import SplatEffect from './SplatEffect.js';
@@ -122,20 +123,6 @@ const TRAIL_STRIPE_COLORS = [
 ];
 const TRAIL_STRIPE_WIDTH = 10.5; // px, fixed -- never shrinks, only fades (50% larger than its original 7)
 const TRAIL_STRIPE_SPACING = 10.5; // px between adjacent stripe centers, scaled with the width so the band still tiles seamlessly
-
-function fillCircle(context, x, y, radius, color) {
-  context.fillStyle = color;
-  context.beginPath();
-  context.arc(x, y, radius, 0, TAU);
-  context.fill();
-}
-
-function fillEllipse(context, x, y, radiusX, radiusY, color) {
-  context.fillStyle = color;
-  context.beginPath();
-  context.ellipse(x, y, radiusX, radiusY, 0, 0, TAU);
-  context.fill();
-}
 
 function fillShape(context, color, trace) {
   context.fillStyle = color;

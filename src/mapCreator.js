@@ -7,7 +7,9 @@ import ChaliceHUD from './ChaliceHUD.js';
 import CombatRoom from './CombatRoom.js';
 import { findRoomDoorways, selectCombatRooms } from './combatRoomLayout.js';
 import CubeObstacle from './CubeObstacle.js';
-import Decoration, { DECORATION_TYPES } from './Decoration.js';
+import Decoration, {
+  DECORATION_TYPE_COUNT, DOWN as DECORATION_DOWN, LEFT as DECORATION_LEFT, RIGHT as DECORATION_RIGHT,
+} from './Decoration.js';
 import generateDungeon, { mulberry32 } from './donjonDungeon.js';
 import { add } from './engine.js';
 import Grub from './Grub.js';
@@ -338,8 +340,12 @@ function buildDungeon(seed) {
   // roll-it-when-it-breaks behavior, just decided up front instead.
   const contentsRng = mulberry32(seed + 8);
   const starterGivesAbility = contentsRng() < 0.5;
-  const starterAbilityId = ITEM_ABILITY_CATALOG[Math.floor(contentsRng() * ITEM_ABILITY_CATALOG.length)].id;
-  const remainingAbilityIds = ITEM_ABILITY_CATALOG.map((ability) => ability.id)
+  // Ability ids are just their own index into ITEM_ABILITY_CATALOG -- no
+  // separate string id needed. That makes id 0 (battleArmor) a legitimate,
+  // falsy-looking value, so every check below tests `!== undefined`
+  // (a real "no ability assigned here" case) rather than plain truthiness.
+  const starterAbilityId = Math.floor(contentsRng() * ITEM_ABILITY_CATALOG.length);
+  const remainingAbilityIds = ITEM_ABILITY_CATALOG.map((_, id) => id)
     .filter((id) => !starterGivesAbility || id !== starterAbilityId);
   const abilityRoomIndices = shuffled(nonSpawnRoomIndices, contentsRng).slice(0, remainingAbilityIds.length);
   const roomAbilityId = new Map(abilityRoomIndices.map((roomIndex, i) => [roomIndex, remainingAbilityIds[i]]));
@@ -352,7 +358,7 @@ function buildDungeon(seed) {
         : (cx, cy) => BubbleShieldItem(cx, cy);
     }
     const abilityId = roomAbilityId.get(roomIndex);
-    if (abilityId) return (cx, cy) => Item(cx, cy, abilityId);
+    if (abilityId !== undefined) return (cx, cy) => Item(cx, cy, abilityId);
     return contentsRng() < 0.5
       ? (cx, cy) => BubbleShieldItem(cx, cy)
       : (cx, cy) => HealthItem(cx, cy);
@@ -407,9 +413,9 @@ function buildDungeon(seed) {
     if (roomIndex !== 0) {
       const budget = roomGrubCount(rawDungeon.rooms[roomIndex]);
       for (let spent = 0; spent < budget;) {
-        const type = budget - spent >= 2 && typeRng() < LARGE_GRUB_CHANCE ? 'large' : 'small';
+        const large = budget - spent >= 2 && typeRng() < LARGE_GRUB_CHANCE;
         const spawn = pickGrubSpawn(worldRoom, playerSpawn, scatterRng);
-        const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + enemies.length, { type }));
+        const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + enemies.length, { large }));
         spent += grub.enemyCost;
         enemies.push(grub);
         obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.puck().radius });
@@ -507,13 +513,13 @@ function buildDungeon(seed) {
   const decorationRng = mulberry32(seed + 5);
   dungeon.walls.forEach(({ x: wx, y: wy }) => {
     let facing;
-    if (floorSet.has(`${wx},${wy + 1}`)) facing = 'down';
-    else if (floorSet.has(`${wx - 1},${wy}`)) facing = 'left';
-    else if (floorSet.has(`${wx + 1},${wy}`)) facing = 'right';
+    if (floorSet.has(`${wx},${wy + 1}`)) facing = DECORATION_DOWN;
+    else if (floorSet.has(`${wx - 1},${wy}`)) facing = DECORATION_LEFT;
+    else if (floorSet.has(`${wx + 1},${wy}`)) facing = DECORATION_RIGHT;
     else return;
     if (decorationRng() >= DECORATION_CHANCE) return;
 
-    const type = DECORATION_TYPES[Math.floor(decorationRng() * DECORATION_TYPES.length)];
+    const type = Math.floor(decorationRng() * DECORATION_TYPE_COUNT);
     const world = toWorld(wx, wy);
     add(Decoration(world.x, world.y, type, facing));
   });

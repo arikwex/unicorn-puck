@@ -22,7 +22,6 @@ function GrubProjectile(x, y, vx, vy, props = {}) {
     x, y, vx, vy,
     radius: RADIUS,
     damage: 1,
-    shape: 'circle',
     order: y,
     tags: [TAG_PROJECTILE],
 

@@ -8,20 +8,13 @@
 // volume/rate params rather than regenerating the waveform.
 
 import { play, synth } from './audio.js';
+import { clamp, noise } from './mathUtils.js';
 
 const TAU = Math.PI * 2;
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
 
 // A soft square wave via hard-clamped sine, same trick the reference uses.
 function sqr(phase) {
   return clamp(Math.sin(phase) * 1000, -1, 1);
-}
-
-function noise() {
-  return Math.random() * 2 - 1;
 }
 
 // Defers buffer generation until first play, so nothing touches
