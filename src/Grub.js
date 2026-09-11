@@ -4,6 +4,7 @@ import { mulberry32 } from './donjonDungeon.js';
 import { add, getObjectsByTag } from './engine.js';
 import GrubProjectile from './GrubProjectile.js';
 import renderHealthBar from './HealthBar.js';
+import { clamp } from './mathUtils.js';
 import orbit3d from './orbit3d.js';
 import SplatEffect from './SplatEffect.js';
 import { playEnemyHit, playOozeShot } from './sounds.js';
@@ -422,8 +423,8 @@ function Grub(x, y, room, seed, props = {}) {
         }
       }
 
-      this.x += this.vx * dt;
-      this.y += this.vy * dt;
+      this.x = clamp(this.x + this.vx * dt, minX, maxX);
+      this.y = clamp(this.y + this.vy * dt, minY, maxY);
       this.vx -= this.vx * 4.5 * dt;
       this.vy -= this.vy * 4.5 * dt;
       this.order = this.y;
