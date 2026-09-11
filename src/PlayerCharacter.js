@@ -1,8 +1,9 @@
 import { add } from './engine.js';
+import { renderBubbleShield, SHIELD_COLOR } from './bubbleShield.js';
 import { applyCollisionResponse, applyImpulse, normalizeAngle } from './physics.js';
 import orbit3d from './orbit3d.js';
 import SplatEffect from './SplatEffect.js';
-import { playPlayerDamage, playWallBounce } from './sounds.js';
+import { playPlayerDamage, playShieldPop, playWallBounce } from './sounds.js';
 import { TAG_ENEMY, TAG_PLAYER, TAG_PROJECTILE, TAG_PUCK } from './tags.js';
 
 const TAU = Math.PI * 2;
@@ -681,6 +682,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
   const {
     maxHp = 5,
     hp = maxHp,
+    bubbleShields = 0,
     mass = 1,
     radius = PLAYER_RADIUS,
     viscosity = 1,
@@ -697,6 +699,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     omega: 0,
     hp: Math.max(0, Math.min(maxHp, hp)),
     maxHp,
+    bubbleShields: Math.max(0, Math.floor(bubbleShields)),
     // Driven by DragController while the player is aiming a launch.
     aiming: false,
     targetAngle: angle,
@@ -775,10 +778,25 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
 
     takeDamage(amount = 1) {
       if (amount <= 0 || this.hp <= 0) return;
+      if (this.bubbleShields > 0) {
+        this.bubbleShields--;
+        for (let i = 0; i < 8; i++) {
+          const angle = Math.random() * TAU;
+          const speed = Math.sqrt(Math.random()) * 180;
+          add(SplatEffect(this.x, this.y, Math.cos(angle) * speed, Math.sin(angle) * speed,
+            SHIELD_COLOR, { size: 6 }));
+        }
+        playShieldPop();
+        return;
+      }
       this.hp = Math.max(0, this.hp - Math.max(0, amount));
       damageFlashTimer = DAMAGE_FLASH_DURATION;
       fireDamageSplats(this.x, this.y);
       playPlayerDamage();
+    },
+
+    addBubbleShield() {
+      if (this.hp > 0) this.bubbleShields++;
     },
 
     // Returns the actual amount healed (0 if already dead or already at
@@ -829,6 +847,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
     render(context) {
       if (damageFlashTimer <= 0) {
         renderPlayer(context, this, anim, this.charge, trail);
+        if (this.bubbleShields > 0) renderBubbleShield(context, this.x, this.y - 12, this.radius * 1.65);
         return;
       }
       // Tint an isolated character silhouette so the red pulse covers all
@@ -849,6 +868,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
       tintContext.fillRect(0, 0, DAMAGE_CANVAS_SIZE, DAMAGE_CANVAS_SIZE);
       tintContext.restore();
       context.drawImage(damageCanvas, this.x - center, this.y - center);
+      if (this.bubbleShields > 0) renderBubbleShield(context, this.x, this.y - 12, this.radius * 1.65);
     },
   };
 }

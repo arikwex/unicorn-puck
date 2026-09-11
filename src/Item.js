@@ -38,6 +38,7 @@ function Item(x, y, abilityId) {
     x,
     y,
     order: y,
+    abilityId,
 
     update(dt) {
       if (collected) return true;

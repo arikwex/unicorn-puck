@@ -1,4 +1,5 @@
 import renderHealthBar from './HealthBar.js';
+import { canvas } from './canvas.js';
 import { renderPlayerPortrait } from './PlayerCharacter.js';
 
 const PORTRAIT_X = 40;
@@ -13,8 +14,13 @@ function PlayerHealthHUD(player) {
   return {
     renderHUD(context) {
       renderPlayerPortrait(context, PORTRAIT_X, PORTRAIT_Y, PORTRAIT_SCALE);
-      renderHealthBar(context, BAR_LEFT + BAR_WIDTH / 2, BAR_Y,
-        BAR_WIDTH, BAR_HEIGHT, player.hp, player.maxHp);
+      const shields = player.bubbleShields;
+      const slots = Math.max(player.maxHp, player.hp + shields);
+      // Preserve ordinary tick size when adding overflow slots, but fit
+      // the screen for large stacks. Actual maxHp is never modified.
+      const width = Math.min(BAR_WIDTH * slots / player.maxHp, Math.max(1, canvas.width - BAR_LEFT - 16));
+      renderHealthBar(context, BAR_LEFT + width / 2, BAR_Y,
+        width, BAR_HEIGHT, player.hp, player.maxHp, { shields });
     },
   };
 }

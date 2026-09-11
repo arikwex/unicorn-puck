@@ -8,7 +8,7 @@ import { TAG_CAMERA, TAG_PLAYER } from './tags.js';
 // fraction of the shorter screen dimension, so a phone's narrower viewport
 // naturally zooms out (more dungeon visible) rather than cropping the
 // character down the way a fixed zoom would.
-const CHARACTER_SCREEN_FRACTION = 0.08;
+const CHARACTER_SCREEN_FRACTION = 0.008;
 
 function computeZoom() {
   const targetDiameter = Math.min(canvas.width, canvas.height) * CHARACTER_SCREEN_FRACTION;

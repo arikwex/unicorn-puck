@@ -1,3 +1,5 @@
+import { SHIELD_COLOR } from './bubbleShield.js';
+
 // A standard, reusable health bar: an outlined rectangle divided into one
 // large tick per health point, colored green, yellow, orange, or red at
 // quarter-health cutoffs. Pure render function -- callers own when/where to show it
@@ -24,6 +26,7 @@ function renderHealthBar(context, x, y, width, height, currentHp, maxHp, props =
     backgroundColor = 'rgba(0, 0, 0, 0.55)',
     tickGap = 2,
     padding = 2,
+    shields = 0,
   } = props;
 
   const fraction = Math.max(0, Math.min(1, currentHp / maxHp));
@@ -37,11 +40,15 @@ function renderHealthBar(context, x, y, width, height, currentHp, maxHp, props =
   // The outline straddles the rectangle edge; measure padding from its
   // inner edge so the full gap remains visible beside the colored ticks.
   const inset = outlineWidth / 2 + padding;
-  const tickWidth = Math.max(0, (width - inset * 2 - tickGap * (maxHp - 1)) / maxHp);
+  const slots = Math.max(maxHp, currentHp + shields);
+  // Dense stacks still get one visible-width tick each, never a zero-width
+  // bar because fixed gaps consumed all the available space.
+  const gap = Math.min(tickGap, Math.max(0, width - inset * 2) / slots * 0.25);
+  const tickWidth = Math.max(0, (width - inset * 2 - gap * (slots - 1)) / slots);
   const tickHeight = Math.max(0, height - inset * 2);
-  context.fillStyle = color;
-  for (let i = 0; i < maxHp && i < currentHp; i++) {
-    context.fillRect(left + inset + i * (tickWidth + tickGap), top + inset, tickWidth, tickHeight);
+  for (let i = 0; i < currentHp + shields; i++) {
+    context.fillStyle = i < currentHp ? color : SHIELD_COLOR;
+    context.fillRect(left + inset + i * (tickWidth + gap), top + inset, tickWidth, tickHeight);
   }
 
   context.strokeStyle = outlineColor;

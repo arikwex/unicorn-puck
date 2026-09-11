@@ -4,11 +4,13 @@
 // center on the hit that finally breaks it.
 
 import { add } from './engine.js';
+import BubbleShieldItem from './BubbleShieldItem.js';
 import HealthItem from './HealthItem.js';
 import SplatEffect from './SplatEffect.js';
 import { TAG_OBSTACLE, TAG_PLAYER } from './tags.js';
 
 const TAU = Math.PI * 2;
+const SHIELD_DROP_CHANCE = 0.5;
 const HITS_REQUIRED = 2;
 // Exported so mapCreator.js's placement check uses the exact same radius
 // rather than a duplicated magic number.
@@ -141,7 +143,8 @@ function TreasureChest(x, y, props = {}) {
 
       if (hitsRemaining > 0) return;
       fireBurst(this.x, this.y, BREAK_SPLAT_COUNT, BREAK_SPLAT_COLORS, BREAK_SPLAT_SPEED_MAX, BREAK_SPLAT_SIZE_MIN, BREAK_SPLAT_SIZE_MAX);
-      add(HealthItem(this.x, this.y));
+      add(Math.random() < SHIELD_DROP_CHANCE
+        ? BubbleShieldItem(this.x, this.y) : HealthItem(this.x, this.y));
       return true;
     },
 
