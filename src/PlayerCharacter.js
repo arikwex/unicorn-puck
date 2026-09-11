@@ -138,8 +138,6 @@ function fillOutlinedShape(context, color, lineWidth, trace) {
   context.fill();
   context.strokeStyle = color;
   context.lineWidth = lineWidth;
-  context.lineJoin = 'round';
-  context.lineCap = 'round';
   context.stroke();
 }
 
@@ -522,7 +520,6 @@ function renderTrail(context, trail, time) {
   if (trail.length < 2) return;
   context.save();
   const opacity = context.globalAlpha;
-  context.lineCap = 'round';
   context.lineWidth = TRAIL_STRIPE_WIDTH;
 
   for (let i = 1; i < trail.length; i++) {
@@ -756,6 +753,8 @@ function PlayerCharacter(x = 0, y = 0, angle = 0, props = {}) {
       if (!damageCanvas) {
         damageCanvas = document.createElement('canvas');
         damageCanvas.width = damageCanvas.height = DAMAGE_CANVAS_SIZE;
+        const c = damageCanvas.getContext('2d');
+        c.lineCap = c.lineJoin = 'round';
       }
       const tintContext = damageCanvas.getContext('2d');
       const center = DAMAGE_CANVAS_SIZE / 2;

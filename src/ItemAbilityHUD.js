@@ -21,10 +21,6 @@ function outlinedText(context, text, x, y, font, color) {
   context.textBaseline = 'middle';
   context.lineWidth = 3;
   context.strokeStyle = STROKE_COLOR;
-  // Round joins -- a miter join (canvas's default) spikes into sharp peaks
-  // on a letter's acute interior angles (the V-notch in "M"/"W" most
-  // visibly) once the stroke is as thick as this outline is.
-  context.lineJoin = 'round';
   context.strokeText(text, x, y);
   context.fillStyle = color;
   context.fillText(text, x, y);

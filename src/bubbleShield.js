@@ -17,7 +17,6 @@ function renderBubbleShield(context, x, y, radius) {
   context.arc(x, y, radius * 0.82, Math.PI * 1.08, Math.PI * 1.4);
   context.strokeStyle = '#eff';
   context.globalAlpha = alpha * 0.85;
-  context.lineCap = 'round';
   context.stroke();
   context.restore();
 }

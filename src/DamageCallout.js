@@ -34,10 +34,6 @@ function DamageCallout(x, y, text, color = '#fff') {
       context.textBaseline = 'middle';
       context.lineWidth = 3 / scale;
       context.strokeStyle = '#000';
-      // Round joins -- a miter join (canvas's default) spikes into sharp
-      // peaks on a letter's acute interior angles (the V-notch in "M"/"W"
-      // most visibly) once the stroke is as thick as this outline is.
-      context.lineJoin = 'round';
       context.strokeText(text, 0, 0);
       context.fillStyle = color;
       context.fillText(text, 0, 0);

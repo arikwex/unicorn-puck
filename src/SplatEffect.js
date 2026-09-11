@@ -63,8 +63,6 @@ function SplatEffect(x, y, vx, vy, color, props = {}) {
         const t = Math.min(1, elapsed / flightDuration);
         context.strokeStyle = color;
         context.lineWidth = ARC_LINE_WIDTH;
-        context.lineCap = 'round';
-        context.lineJoin = 'round';
         context.beginPath();
         for (let i = 0; i <= ARC_SAMPLES; i++) {
           const [px, py] = pointAt(Math.max(Math.min(i / ARC_SAMPLES * 0.4 + t * 0.8, 1), 0));

@@ -194,7 +194,6 @@ function renderCandelabra(context, obstacle, anim) {
 
   context.strokeStyle = CANDELABRA_METAL_COLOR;
   context.lineWidth = CANDELABRA_STEM_WIDTH;
-  context.lineCap = 'round';
   context.beginPath();
   context.moveTo(x, y - 4);
   context.lineTo(x, stemTop);

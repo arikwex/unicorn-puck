@@ -58,7 +58,6 @@ function renderDragIndicator(context, start, end, hueAnimator) {
   const ux = dx / length;
   const uy = dy / length;
 
-  context.lineCap = 'round';
   context.lineWidth = LINE_WIDTH;
 
   const segments = Math.max(1, Math.ceil(length / SEGMENT_LENGTH));

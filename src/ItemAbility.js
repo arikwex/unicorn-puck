@@ -16,7 +16,6 @@ function fillOutlined(context) {
   context.fill();
   context.strokeStyle = OUTLINE_COLOR;
   context.lineWidth = OUTLINE_WIDTH;
-  context.lineJoin = 'round';
   context.stroke();
 }
 
