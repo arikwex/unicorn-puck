@@ -7,7 +7,7 @@ function resize() {
   ctx.imageSmoothingEnabled = false;
   // Resizing resets all context state, so this lives here rather than
   // running once. Round everywhere: a miter join spikes into sharp peaks on
-  // acute angles (outlined text's "M"/"W" V-notches most visibly).
+  // acute angles.
   ctx.lineCap = ctx.lineJoin = 'round';
 }
 

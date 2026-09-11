@@ -5,13 +5,9 @@ import { TAG_OBSTACLE } from './tags.js';
 
 // Just the map and your own dot -- no chests/chalices/grubs, per the ask.
 const MAP_SIZE = 160;
-const MAP_MARGIN = 16;
-const PADDING = 10; // world-bounds inset, in map pixels, so edge walls aren't clipped
-const BG_COLOR = '#000';
-const BORDER_COLOR = '#fff';
-const WALL_COLOR = '#766';
+const BG_COLOR = '#444';
+const WALL_COLOR = '#111';
 const PLAYER_COLOR = '#fff';
-const PLAYER_DOT_RADIUS = 4;
 
 function isWall(object) {
   return object.tags?.includes(TAG_OBSTACLE) && typeof object.w === 'number';
@@ -25,26 +21,22 @@ function isWall(object) {
 // once here at map-build time rather than re-deriving a wall bounding box
 // (and re-solving scale/origin from it) on every single frame.
 function MiniMap(player, worldSpan, worldMin) {
-  const scale = (MAP_SIZE - PADDING * 2) / worldSpan;
+  const scale = (MAP_SIZE) / worldSpan;
 
   return {
     hudAnchor: [0, 1],
     renderHUD(context) {
       if (!player.oracleEyes) return;
-      const originX = MAP_MARGIN;
-      const originY = canvas.height - MAP_MARGIN - MAP_SIZE;
       const toMap = (wx, wy) => [
-        originX + PADDING + (wx - worldMin) * scale,
-        originY + PADDING + (wy - worldMin) * scale,
+        (wx - worldMin) * scale,
+        (wy - worldMin) * scale,
       ];
 
       context.save();
-      fillRect(context, originX, originY, MAP_SIZE, MAP_SIZE, BG_COLOR, 0.55);
+      context.translate(10, canvas.height -10 - MAP_SIZE);
+      fillRect(context, 0, 0, MAP_SIZE, MAP_SIZE, BG_COLOR, 0.55);
 
-      context.save();
       context.beginPath();
-      context.rect(originX, originY, MAP_SIZE, MAP_SIZE);
-      context.clip();
       context.fillStyle = WALL_COLOR;
       getObjectsByTag(TAG_OBSTACLE).filter(isWall).forEach((wall) => {
         const [x1, y1] = toMap(wall.x - wall.w / 2, wall.y - wall.h / 2);
@@ -55,13 +47,8 @@ function MiniMap(player, worldSpan, worldMin) {
       const [px, py] = toMap(player.x, player.y);
       context.fillStyle = PLAYER_COLOR;
       context.beginPath();
-      context.arc(px, py, PLAYER_DOT_RADIUS, 0, Math.PI * 2);
+      context.arc(px, py, 4, 0, Math.PI * 2);
       context.fill();
-      context.restore();
-
-      context.strokeStyle = BORDER_COLOR;
-      context.lineWidth = 2;
-      context.strokeRect(originX, originY, MAP_SIZE, MAP_SIZE);
       context.restore();
     },
   };

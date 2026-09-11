@@ -10,7 +10,6 @@ const TEXT_X = 68;
 const TEXT_Y = 126;
 const FONT = 'bold 24px sans-serif';
 const TEXT_COLOR = '#fff';
-const STROKE_COLOR = '#000';
 
 // The "N / total chalices collected" counter -- a small icon (reusing
 // Chalice's own render function, same trick PlayerHealthHUD uses for its
@@ -27,9 +26,6 @@ function ChaliceHUD() {
       context.font = FONT;
       context.textAlign = 'left';
       context.textBaseline = 'middle';
-      context.lineWidth = 3;
-      context.strokeStyle = STROKE_COLOR;
-      context.strokeText(text, TEXT_X, TEXT_Y);
       context.fillStyle = TEXT_COLOR;
       context.fillText(text, TEXT_X, TEXT_Y);
     },

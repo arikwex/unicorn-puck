@@ -13,15 +13,11 @@ const NAME_FONT = 'bold 16px sans-serif';
 const DESCRIPTION_FONT = '12px sans-serif';
 const NAME_COLOR = '#fff';
 const DESCRIPTION_COLOR = '#ccc';
-const STROKE_COLOR = '#000';
 
-function outlinedText(context, text, x, y, font, color) {
+function renderText(context, text, x, y, font, color) {
   context.font = font;
   context.textAlign = 'left';
   context.textBaseline = 'middle';
-  context.lineWidth = 3;
-  context.strokeStyle = STROKE_COLOR;
-  context.strokeText(text, x, y);
   context.fillStyle = color;
   context.fillText(text, x, y);
 }
@@ -42,8 +38,8 @@ function ItemAbilityHUD() {
         ability.draw(context);
         context.restore();
 
-        outlinedText(context, ability.name, TEXT_X, rowY + NAME_OFFSET_Y, NAME_FONT, NAME_COLOR);
-        outlinedText(context, ability.description, TEXT_X, rowY + DESCRIPTION_OFFSET_Y, DESCRIPTION_FONT, DESCRIPTION_COLOR);
+        renderText(context, ability.name, TEXT_X, rowY + NAME_OFFSET_Y, NAME_FONT, NAME_COLOR);
+        renderText(context, ability.description, TEXT_X, rowY + DESCRIPTION_OFFSET_Y, DESCRIPTION_FONT, DESCRIPTION_COLOR);
       });
     },
   };
