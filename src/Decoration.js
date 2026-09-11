@@ -2,7 +2,12 @@
 // candle sconce, a mounted crystal, or a runic stone. Purely decorative --
 // no tags, no puck(), nothing for physics to see -- just a render (plus a
 // tiny per-instance anim clock for the candle's flame).
-import { renderFlame } from './Pillar.js';
+// renderFlame's own export was retired along with Pillar.js's non-classic
+// variants (see its VARIANT_COUNT comment) -- this whole module is unused
+// dead weight already (nothing imports Decoration.js since mapCreator.js
+// stopped placing them), so drawCandle's own renderFlame(...) call below
+// is commented out too rather than left as a broken import.
+// import { renderFlame } from './Pillar.js';
 
 const TAU = Math.PI * 2;
 // Shifts a decoration off its own wall cell and into the neighboring
@@ -55,7 +60,7 @@ function drawCandle(context, anim) {
   context.fillRect(-7, 6, 14, 5);
   context.fillStyle = WAX_COLOR;
   context.fillRect(-2, -8, 4, 14);
-  renderFlame(context, 0, -8, anim);
+  // renderFlame(context, 0, -8, anim); -- see the import note above
 }
 
 function drawCrystal(context) {
