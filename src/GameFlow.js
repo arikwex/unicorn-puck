@@ -11,6 +11,7 @@ import { playDungeonTheme } from './music.js';
 import { fireSplatBurst } from './SplatEffect.js';
 import StatusCard from './StatusCard.js';
 import { TAG_COMBAT_ROOM } from './tags.js';
+import { collectItemAbility } from './ItemAbility.js';
 
 // Same ROYGBV set the player's own on-hit splats use (see
 // PlayerCharacter.js's fireDamageSplats) -- death gets a bigger burst of
@@ -65,6 +66,9 @@ function startGame() {
     player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap,
   } = createMap(seed);
   add(GameWatcher(player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap));
+
+  // Add all ability items
+  [0,1,2,3,4].map((i) => collectItemAbility(i, player));
 }
 
 function startGameFlow() {

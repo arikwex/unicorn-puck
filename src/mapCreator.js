@@ -29,9 +29,8 @@ import ToastSystem, { showToast } from './ToastSystem.js';
 // Grubs are scattered to their own spots within the
 // room (buildDungeon's own grubSeed offset by <room index> seeds that
 // scatter) and its own patrol (offset by <room index> * 100 + <grub index>
-// seeds that), kept at least GRUB_MIN_PLAYER_DISTANCE from wherever the player spawns
-// and GRUB_ROOM_MARGIN off its room's own walls where the room is big
-// enough to allow both.
+// seeds that) and kept GRUB_ROOM_MARGIN off its room's own walls where the room is big
+// enough to allow it.
 // A room's enemy budget scales with its (raw, pre-inflation) size: a
 // square room's width+height minus 3 gives exactly 3/5/7 slots for a
 // 3x3/4x4/5x5 room -- and since donjonDungeon.js only ever generates 3- or
@@ -42,7 +41,6 @@ function roomGrubCount(rawRoom) {
   return rawRoom.w + rawRoom.h - 3;
 }
 const LARGE_GRUB_CHANCE = 0.3;
-const GRUB_MIN_PLAYER_DISTANCE = 200;
 const GRUB_ROOM_MARGIN = 50;
 // A hallway only ever gets a grub if it's a straight run of at least this
 // many raw grid cells (see findLongHallways) -- a short jog between two
@@ -102,37 +100,18 @@ function gridToWorld(x, y, gridWidth, gridHeight) {
   return { x: (x - gridWidth / 2) * TILE, y: (y - gridHeight / 2) * TILE };
 }
 
-// A grub's spawn point within its room (world space): a point scattered
-// randomly (via `rng`) across the room's own interior (inset by
-// GRUB_ROOM_MARGIN off its walls), then pushed away from the player's own
-// spawn point to at least GRUB_MIN_PLAYER_DISTANCE where the room allows
-// it, clamped back inside that same interior -- "if possible": a room too
-// small to reach the full distance just does its best rather than
-// spawning the grub inside a wall.
-function pickGrubSpawn(room, playerSpawn, rng) {
+// A grub's spawn point within its room (world space), scattered randomly
+// via `rng` across the room's own interior (inset by GRUB_ROOM_MARGIN off
+// its walls). The spawn room is enemy-free, so no player-distance check is
+// needed here.
+function pickGrubSpawn(room, rng) {
   const minX = room.x - room.w / 2 + GRUB_ROOM_MARGIN;
   const maxX = room.x + room.w / 2 - GRUB_ROOM_MARGIN;
   const minY = room.y - room.h / 2 + GRUB_ROOM_MARGIN;
   const maxY = room.y + room.h / 2 - GRUB_ROOM_MARGIN;
-  const clamp = (value, lo, hi, fallback) => (lo > hi ? fallback : Math.min(Math.max(value, lo), hi));
-
-  let x = minX <= maxX ? minX + rng() * (maxX - minX) : room.x;
-  let y = minY <= maxY ? minY + rng() * (maxY - minY) : room.y;
-
-  const dx = x - playerSpawn.x;
-  const dy = y - playerSpawn.y;
-  const distance = Math.hypot(dx, dy);
-  if (distance < GRUB_MIN_PLAYER_DISTANCE) {
-    // Too close to the player's own spawn point (most likely in the
-    // spawn room itself) -- push in that same direction out to the
-    // minimum distance instead, or an arbitrary one if it landed exactly
-    // on top of the player.
-    const angle = distance > 0.001 ? Math.atan2(dy, dx) : 0;
-    x = playerSpawn.x + Math.cos(angle) * GRUB_MIN_PLAYER_DISTANCE;
-    y = playerSpawn.y + Math.sin(angle) * GRUB_MIN_PLAYER_DISTANCE;
-  }
-
-  return { x: clamp(x, minX, maxX, room.x), y: clamp(y, minY, maxY, room.y) };
+  const x = minX <= maxX ? minX + rng() * (maxX - minX) : room.x;
+  const y = minY <= maxY ? minY + rng() * (maxY - minY) : room.y;
+  return { x, y };
 }
 
 // Pulls a -1..1 sample toward 0 -- CENTER_BIAS_POWER > 1 means small
@@ -147,7 +126,7 @@ function centerBiasedUnit(rng) {
 
 // A center-biased point within a room's own interior, inset by `margin`
 // off its walls -- shared by chest and chalice placement (a grub
-// additionally pushes away from the player's spawn; see pickGrubSpawn).
+// while staying inside the room; see pickGrubSpawn).
 function pickPointInRoom(room, margin, rng) {
   const halfW = Math.max(0, room.w / 2 - margin);
   const halfH = Math.max(0, room.h / 2 - margin);
@@ -392,8 +371,7 @@ function buildDungeon(seed) {
   // roomGrubCount(room) enemy slots per room -- except the player's own spawn
   // room, which stays enemy-free so the run always opens on calm ground --
   // each scattered to its own spot and with its own seeded patrol, so
-  // behavior stays reproducible run to run, and never within
-  // GRUB_MIN_PLAYER_DISTANCE of the player's spawn.
+  // behavior stays reproducible run to run.
   dungeon.rooms.forEach((room, roomIndex) => {
     const roomCenter = toWorld(room.x + room.w / 2, room.y + room.h / 2);
     const worldRoom = {
@@ -406,7 +384,7 @@ function buildDungeon(seed) {
       const budget = roomGrubCount(rawDungeon.rooms[roomIndex]);
       for (let spent = 0; spent < budget;) {
         const large = budget - spent >= 2 && typeRng() < LARGE_GRUB_CHANCE;
-        const spawn = pickGrubSpawn(worldRoom, playerSpawn, scatterRng);
+        const spawn = pickGrubSpawn(worldRoom, scatterRng);
         const grub = add(Grub(spawn.x, spawn.y, worldRoom, grubSeed + roomIndex * 100 + enemies.length, { large }));
         spent += grub.enemyCost;
         enemies.push(grub);
@@ -456,7 +434,7 @@ function buildDungeon(seed) {
     };
     const grubCount = Math.min(HALLWAY_MAX_GRUBS, Math.floor(hallway.length / HALLWAY_GRUB_SPACING));
     for (let i = 0; i < grubCount; i++) {
-      const spawn = pickGrubSpawn(worldHallway, playerSpawn, hallwayRng);
+      const spawn = pickGrubSpawn(worldHallway, hallwayRng);
       const grub = add(Grub(spawn.x, spawn.y, worldHallway, hallwayGrubSeed + hallwayIndex * 100 + i));
       obstacleCircles.push({ x: spawn.x, y: spawn.y, radius: grub.puck().radius });
     }
@@ -494,7 +472,22 @@ function buildDungeon(seed) {
   });
   resetChalices(chaliceRoomIndices.length);
 
-  return playerSpawn;
+  // The dungeon's own world-space bounding box -- always square, and always
+  // this same fixed size/position for every seed (see donjonDungeon.js's
+  // own GRID_WIDTH/GRID_HEIGHT and computeWalls: every uncarved cell,
+  // including the whole boundary ring, is a wall, so it always fills the
+  // grid to its edges). mapWorldMin is offset an extra half-TILE beyond
+  // -mapWorldSpan/2 because a merged wall rect's own world center (see the
+  // wall-adding loop above) is keyed off its *cell-center* grid coordinate,
+  // not its edge -- so the very first cell's left/top edge actually sits
+  // half a tile before gridToWorld(0, 0), not exactly at it. Handed to
+  // MiniMap so it can scale itself once at map-build time instead of
+  // re-deriving a wall bounding box from scratch every single frame.
+  const mapWorldSpan = dungeon.gridWidth * TILE;
+  const mapWorldMin = -mapWorldSpan / 2 - TILE / 2;
+  return {
+    ...playerSpawn, mapWorldSpan, mapWorldMin,
+  };
 }
 
 // Entry point for specifying everything in the scene: the player, camera,
@@ -507,7 +500,7 @@ function createMap(seed) {
   const playerHealthHUD = add(PlayerHealthHUD(player));
   const chaliceHUD = add(ChaliceHUD());
   const itemAbilityHUD = add(ItemAbilityHUD());
-  const miniMap = add(MiniMap(player));
+  const miniMap = add(MiniMap(player, spawn.mapWorldSpan, spawn.mapWorldMin));
   add(ToastSystem());
   // Shown instantly (not after any delay) since it's establishing the
   // whole game's premise, not reacting to something the player just did.

@@ -14,37 +14,28 @@ const PLAYER_COLOR = '#fff';
 const PLAYER_DOT_RADIUS = 4;
 
 function isWall(object) {
-  return object.tags?.includes(TAG_OBSTACLE) && typeof object.w === 'number' && typeof object.h === 'number';
+  return object.tags?.includes(TAG_OBSTACLE) && typeof object.w === 'number';
 }
 
 // Revealed only once the player has Oracle Eyes -- a bottom-left overview of
-// every wall (recomputing their bounding box each frame is cheap; there
-// are only ever a few dozen) plus the player's own current position.
-function MiniMap(player) {
+// every wall (there are only ever a few dozen) plus the player's own
+// current position. `worldSpan`/`worldMin` are the dungeon's own fixed
+// world-space bounding box -- always square and the same for every seed
+// (see mapCreator.js's own comment on it) -- so scale/origin are fixed
+// once here at map-build time rather than re-deriving a wall bounding box
+// (and re-solving scale/origin from it) on every single frame.
+function MiniMap(player, worldSpan, worldMin) {
+  const scale = (MAP_SIZE - PADDING * 2) / worldSpan;
+
   return {
     hudAnchor: [0, 1],
     renderHUD(context) {
       if (!player.oracleEyes) return;
-      const walls = getObjectsByTag(TAG_OBSTACLE).filter(isWall);
-      if (walls.length === 0) return;
-
-      let minX = Infinity;
-      let maxX = -Infinity;
-      let minY = Infinity;
-      let maxY = -Infinity;
-      walls.forEach((wall) => {
-        minX = Math.min(minX, wall.x - wall.w / 2);
-        maxX = Math.max(maxX, wall.x + wall.w / 2);
-        minY = Math.min(minY, wall.y - wall.h / 2);
-        maxY = Math.max(maxY, wall.y + wall.h / 2);
-      });
-      const span = Math.max(maxX - minX, maxY - minY) || 1;
-      const scale = (MAP_SIZE - PADDING * 2) / span;
       const originX = MAP_MARGIN;
       const originY = canvas.height - MAP_MARGIN - MAP_SIZE;
       const toMap = (wx, wy) => [
-        originX + PADDING + (wx - minX) * scale,
-        originY + PADDING + (wy - minY) * scale,
+        originX + PADDING + (wx - worldMin) * scale,
+        originY + PADDING + (wy - worldMin) * scale,
       ];
 
       context.save();
@@ -55,7 +46,7 @@ function MiniMap(player) {
       context.rect(originX, originY, MAP_SIZE, MAP_SIZE);
       context.clip();
       context.fillStyle = WALL_COLOR;
-      walls.forEach((wall) => {
+      getObjectsByTag(TAG_OBSTACLE).filter(isWall).forEach((wall) => {
         const [x1, y1] = toMap(wall.x - wall.w / 2, wall.y - wall.h / 2);
         const [x2, y2] = toMap(wall.x + wall.w / 2, wall.y + wall.h / 2);
         context.fillRect(x1, y1, Math.max(1, x2 - x1), Math.max(1, y2 - y1));
