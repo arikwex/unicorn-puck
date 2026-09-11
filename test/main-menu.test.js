@@ -1,0 +1,104 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+const listeners = new Map();
+const canvas = {
+  getContext: () => ({}),
+  addEventListener: (event, callback) => listeners.set(event, callback),
+  removeEventListener(event, callback) {
+    if (listeners.get(event) === callback) listeners.delete(event);
+  },
+};
+globalThis.document = { querySelector: () => canvas };
+globalThis.window = {};
+globalThis.innerWidth = 800;
+globalThis.innerHeight = 600;
+globalThis.addEventListener = () => {};
+
+const { default: MainMenu } = await import('../src/MainMenu.js');
+const { getObjects } = await import('../src/engine.js');
+
+function render(menu) {
+  const calls = [];
+  const context = new Proxy({
+    getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+    measureText: () => ({ width: 20 }),
+    createLinearGradient: () => ({ addColorStop() {} }),
+  }, {
+    get(target, key) {
+      return key in target ? target[key] : (...args) => calls.push({
+        method: key, args, color: target.fillStyle,
+      });
+    },
+  });
+  menu.renderHUD(context);
+  return calls;
+}
+
+test('menu reuses wall, candelabra and chalice art without adding gameplay objects', () => {
+  const menu = MainMenu(() => {});
+  try {
+    for (const [width, height] of [[800, 600], [320, 640], [1200, 500]]) {
+      canvas.width = width;
+      canvas.height = height;
+      const calls = render(menu);
+      const walls = calls.filter(({ method, color }) => method === 'fillRect'
+        && ['#7c6865', '#453f5d'].includes(color));
+      assert.equal(walls.length, 6, 'three walls, two faces each');
+      assert.ok(calls.indexOf(walls.at(-1)) < calls.findIndex(({ method }) => method === 'fillText'));
+      assert.ok(calls.some(({ method, args }) => method === 'translate'
+        && args[0] === width * 0.2 && args[1] === height * 0.73), 'candelabra on the left');
+      assert.ok(calls.some(({ method, args }) => method === 'translate'
+        && args[0] === width * 0.8 && args[1] === height * 0.65), 'chalice on the right');
+      assert.ok(calls.some(({ method, color }) => method === 'fill' && color === '#a5183a'), 'blood in chalice');
+      assert.equal(calls.filter(({ method, color }) => method === 'fill' && color === '#ff6a00').length, 3,
+        'three candelabra flames');
+      assert.equal(getObjects().length, 0, 'scenery is not registered with the game engine');
+    }
+  } finally {
+    menu.destroy();
+  }
+});
+
+test('menu scenery animates without starting gameplay', () => {
+  const menu = MainMenu(() => assert.fail('animation must not start the game'));
+  try {
+    const before = render(menu);
+    menu.update(0.2);
+    const after = render(menu);
+    const flamePaths = (calls) => calls.filter(({ method }) => method === 'quadraticCurveTo');
+    assert.notDeepEqual(flamePaths(before), flamePaths(after));
+    const chalicePosition = (calls) => calls.find(({ method, args }) => method === 'translate'
+      && args[0] === canvas.width * 0.8).args;
+    assert.notDeepEqual(chalicePosition(before), chalicePosition(after));
+  } finally {
+    menu.destroy();
+  }
+});
+
+test('staggered left walls have a visible gap, including their raised tops and front faces', () => {
+  const menu = MainMenu(() => {});
+  try {
+    for (const [width, height] of [[800, 600], [320, 640], [1200, 500], [1920, 1080], [600, 600]]) {
+      canvas.width = width;
+      canvas.height = height;
+      const walls = render(menu).filter(({ method, color }) => method === 'fillRect'
+        && ['#7c6865', '#453f5d'].includes(color));
+      const upperFront = walls[2].args;
+      const lowerTop = walls[5].args;
+      assert.ok(upperFront[1] + upperFront[3] < lowerTop[1], `${width}x${height}: walls must not overlap`);
+    }
+  } finally {
+    menu.destroy();
+  }
+});
+
+test('click anywhere still starts once and the menu removes its listener on teardown', () => {
+  let starts = 0;
+  const menu = MainMenu(() => starts++);
+  listeners.get('pointerdown')();
+  listeners.get('pointerdown')();
+  assert.equal(starts, 1);
+  menu.destroy();
+  assert.equal(listeners.has('pointerdown'), false);
+});

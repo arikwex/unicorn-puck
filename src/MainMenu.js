@@ -1,4 +1,7 @@
 import { canvas } from './canvas.js';
+import { renderChaliceIcon } from './Chalice.js';
+import CubeObstacle from './CubeObstacle.js';
+import Pillar from './Pillar.js';
 import { renderPlayer } from './PlayerCharacter.js';
 
 const TITLE_TOP = 'PEGACORN';
@@ -50,6 +53,13 @@ function renderRainbowText(context, text, cx, y, font, hueAt) {
 function MainMenu(onBegin) {
   let anim = 0;
   let started = false;
+  // Render-only scenery: never added to the world or pickup/physics passes.
+  const candelabra = Pillar(0, 0, { variant: 3 });
+  const walls = [
+    { x: 0.9, y: 0.27, width: 220 },
+    { x: 0.12, y: 0.32, width: 180 },
+    { x: 0.03, y: 0.53, width: 140 },
+  ].map((placement) => ({ ...placement, wall: CubeObstacle() }));
 
   function onPointerDown() {
     if (started) return;
@@ -66,10 +76,33 @@ function MainMenu(onBegin) {
 
     update(dt) {
       anim += dt;
+      candelabra.update(dt);
     },
 
     renderHUD(context) {
       const cx = canvas.width / 2;
+      const sceneryScale = Math.min(canvas.width / 800, canvas.height / 600, 1.5);
+      context.save();
+      context.globalAlpha = 0.45;
+      walls.forEach(({ x, y, width, wall }) => {
+        wall.x = canvas.width * x;
+        wall.y = canvas.height * y;
+        wall.w = width * sceneryScale;
+        wall.h = 45 * sceneryScale;
+        wall.height = 65 * sceneryScale;
+        wall.render(context);
+      });
+      context.restore();
+
+      context.save();
+      context.translate(canvas.width * 0.2, canvas.height * 0.73);
+      context.scale(sceneryScale * 1.35, sceneryScale * 1.35);
+      candelabra.render(context);
+      context.restore();
+      renderChaliceIcon(context, canvas.width * 0.8,
+        canvas.height * 0.65 + Math.sin(anim * 2.2) * 4 * sceneryScale,
+        sceneryScale * 3.4);
+
       const titleFont = clamp(canvas.width * TITLE_FONT_RATIO, TITLE_FONT_MIN, TITLE_FONT_MAX);
       const font = `900 ${titleFont}px sans-serif`;
       const topY = canvas.height * 0.2;

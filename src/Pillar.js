@@ -295,3 +295,4 @@ function Pillar(x = 0, y = 0, props = {}) {
 }
 
 export default Pillar;
+export { renderFlame };
