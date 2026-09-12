@@ -22,10 +22,8 @@ const PROMPT_FONT_SIZE = 22;
 const PROMPT_BOTTOM_MARGIN = 48;
 const PROMPT_PULSE_SPEED = 3; // rad/s
 
-const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
 // Large centered idle unicorn, a static rainbow "PEGACORN" over a
-// permanently red "BLOOD", and a pulsing "click/tap anywhere" prompt at the
+// permanently red "BLOOD", and a pulsing "click / tap to begin" prompt at the
 // bottom -- the whole thing is HUD-space (raw canvas pixels), so it's
 // unaffected by any camera. Calls `onBegin()` on the first pointer press
 // anywhere on the canvas -- `{ once: true }` fires and detaches itself, so
@@ -107,13 +105,12 @@ function MainMenu(onBegin) {
       renderPlayer(context, { x: 0, y: 0, a: CHARACTER_ANGLE }, anim, 0, []);
       context.restore();
 
-      const promptText = `[${IS_TOUCH ? 'Tap' : 'Click'} Anywhere to Begin]`;
       context.font = `bold ${PROMPT_FONT_SIZE}px sans-serif`;
       context.fillStyle = '#fff';
       // No need to reset globalAlpha back to 1 after -- hud.js's own
       // renderScreenHUD already wraps every hud() call in save/restore.
       context.globalAlpha = 0.6 + 0.4 * Math.sin(anim * PROMPT_PULSE_SPEED);
-      context.fillText(promptText, cx, canvas.height - PROMPT_BOTTOM_MARGIN);
+      context.fillText('[Click / Tap to Begin]', cx, canvas.height - PROMPT_BOTTOM_MARGIN);
     },
   };
 }
