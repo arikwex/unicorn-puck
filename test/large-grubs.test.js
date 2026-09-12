@@ -96,11 +96,16 @@ test('medium orbs are a purple sphere with one foreshortened blue eye and four d
   Object.assign(medium, { a: Math.PI / 2 });
   calls = draw(medium);
   assert.ok(indexOf(calls, winglet) > indexOf(calls, body));
-  // The charge-up shakes the whole orb, harder toward the end of the tell.
-  const center = (aimT) => { Object.assign(medium, { state: AIMING, aimT }); return draw(medium).find(body).args.slice(0, 2); };
-  const [x0, y0] = center(0);
-  const [x1, y1] = center(0.9);
-  assert.ok(Math.hypot(x1 - x0, y1 - y0) > 0.5);
+  // Charging siphons motes into the eye; nothing gathers while patrolling.
+  const motes = (c) => c.filter(({ method, color }) => method === 'arc' && color === '#3de');
+  Object.assign(medium, { a: -Math.PI / 2, state: PATROL, aimT: 0 });
+  assert.equal(motes(draw(medium)).length, 0);
+  Object.assign(medium, { state: AIMING, aimT: 0.9 });
+  const charging = draw(medium);
+  assert.equal(motes(charging).length, 7);
+  const [ex, ey] = charging.find(eye).args;
+  assert.ok(motes(charging).every(({ args: [x, y, r] }) => Math.hypot(x - ex, y - ey) <= 40 * 1.4 && r > 0),
+    'every mote is closing on the eye');
 });
 
 test('all types fire their colored volley once per tell and leave matching ooze trails', () => {

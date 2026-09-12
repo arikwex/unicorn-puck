@@ -105,7 +105,7 @@ const ITEM_ABILITY_CATALOG = [
   ['MITHRIL HORN', '+1 impact damage', drawMithrilHorn, (player) => {
     player.horn += 1;
   }],
-  ['CHROMATIC HOOF', 'bounces reboost momentum', drawChromaticHoof, (player) => {
+  ['CHROMATIC HOOF', 'chain lightning hits +2 enemies', drawChromaticHoof, (player) => {
     player.hoof = true;
   }],
   ['ORACLE EYES', 'reveals the minimap', drawOracleEyes, (player) => {

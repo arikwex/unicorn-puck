@@ -1,4 +1,5 @@
 import { fillCircle, fillEllipse } from './canvasShapes.js';
+import chainLightning from './ChainLightning.js';
 import DamageCallout from './DamageCallout.js';
 import { mulberry32 } from './donjonDungeon.js';
 import { add, getObjectsByTag } from './engine.js';
@@ -29,22 +30,9 @@ function randRange(rng, min, max) {
 // -- body -----------------------------------------------------------------
 const SEGMENT_RADII = [22, 18, 14, 10]; // head to tail
 const SEGMENT_SPACING = 15;
-// Local side-view S pose, head to tail. The tail stays planted while the
-// head rises, the neck curls back, and the lower body bends forward.
-const AIM_SEGMENT_ALONG = [0, -14, -10, -1.5 * SEGMENT_SPACING];
-const AIM_SEGMENT_LIFT = [56, 32, 14, 0];
-const AIM_SEGMENT_PULLBACK = [12, 16, 2, 0];
-// Only the head and neck shudder, and only while winding up -- amplitude
-// ramps in with progress^2 (quadratic: none at t=0, a quarter of max at
-// t=0.5, full max at t=1) so it's barely there early and most pronounced
-// right before the spit fires.
-const AIM_SEGMENT_JITTER = [8, 5, 0, 0];
-// Momentum kick on release: the whole spine whips forward past its idle
-// pose the instant the spit fires, before easing back -- see 'recovering'
-// in segmentPosition. Amounts taper tail-ward so the head snaps hardest and
-// the tail least, bowing the S-shaped wind-up pose into a C on release.
-const RELEASE_LUNGE_ALONG = [55, 30, 16, 8];
-const RELEASE_LUNGE_PEAK_T = 0.07; // fraction of RECOVER_DURATION spent shooting forward before it eases back
+// How far the front of the body rears up and draws back at a full tell.
+const AIM_LIFT = 46;
+const AIM_PULLBACK = 20;
 // Matches renderTail's own perspectiveY in PlayerCharacter.js -- the same
 // depth-compression ratio, for a consistent faux-3D feel across the cast.
 const SPINE_PERSPECTIVE = 0.6;
@@ -108,60 +96,18 @@ const PAUSE_MAX = 1.6;
 // trail the facing angle, with the y-offset compressed by
 // SPINE_PERSPECTIVE the same way renderTail compresses depth.
 function segmentPosition(grub, index) {
-  let along = (1.5 - index) * SEGMENT_SPACING;
-  let lift = 0;
-  let jitterX = 0;
-  if (grub.state === AIMING) {
-    // Rise smoothly during the first part of the tell, then keep drawing
-    // backward along local -x as the spit winds up. Height is screen-up,
-    // while the bend rotates with the grub's facing direction below.
-    const progress = Math.max(0, Math.min(1, grub.aimT));
-    const riseT = Math.min(1, progress / 0.45);
-    const rise = riseT * riseT * (3 - 2 * riseT);
-    along += (AIM_SEGMENT_ALONG[index] - along) * rise
-      - AIM_SEGMENT_PULLBACK[index] * progress * progress;
-    lift = AIM_SEGMENT_LIFT[index] * rise;
-    if (AIM_SEGMENT_JITTER[index] > 0) {
-      // Two off-ratio sine waves summed stand in for jitter noise without
-      // needing a per-frame rng; elapsed aim time (progress * AIM_DURATION)
-      // drives the phase since grub.anim is frozen while aiming.
-      const t = progress * AIM_DURATION;
-      const shake = Math.sin(t * 41 + index * 5) + Math.sin(t * 67 + index * 2.3) * 0.5;
-      jitterX = shake / 1.5 * AIM_SEGMENT_JITTER[index] * progress * progress;
-    }
-  } else if (grub.state === RECOVERING) {
-    // aimT counts back down from 1 (the instant of firing, still in
-    // the fully pulled-back pose) to 0 (idle). Smoothstep it directly --
-    // no plateau this time -- so the body eases toward idle across the
-    // whole recovery instead of snapping.
-    const progress = Math.max(0, Math.min(1, grub.aimT));
-    const settle = progress * progress * (3 - 2 * progress);
-    along += (AIM_SEGMENT_ALONG[index] - along) * settle;
-    lift = AIM_SEGMENT_LIFT[index] * settle;
-
-    if (RELEASE_LUNGE_ALONG[index] > 0) {
-      // A fast-rise, slow-decay "hump" over elapsed recovery time: each
-      // segment shoots forward past idle the instant the spit releases,
-      // head hardest and tail least, curling the S wind-up into a C --
-      // then all resolve back to idle together.
-      const elapsed = 1 - progress;
-      let kick;
-      if (elapsed < RELEASE_LUNGE_PEAK_T) {
-        const riseX = elapsed / RELEASE_LUNGE_PEAK_T;
-        kick = 1 - (1 - riseX) * (1 - riseX);
-      } else {
-        const fallX = (elapsed - RELEASE_LUNGE_PEAK_T) / (1 - RELEASE_LUNGE_PEAK_T);
-        kick = 1 - fallX * fallX * (3 - 2 * fallX);
-      }
-      along += RELEASE_LUNGE_ALONG[index] * kick;
-    }
-  }
+  // The tell (and the recovery after it) rears the front of the body up and
+  // back, tapering to nothing at the planted tail. aimT runs 0 -> 1 through
+  // the wind-up, then back down to 0 as it settles.
+  const pose = grub.state ? grub.aimT * (3 - index) / 3 : 0;
+  const along = (1.5 - index) * SEGMENT_SPACING - pose * AIM_PULLBACK;
+  const lift = pose * AIM_LIFT;
   let motionY = 0;
   if (grub.target != null) {
     motionY = (1 - Math.abs(Math.sin(grub.anim * 6.0 + index * 2))) * (8 - index) * 1;
   }
   return {
-    x: grub.x + (Math.cos(grub.a) * along + jitterX) * grub.size,
+    x: grub.x + Math.cos(grub.a) * along * grub.size,
     y: grub.y + (-Math.sin(grub.a) * along * SPINE_PERSPECTIVE - SEGMENT_RADII[index] / 2 + motionY - lift) * grub.size,
     r: SEGMENT_RADII[index] * grub.size,
   };
@@ -251,22 +197,9 @@ const ORBITERS = 5;
 const ORBIT_RADIUS = ORB_RADIUS * 1.65;
 const ORBITER_RADIUS = 6.5;
 
-// While winding up a shot the whole orb shudders harder and harder: two
-// off-ratio sines per axis stand in for noise, ramping in with aimT^2.
-function aimShake(grub) {
-  if (grub.state !== AIMING) return [0, 0];
-  const t = grub.aimT * AIM_DURATION;
-  const k = 3 * grub.aimT * grub.aimT;
-  return [(Math.sin(t * 41) + Math.sin(t * 67) / 2) * k, (Math.sin(t * 53 + 1) + Math.sin(t * 31) / 2) * k];
-}
-
-// World-space center of the body sphere: hovering, gently bobbing, shaking.
+// World-space center of the body sphere: hovering, gently bobbing.
 function orbCenter(grub) {
-  const [shakeX, shakeY] = aimShake(grub);
-  return {
-    x: grub.x + shakeX * grub.size,
-    y: grub.y + (shakeY - ORB_HOVER + Math.sin(grub.t * 2.5) * 3) * grub.size,
-  };
+  return { x: grub.x, y: grub.y + (Math.sin(grub.t * 2.5) * 3 - ORB_HOVER) * grub.size };
 }
 
 // A point on/around the orb, in its own local space (x forward, y down, z
@@ -402,6 +335,29 @@ function renderOrb(context, grub, flashTimer) {
   parts.sort((a, b) => b.depth - a.depth).forEach((part) => part.draw());
 }
 
+// The tell every type shares: a ring of motes spiralling into the muzzle,
+// each falling in on its own stagger and the whole cycle winding faster as
+// the shot nears. They fade in as they arrive, so the muzzle visibly gathers.
+const CHARGE_MOTES = 7;
+const CHARGE_REACH = 40; // how far out the motes start
+
+function renderCharge(context, grub) {
+  if (grub.state !== AIMING) return;
+  const { x, y } = muzzle(grub);
+  for (let i = 0; i < CHARGE_MOTES; i++) {
+    // `orbit` already winds faster as the tell nears its end (see tick), so
+    // the motes fall in quicker and quicker; each trails the last by a
+    // seventh of the cycle, and brightens and swells as it lands.
+    const fall = (grub.orbit + i / CHARGE_MOTES) % 1;
+    const reach = (1 - fall) * CHARGE_REACH * grub.size;
+    const spin = i * TAU / CHARGE_MOTES + fall * 1.5;
+    context.globalAlpha = 0.35 + fall * 0.65;
+    fillCircle(context, x + Math.cos(spin) * reach, y + Math.sin(spin) * reach * 0.75,
+      (1.5 + fall * 3.5) * grub.size, FACE_COLORS[grub.type]);
+  }
+  context.globalAlpha = 1;
+}
+
 // Where a volley leaves from: the small grub's mouth, the medium orb's eye,
 // or the large orb's center.
 function muzzle(grub) {
@@ -426,7 +382,6 @@ function Grub(x, y, room, seed, type = SMALL) {
   let flashTimer = 0;
   let hitCooldown = 0;
   let healthBarTimer = 0;
-  let deathSplatsFired = false;
   let attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
   let hadAimTarget = false;
   let aimElapsed = 0;
@@ -592,12 +547,20 @@ function Grub(x, y, room, seed, type = SMALL) {
       if (this.hp <= 0 || hitCooldown > 0 || player.chg <= CHARGING_THRESHOLD) return;
 
       // Mithril Horn adds a flat bonus on top of the usual charge-based roll.
-      const damage = (player.chg >= HIGH_CHARGE_DAMAGE_THRESHOLD ? 2 : 1) + player.horn;
+      hitCooldown = HIT_COOLDOWN;
+      const dead = this.hurt((player.chg >= HIGH_CHARGE_DAMAGE_THRESHOLD ? 2 : 1) + player.horn, player.vx, player.vy);
+      if (player.hoof) chainLightning(this);
+      return dead;
+    },
+
+    // Shared damage feedback; lightning has no impact momentum or horn bonus
+    // and bypasses the cooldown that prevents repeated contact damage.
+    hurt(damage, vx = 0, vy = 0) {
+      if (this.hp <= 0) return;
       this.hp = Math.max(0, this.hp - damage);
       playEnemyHit(damage);
       flashTimer = FLASH_DURATION;
       healthBarTimer = HEALTH_BAR_SHOW_DURATION;
-      hitCooldown = HIT_COOLDOWN;
       if (this.state === AIMING) {
         // A charging hit never cancels a wound-up shot, only delays it --
         // rewind aimElapsed so at least 1 second remains before it fires,
@@ -610,21 +573,21 @@ function Grub(x, y, room, seed, type = SMALL) {
         this.aimT = 0;
       }
       attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
-      this.vx += player.vx * KNOCKBACK_TRANSFER;
-      this.vy += player.vy * KNOCKBACK_TRANSFER;
+      this.vx += vx * KNOCKBACK_TRANSFER;
+      this.vy += vy * KNOCKBACK_TRANSFER;
       // These independent effects survive removal on the killing blow.
       add(DamageCallout(this.x, this.y - 30, `-${damage} hp`));
-      fireSplats(this.x, this.y, HIT_SPLAT_COUNT, SPLAT_GREEN, player.vx, player.vy);
-      if (this.hp <= 0 && !deathSplatsFired) {
-        deathSplatsFired = true;
-        fireSplats(this.x, this.y, DEATH_SPLAT_GREEN_COUNT, SPLAT_GREEN, player.vx, player.vy);
-        fireSplats(this.x, this.y, DEATH_SPLAT_PURPLE_COUNT, SPLAT_PURPLE, player.vx, player.vy);
+      fireSplats(this.x, this.y, HIT_SPLAT_COUNT, SPLAT_GREEN, vx, vy);
+      if (this.hp <= 0) {
+        fireSplats(this.x, this.y, DEATH_SPLAT_GREEN_COUNT, SPLAT_GREEN, vx, vy);
+        fireSplats(this.x, this.y, DEATH_SPLAT_PURPLE_COUNT, SPLAT_PURPLE, vx, vy);
       }
       return this.hp <= 0;
     },
 
     render(context) {
       (type ? renderOrb : renderGrub)(context, this, flashTimer);
+      renderCharge(context, this);
       if (healthBarTimer > 0) {
         renderHealthBar(context, this.x, this.y - (type ? 72 : HEALTH_BAR_OFFSET_Y) * size,
           HEALTH_BAR_WIDTH * size, HEALTH_BAR_HEIGHT * size, this.hp, this.maxHp);

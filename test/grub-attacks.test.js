@@ -93,7 +93,7 @@ test('grub stays still and tracks the player for two seconds before firing once'
   assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 1);
 });
 
-test('aiming raises an S-shaped body and pulls it backward while the tail stays planted', () => {
+test('aiming rears the front of the body up and back while the tail stays planted', () => {
   const grub = Grub(0, 0, room, 123);
   const segments = () => {
     const context = drawingContext();
@@ -115,7 +115,7 @@ test('aiming raises an S-shaped body and pulls it backward while the tail stays 
         for (let i = 0; i < 3; i++) {
           assert.ok((pose[i][0] - resting[i][0]) * Math.cos(angle) < 0, 'pullback follows local -x');
         }
-        // Head/neck jitter aside, the body keeps drawing back all tell long.
+        // It keeps drawing back for the whole tell.
         assert.ok((pose[2][0] - previous[2][0]) * Math.cos(angle) < 0, 'pullback keeps growing');
       }
       for (let i = 0; i < 3; i++) {
@@ -123,11 +123,6 @@ test('aiming raises an S-shaped body and pulls it backward while the tail stays 
           < pose[i][2] + pose[i + 1][2], 'adjacent body segments stay connected');
       }
       previous = pose;
-    }
-    if (angle === 0) {
-      assert.ok(previous[0][0] > previous[1][0]);
-      assert.ok(previous[1][0] < previous[2][0]);
-      assert.ok(previous[2][0] > previous[3][0], 'alternating bends form the S profile');
     }
   }
 });

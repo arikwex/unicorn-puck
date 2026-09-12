@@ -15,7 +15,6 @@ const DAMAGE_FLASH_DURATION = 0.6;
 const PLAYER_RADIUS = 38;
 const WALL_BOUNCE_SOUND_MIN_SPEED = 30; // world units/s of velocity change -- below this, a resting/sliding contact stays silent
 const DAMAGE_CANVAS_SIZE = 320;
-const PINBALL_BOOST_FACTOR = 1.08; // Chromatic Hoof: fraction of pre-bounce speed an enemy bounce reboosts back up to (and past)
 // Velocity decay rates (1/s) below/above CHARGE_MIN_SPEED -- see tick().
 const DRAG = 0.6;
 const CHARGING_DRAG = 3;
@@ -611,7 +610,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
     // fallback needed anywhere.
     boostPower: 1, // multiplies a drag-launch's impulse magnitude (Valkyrie Wings)
     horn: 0, // added to every charging-hit damage roll (Mithril Horn)
-    hoof: false, // enemy bounces reboost speed instead of losing it (Chromatic Hoof)
+    hoof: false, // impact hits chain lightning to two more enemies (Chromatic Hoof)
     oracleEyes: false, // reveals MiniMap.js's HUD (Oracle Eyes)
     // Draw order keyed off y, recomputed every tick -- see CubeObstacle.js
     // for why (same painter's-algorithm depth illusion), but a moving puck
@@ -698,7 +697,6 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
         const push = Math.max(0, penetration + (this.x - body.x) * nx + (this.y - body.y) * ny);
         this.x -= nx * push;
         this.y -= ny * push;
-        const preSpeed = Math.hypot(this.vx, this.vy);
         const impact = Math.max(0, this.vx * nx + this.vy * ny) * (1 + RESTITUTION);
         this.vx -= nx * impact;
         this.vy -= ny * impact;
@@ -706,14 +704,6 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
           // Grub.js plays its own hit sound, so a plain enemy bump stays
           // silent rather than doubling up on the wall-bounce sound.
           if (impact >= WALL_BOUNCE_SOUND_MIN_SPEED) playWallBounce(impact);
-        } else if (this.hoof) {
-          // Chromatic Hoof: reboost past the pre-bounce speed,
-          // pinball-bumper style, instead of letting restitution decay it.
-          const postSpeed = Math.hypot(this.vx, this.vy);
-          if (postSpeed) {
-            this.vx *= preSpeed * PINBALL_BOOST_FACTOR / postSpeed;
-            this.vy *= preSpeed * PINBALL_BOOST_FACTOR / postSpeed;
-          }
         }
       });
       this.z = this.y;

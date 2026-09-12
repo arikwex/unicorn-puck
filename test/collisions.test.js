@@ -139,12 +139,12 @@ test('an embedded player leaves a box through its nearest face', () => {
   assert.equal(player.y, 5);
 });
 
-test('pinball momentum reboosts enemy bounces past the incoming speed', () => {
+test('Chromatic Hoof retains ordinary enemy bounce restitution', () => {
   const player = add(playerAt());
   player.hoof = true;
   add(grubAt());
   player.tick(0);
-  assert.ok(Math.abs(player.vx + 800 * 1.08) < 1e-9);
+  assert.equal(player.vx, -320);
 });
 
 test('damage thresholds, cooldown and killing-blow removal remain intact', () => {
