@@ -25,7 +25,7 @@ import ToastSystem, { showToast } from './ToastSystem.js';
 
 // Each room has an enemy budget: small/medium/large grubs cost 1/2/3.
 // Grubs are scattered to their own spots within the
-// room (buildDungeon's own grubSeed offset by <room index> seeds that
+// room (createMap's own grubSeed offset by <room index> seeds that
 // scatter) and its own patrol (offset by <room index> * 100 + <grub index>
 // seeds that) and kept GRUB_ROOM_MARGIN off its room's own walls where the room is big
 // enough to allow it.
@@ -37,7 +37,7 @@ import ToastSystem, { showToast } from './ToastSystem.js';
 // formula's 5 slots too, rather than needing a separate lookup table.
 const GRUB_ROOM_MARGIN = 50;
 // A hallway only ever gets a grub if it's a straight run of at least this
-// many raw grid cells (see findLongHallways) -- a short jog between two
+// many raw grid cells (see the hallway scan in createMap) -- a short jog between two
 // rooms stays empty. A qualifying hallway's own grub count then scales with
 // its length (one per HALLWAY_GRUB_SPACING cells, capped at
 // HALLWAY_MAX_GRUBS), patrolling that hallway alone (see
@@ -54,12 +54,12 @@ const CHEST_PLACEMENT_ATTEMPTS = 30;
 // The level's required collectibles: winning means collecting *every*
 // chalice that spawns, not a fixed count. Exactly CHALICE_ROOM_FRACTION of
 // non-spawn rooms get one -- the room count is computed up front and that
-// many distinct rooms are shuffled into (see buildDungeon), rather than
+// many distinct rooms are shuffled into (see createMap), rather than
 // each room independently rolling the fraction as a per-room chance,
 // which could unluckily land on far fewer (even zero) chalices for a
 // given dungeon instead of reliably landing on the target count. Unlike a
 // chest, placement within a chosen room never gives up (see the fallback
-// in buildDungeon) since a skipped chalice would shrink the required
+// in createMap) since a skipped chalice would shrink the required
 // total without actually placing the item, silently making the level
 // unwinnable.
 const CHALICE_ROOM_FRACTION = 0.5;
@@ -76,7 +76,7 @@ const OBSTACLE_CLEARANCE = 2; // world units of clearance required off every wal
 // of the grid this module actually places in, which guarantees every
 // corridor and room is that many cells wide without changing the dungeon's
 // layout/topology at all. Nothing ever materializes those blocks as cells
-// (see buildDungeon): room rectangles and merged wall rects are simply
+// (see createMap): room rectangles and merged wall rects are simply
 // scaled up, and the floor test divides back down.
 const CORRIDOR_WIDTH_FACTOR = 3;
 
@@ -160,45 +160,6 @@ function shuffled(list, rng) {
   return result;
 }
 
-// Finds every run of at least HALLWAY_MIN_LENGTH consecutive non-room floor
-// cells along a row or column in the *raw* (pre-inflation) grid -- a cheap
-// stand-in for "a long, mostly-straight corridor stretch" that doesn't try
-// to reason about turns/junctions the way a true single-cell-wide-corridor
-// graph walk would (a run can validly include a turn near one end), each
-// returned as a {x, y, w, h} box in that same raw grid -- the caller
-// inflates/converts to world space itself, same as it already does for
-// dungeon.rooms.
-function findLongHallways(rawDungeon, isRawFloor) {
-  const hallways = [];
-
-  const { size } = rawDungeon;
-  function scan(alongX) {
-    for (let a = 0; a < size; a++) {
-      let start = null;
-      for (let b = 0; b <= size; b++) {
-        // A corridor cell: floor, and not inside any room.
-        const cx = alongX ? b : a;
-        const cy = alongX ? a : b;
-        if (b < size && isRawFloor(cx, cy)
-          && !rawDungeon.rooms.some((r) => cx >= r.x && cx < r.x + r.w && cy >= r.y && cy < r.y + r.h)) {
-          if (start === null) start = b;
-          continue;
-        }
-        if (start !== null && b - start >= HALLWAY_MIN_LENGTH) {
-          hallways.push(alongX
-            ? { x: start, y: a, w: b - start, h: 1, length: b - start }
-            : { x: a, y: start, w: 1, h: b - start, length: b - start });
-        }
-        start = null;
-      }
-    }
-  }
-  scan(true);
-  scan(false);
-
-  return hallways;
-}
-
 // Entry point for specifying everything in the scene: the dungeon itself
 // (walls as CubeObstacles, then pillars, grubs, chests and chalices),
 // followed by the player, camera, HUD and input. Swap or extend this module
@@ -217,7 +178,7 @@ function createMap(seed) {
   const hallwayGrubSeed = seed + 7;
   // The generator's grid gets read at two resolutions. Its own raw cells --
   // corridors exactly one cell wide, trivial to reason about -- are what
-  // findLongHallways analyzes, and `isRawFloor` answers membership there.
+  // the hallway scan analyzes, and `isRawFloor` answers membership there.
   // Everything placed below instead works in the widened grid (see
   // CORRIDOR_WIDTH_FACTOR), so that chest/chalice room bounds and obstacle
   // clearance checks all sit in the same world scale as the
@@ -398,12 +359,46 @@ function createMap(seed) {
   });
 
   // A grub or two garrisoned in some of the dungeon's longer hallways
-  // (see findLongHallways/HALLWAY_MIN_LENGTH), confined to that one
+  // (see HALLWAY_MIN_LENGTH and the hallway scan above), confined to that one
   // hallway's own box exactly the way a room grub is confined to its room
   // -- pickGrubSpawn and Grub's own patrol bounds don't care whether the
   // box they're given is a room or a corridor.
+  // Every run of at least HALLWAY_MIN_LENGTH consecutive non-room floor cells
+  // along a row or column of the *raw* grid -- a cheap stand-in for "a long,
+  // mostly-straight corridor stretch" that doesn't try to reason about
+  // turns/junctions the way a true single-cell-wide-corridor graph walk would
+  // (a run can validly include a turn near one end). Each is collected as a
+  // {x, y, w, h} box in that same raw grid and widened to world space below,
+  // same as dungeon.rooms already is. Scanned inline (one caller), though the
+  // scan itself stays a function: it runs once per axis.
+  const hallways = [];
+  const rawSize = rawDungeon.size;
+  function scanHallways(alongX) {
+    for (let a = 0; a < rawSize; a++) {
+      let start = null;
+      for (let b = 0; b <= rawSize; b++) {
+        // A corridor cell: floor, and not inside any room.
+        const cx = alongX ? b : a;
+        const cy = alongX ? a : b;
+        if (b < rawSize && isRawFloor(cx, cy)
+          && !rawDungeon.rooms.some((r) => cx >= r.x && cx < r.x + r.w && cy >= r.y && cy < r.y + r.h)) {
+          if (start === null) start = b;
+          continue;
+        }
+        if (start !== null && b - start >= HALLWAY_MIN_LENGTH) {
+          hallways.push(alongX
+            ? { x: start, y: a, w: b - start, h: 1, length: b - start }
+            : { x: a, y: start, w: 1, h: b - start, length: b - start });
+        }
+        start = null;
+      }
+    }
+  }
+  scanHallways(true);
+  scanHallways(false);
+
   const hallwayRng = mulberry32(hallwayGrubSeed);
-  findLongHallways(rawDungeon, isRawFloor).forEach((hallway, hallwayIndex) => {
+  hallways.forEach((hallway, hallwayIndex) => {
     const inflated = {
       x: hallway.x * CORRIDOR_WIDTH_FACTOR,
       y: hallway.y * CORRIDOR_WIDTH_FACTOR,

@@ -4,7 +4,7 @@ import generateDungeon from '../../src/donjonDungeon.js';
 // room rectangles scaled by CORRIDOR_WIDTH_FACTOR, plus a floor test that
 // maps a widened cell back to the raw cell containing it. Kept here so the
 // tests exercise the same widened coordinates mapCreator.js places in
-// without reaching into buildDungeon.
+// without reaching into createMap.
 const FACTOR = 3;
 
 function widenedDungeon(seed) {
