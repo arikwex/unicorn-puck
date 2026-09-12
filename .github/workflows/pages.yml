@@ -1,0 +1,67 @@
+# Builds the single-file game and publishes it to GitHub Pages.
+#
+# The playable page is a build artifact, not a source file: tools/build.js
+# writes index.html at the repo root (inlined CSS plus roadroller-packed JS,
+# with no external requests), and .gitignore deliberately keeps it out of git.
+# So Pages is fed from a fresh build here rather than from a committed copy
+# that would silently go stale on every source edit.
+#
+# One-time setup: repo Settings -> Pages -> Source = "GitHub Actions".
+name: Deploy to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege for a Pages deploy: read the source, mint the OIDC token
+# deploy-pages authenticates with, write the Pages deployment.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time. Queue rather than cancel, so an in-flight deployment
+# is never left half-applied.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same Node the repo pins for local work, rather than a second version
+      # to keep in sync here.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Don't publish a build whose tests don't pass.
+      - run: npm test
+
+      # Writes index.html (and build.zip, which the size check measures) at
+      # the repo root.
+      - run: npm run build
+
+      # Publish only the page itself. Pointing the upload at the checkout
+      # would ship src/, node_modules/ and the zip to a public URL.
+      - name: Stage the page
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

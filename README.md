@@ -2,6 +2,8 @@
 
 ![Pegacorn Blood title art](images/title-screen.png)
 
+**[Play it in your browser](https://arikwex.github.io/unicorn-puck/)**
+
 Your blood belongs in a pegacorn, not a dungeon's chalices. Take it back.
 
 A tiny browser dungeon crawler with pinball momentum: fling your winged unicorn through twisting halls, ram enemies, smash treasure chests, and dodge volleys of ooze. Reclaim every blood chalice and survive any active battle to win.
@@ -41,3 +43,17 @@ npm run build
 ```
 
 Bundles with esbuild, minifies with Terser, and packs with Roadroller. Outputs a self-contained `index.html` and `build.zip`, then prints the ZIP size against the **13,312-byte** target.
+
+## Deploying
+
+`.github/workflows/pages.yml` publishes the game to GitHub Pages on every push
+to `main` (and on demand via *Actions -> Deploy to Pages -> Run workflow*): it
+installs dependencies, runs the tests, builds, and serves the resulting
+`index.html`. Nothing else is uploaded — `src/` and `node_modules/` stay off
+the public site.
+
+The page is generated rather than committed (`index.html` is gitignored), so
+the live site always matches `main` instead of drifting from a stale copy.
+
+One-time setup, once the workflow is on `main`: repo **Settings -> Pages ->
+Source** = **GitHub Actions**.

@@ -145,5 +145,6 @@ node_modules/
 dist/
 index.html
 build.zip
+_site/
 .DS_Store
 npm-debug.log*
