@@ -610,7 +610,7 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
     // fallback needed anywhere.
     boostPower: 1, // multiplies a drag-launch's impulse magnitude (Valkyrie Wings)
     horn: 0, // added to every charging-hit damage roll (Mithril Horn)
-    hoof: false, // impact hits chain lightning to two more enemies (Chromatic Hoof)
+    hoof: false, // impact hits chain lightning to three more enemies (Chromatic Hoof)
     oracleEyes: false, // reveals MiniMap.js's HUD (Oracle Eyes)
     // Draw order keyed off y, recomputed every tick -- see CubeObstacle.js
     // for why (same painter's-algorithm depth illusion), but a moving puck

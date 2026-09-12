@@ -54,11 +54,11 @@ function renderEffects() {
   return calls;
 }
 
-test('Chromatic Hoof hits only two unique additional enemies, at 200 ms per hop', () => {
+test('Chromatic Hoof hits only three unique additional enemies, at 200 ms per hop', () => {
   const hero = player();
-  const source = enemy(0), first = enemy(100), second = enemy(250), fourth = enemy(390);
+  const source = enemy(0), first = enemy(100), second = enemy(250), third = enemy(390), extra = enemy(500);
   source.hit(hero);
-  assert.deepEqual([source.hp, first.hp, second.hp, fourth.hp], [4, 5, 5, 5]);
+  assert.deepEqual([source.hp, first.hp, second.hp, third.hp], [4, 5, 5, 5]);
   travel(0.199);
   assert.equal(first.hp, 5);
   travel(0.001);
@@ -66,22 +66,26 @@ test('Chromatic Hoof hits only two unique additional enemies, at 200 ms per hop'
   travel(0.199);
   assert.equal(second.hp, 5);
   travel(0.001);
-  assert.deepEqual([source.hp, first.hp, second.hp, fourth.hp], [4, 4, 4, 5]);
-  assert.equal(sounds, 3, 'one existing hit sound per damaged enemy');
-  assert.equal(renderEffects().filter(({ text }) => text === '-1 hp').length, 3);
+  assert.deepEqual([source.hp, first.hp, second.hp, third.hp], [4, 4, 4, 5]);
+  travel(0.199);
+  assert.equal(third.hp, 5);
+  travel(0.001);
+  assert.deepEqual([source.hp, first.hp, second.hp, third.hp, extra.hp], [4, 4, 4, 4, 5]);
+  assert.equal(sounds, 4, 'one existing hit sound per damaged enemy');
+  assert.equal(renderEffects().filter(({ text }) => text === '-1 hp').length, 4);
   travel(1);
-  assert.equal(fourth.hp, 5);
+  assert.equal(extra.hp, 5);
 });
 
-test('each hop includes the 350-unit boundary and ignores dead enemies and non-enemies', () => {
-  const source = enemy(0), edge = enemy(350), outside = enemy(700.01);
+test('each hop includes the 450-unit boundary and ignores dead enemies and non-enemies', () => {
+  const source = enemy(0), edge = enemy(450), outside = enemy(900.01);
   enemy(50).hp = 0;
   add({ x: 20, y: 0, hp: 5, tags: [TAG_OBSTACLE], hurt() { assert.fail('not an enemy'); } });
   source.hit(player());
   travel(0.4);
   assert.equal(edge.hp, 4);
   assert.equal(outside.hp, 5);
-  travel(0.3);
+  travel(0.5);
   assert.equal(renderEffects().filter(({ stroke }) => stroke?.stops).length, 0, 'chain ends when no target is in range');
 });
 
@@ -156,12 +160,13 @@ test('a target killed during travel is not damaged again or revived', () => {
   assert.equal(sounds, 2, 'no extra hit sound on a corpse');
 });
 
-test('travel carries excess frame time through both hops and stops after them', () => {
-  const source = enemy(0), first = enemy(100), second = enemy(250), extra = enemy(400);
+test('travel carries excess frame time through all three hops and stops damaging enemies after them', () => {
+  const source = enemy(0), first = enemy(100), second = enemy(250), third = enemy(400), extra = enemy(550);
   source.hit(player());
-  travel(0.45);
-  assert.deepEqual([first.hp, second.hp, extra.hp], [4, 4, 5]);
-  travel(0.4);
+  travel(0.65);
+  assert.deepEqual([first.hp, second.hp, third.hp, extra.hp], [4, 4, 4, 5]);
+  assert.equal(renderEffects().filter(({ stroke }) => stroke?.stops).length, 1, 'shorter tail remains on the final hop');
+  travel(0.6);
   assert.equal(renderEffects().filter(({ stroke }) => stroke?.stops).length, 0);
 });
 
@@ -171,30 +176,52 @@ test('the thicker rainbow sinusoid advances to the midpoint of each hop after 10
   source.hit(player());
   travel(0.1);
   let bolt = renderEffects().find(({ stroke }) => stroke?.stops);
-  assert.equal(bolt.width, 20);
+  assert.equal(bolt.width, 15);
   assert.deepEqual(bolt.path[0], [0, -30]);
   assert.equal(bolt.path.at(-1)[0], 50);
-  assert.ok(bolt.path.some(([, y]) => Math.abs(y + 30) > 1), 'visible sine-wave displacement');
+  const midpointRipple = Math.abs(bolt.path.at(-1)[1] + 120);
+  assert.ok(midpointRipple > 1 && midpointRipple <= 7.5, '90-unit upward arc with half-strength sine displacement');
   assert.equal(new Set(bolt.stroke.stops.map(([, color]) => color)).size, 7);
   travel(0.2);
   bolt = renderEffects().filter(({ stroke }) => stroke?.stops).at(-1);
   assert.deepEqual(bolt.path[0], [100, -30]);
   assert.ok(Math.abs(bolt.path.at(-1)[0] - 175) < 1e-8);
+  assert.ok(Math.abs(bolt.path.at(-1)[1] + 120) <= 9, 'each hop has the same arc height and reduced ripple cap');
 });
 
-test('completed rainbow segments linger for three hop durations and fade without more damage', () => {
+test('the animated tail follows the entire path to the final target before disappearing', () => {
   const source = enemy(0), first = enemy(100), second = enemy(250);
   source.hit(player());
   travel(0.4);
   const bolts = () => renderEffects().filter(({ stroke }) => stroke?.stops);
   assert.equal(bolts().length, 2, 'both hops remain visible after the final hit');
-  assert.ok(bolts()[0].alpha < bolts()[1].alpha, 'older trail fades first');
+  assert.ok(Math.abs(bolts()[0].path[0][0] - 80) < 1e-8, 'tail follows the head by 240 ms');
+  assert.ok(bolts().every(({ alpha }) => alpha === 1), 'the path stays bright while the tail travels');
   const paths = bolts().map(({ path }) => path);
   source.x = -100; first.x = 200; second.x = 500;
   assert.deepEqual(bolts().map(({ path }) => path), paths, 'completed trails stay at impact positions');
-  travel(0.201);
-  assert.equal(bolts().length, 1, 'first hop expires 600 ms after it started');
-  travel(0.2);
-  assert.equal(bolts().length, 0, 'second hop expires 600 ms after it started');
+  travel(0.02);
+  assert.equal(bolts().length, 2);
+  assert.ok(Math.abs(bolts()[0].path[0][0] - 90) < 1e-8, 'tail advances along the first hop');
+  assert.notDeepEqual(bolts()[1].path, paths[1], 'the sine wave keeps animating after the final hit');
+  travel(0.12);
+  assert.equal(bolts().length, 1);
+  assert.ok(Math.abs(bolts()[0].path[0][0] - 175) < 1e-8, 'tail moves halfway along the final hop');
+  assert.ok(Math.abs(bolts()[0].path.at(-1)[0] - 250) < 1e-8, 'head stays at the last impact position');
+  travel(0.101);
+  assert.equal(bolts().length, 0, 'effect ends only after the tail reaches the final target');
   assert.deepEqual([source.hp, first.hp, second.hp], [4, 4, 4]);
+});
+
+test('the next hop starts at the previous impact position when enemies move', () => {
+  const source = enemy(0), first = enemy(100);
+  enemy(250);
+  source.hit(player());
+  travel(0.2);
+  source.x = -100;
+  first.x = 180;
+  travel(0.1);
+  const bolts = renderEffects().filter(({ stroke }) => stroke?.stops);
+  assert.deepEqual(bolts[0].stroke.points.slice(2), [100, -30]);
+  assert.deepEqual(bolts[1].path[0], [100, -30]);
 });
