@@ -83,10 +83,6 @@ const EXTRA_CONNECTOR_CHANCE = 0.04;
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-function inBounds(x, y) {
-  return x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT;
-}
-
 // Cell state for the whole grid: -1 = wall/uncarved, otherwise the id of
 // the room or maze region that carved it. `room` separately flags cells
 // that belong to an actual room (as opposed to a corridor or door), since
@@ -110,11 +106,6 @@ function Grid() {
   };
 }
 
-function roomsOverlap(a, b) {
-  return a.x - ROOM_SPACING < b.x + b.w && a.x + a.w + ROOM_SPACING > b.x
-    && a.y - ROOM_SPACING < b.y + b.h && a.y + a.h + ROOM_SPACING > b.y;
-}
-
 // Rectangles placed at odd x/y with odd w/h so their boundary walls line
 // up exactly with the maze lattice.
 function placeRooms(rng) {
@@ -134,7 +125,9 @@ function placeRooms(rng) {
       w,
       h,
     };
-    if (!rooms.some((other) => roomsOverlap(room, other))) rooms.push(room);
+    // Overlap test carries ROOM_SPACING's gap on every side.
+    if (!rooms.some((other) => room.x - ROOM_SPACING < other.x + other.w && room.x + room.w + ROOM_SPACING > other.x
+      && room.y - ROOM_SPACING < other.y + other.h && room.y + room.h + ROOM_SPACING > other.y)) rooms.push(room);
   }
   return rooms;
 }
@@ -150,13 +143,6 @@ function carveRoom(grid, room, regionId) {
   }
 }
 
-// Whether the lattice cell two steps away from (x, y) in `dir` is free to
-// tunnel into: in bounds, and neither it nor the wall cell between them
-// has been carved yet (keeps each maze run a "perfect" tree on its own).
-function canCarve(grid, x, y, [dx, dy]) {
-  return inBounds(x + dx * 2, y + dy * 2) && !grid.open(x + dx, y + dy) && !grid.open(x + dx * 2, y + dy * 2);
-}
-
 // Randomized-recursive-backtracker maze carve, biased by
 // CORRIDOR_STRAIGHTNESS toward continuing in the same direction.
 function growMaze(grid, rng, startX, startY, regionId) {
@@ -166,7 +152,12 @@ function growMaze(grid, rng, startX, startY, regionId) {
 
   while (stack.length) {
     const [x, y] = stack.at(-1);
-    const open = DIRS.filter((dir) => canCarve(grid, x, y, dir));
+    // Every direction whose lattice cell two steps away is free to tunnel
+    // into: in bounds, and neither it nor the wall cell between them has
+    // been carved yet (keeps each maze run a "perfect" tree on its own).
+    const open = DIRS.filter(([dx, dy]) => x + dx * 2 >= 0 && x + dx * 2 < GRID_WIDTH
+      && y + dy * 2 >= 0 && y + dy * 2 < GRID_HEIGHT
+      && !grid.open(x + dx, y + dy) && !grid.open(x + dx * 2, y + dy * 2));
 
     if (open.length === 0) {
       stack.pop();
@@ -201,15 +192,6 @@ function fillMaze(grid, rng, firstRegionId) {
   return regionId;
 }
 
-// A wall cell sits between exactly two lattice neighbors: horizontally if
-// it's on an even column/odd row, vertically if odd column/even row.
-// Even/even cells are corner pillars and never a connector.
-function wallNeighbors(x, y) {
-  if (x % 2 === 0 && y % 2 === 1) return [[x - 1, y], [x + 1, y]];
-  if (x % 2 === 1 && y % 2 === 0) return [[x, y - 1], [x, y + 1]];
-  return null;
-}
-
 // Every uncarved wall cell whose two opposite neighbors are both carved
 // but belong to different regions is a candidate door between them.
 function findConnectors(grid) {
@@ -217,7 +199,11 @@ function findConnectors(grid) {
   for (let x = 1; x < GRID_WIDTH - 1; x++) {
     for (let y = 1; y < GRID_HEIGHT - 1; y++) {
       if (grid.open(x, y)) continue;
-      const neighbors = wallNeighbors(x, y);
+      // A wall cell sits between exactly two lattice neighbors: horizontally
+      // if it's on an even column/odd row, vertically if odd column/even row.
+      // Even/even cells are corner pillars and never a connector.
+      const neighbors = x % 2 === 0 && y % 2 === 1 ? [[x - 1, y], [x + 1, y]]
+        : x % 2 === 1 && y % 2 === 0 ? [[x, y - 1], [x, y + 1]] : null;
       if (!neighbors) continue;
       const [[ax, ay], [bx, by]] = neighbors;
       if (!grid.open(ax, ay) || !grid.open(bx, by)) continue;

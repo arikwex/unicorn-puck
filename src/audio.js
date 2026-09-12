@@ -22,7 +22,7 @@ function play(buffer, volume, rate) {
   const node = context.createBufferSource();
   node.buffer = buffer;
   node.playbackRate.value = rate;
-  gain.gain.value = volume;
+  gain.gain.value = volume * 2;
   node.connect(gain);
   gain.connect(context.destination);
   node.start();
