@@ -6,7 +6,6 @@ let objects = [];
 let objectsByTag = new Map();
 let running = false;
 let lastFrame = 0;
-let startedAt = 0;
 
 function add(object) {
   objects.push(object);
@@ -96,7 +95,6 @@ function tick(now) {
 function start() {
   if (running) return;
   running = true;
-  startedAt = Date.now();
   lastFrame = performance.now();
   requestAnimationFrame(tick);
 }
@@ -105,8 +103,4 @@ function stop() {
   running = false;
 }
 
-function getStartTime() {
-  return startedAt;
-}
-
-export { add, clear, getObjects, getObjectsByTag, getStartTime, remove, start, stop, tag, untag };
+export { add, clear, getObjects, getObjectsByTag, remove, start, stop, tag, untag };

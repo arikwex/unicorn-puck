@@ -5,7 +5,7 @@
 // participation, just a proximity check), incrementing the shared
 // chaliceProgress counter GameFlow.js watches for the win condition.
 
-import { fillCircle, fillEllipse, fillRect } from './canvasShapes.js';
+import { fillEllipse, fillRect } from './canvasShapes.js';
 import { getObjectsByTag } from './engine.js';
 import { collectChalice } from './chaliceProgress.js';
 import { fireSplatBurst } from './SplatEffect.js';
@@ -19,9 +19,7 @@ const BOB_SPEED = 2.2; // rad/s
 const BOB_AMOUNT = 4; // px
 
 const METAL_COLOR = '#eb4'; // same gold as TreasureChest, for a consistent "treasure" palette
-const METAL_DARK_COLOR = '#a82';
 const WINE_COLOR = '#a13';
-const WINE_HIGHLIGHT_COLOR = '#f58';
 
 const COLLECT_SPLAT_COUNT = 8;
 const COLLECT_SPLAT_COLORS = [METAL_COLOR, WINE_COLOR];
@@ -37,11 +35,10 @@ function renderChaliceIcon(context, x, y, scale) {
   context.translate(x, y);
   context.scale(scale, scale);
 
-  fillEllipse(context, 0, 14, 12, 4, METAL_DARK_COLOR);
-  fillEllipse(context, 0, 12, 10, 3, METAL_COLOR);
+  // One gold foot ellipse (was a two-tone pair) and no stem knop.
+  fillEllipse(context, 0, 12, 11, 4, METAL_COLOR);
 
   fillRect(context, -2, -4, 4, 16, METAL_COLOR);
-  fillCircle(context, 0, 4, 4, METAL_COLOR);
 
   context.beginPath();
   context.moveTo(-6, -4);
@@ -53,9 +50,6 @@ function renderChaliceIcon(context, x, y, scale) {
   fillEllipse(context, 0, -16, 13, 5, METAL_COLOR);
 
   fillEllipse(context, 0, -16, 10, 3.5, WINE_COLOR);
-  context.globalAlpha = 0.8;
-  fillEllipse(context, -3, -16.5, 4, 1.5, WINE_HIGHLIGHT_COLOR);
-  context.globalAlpha = 1;
 
   context.restore();
 }

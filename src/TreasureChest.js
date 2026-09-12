@@ -108,8 +108,7 @@ function TreasureChest(x, y, contents) {
       fillRect(context, left, baseTop, CHEST_WIDTH, BASE_HEIGHT, WOOD_COLOR);
       fillRect(context, left, lidTop, CHEST_WIDTH, LID_HEIGHT, WOOD_DARK_COLOR);
       fillRect(context, left, baseTop - 4.5, CHEST_WIDTH, 6, METAL_COLOR);
-      fillRect(context, left, lidTop, 7.5, LID_HEIGHT, METAL_COLOR);
-      fillRect(context, left + CHEST_WIDTH - 7.5, lidTop, 7.5, LID_HEIGHT, METAL_COLOR);
+      // Lid corner straps dropped for size; the band and lock still read.
       fillRect(context, -9, baseTop - 9, 18, 18, METAL_DARK_COLOR);
       fillRect(context, left, lidTop, CHEST_WIDTH, BASE_HEIGHT + LID_HEIGHT, '#fff', flash);
       context.restore();

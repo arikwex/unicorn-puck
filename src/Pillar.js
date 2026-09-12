@@ -81,7 +81,6 @@ function renderCrystalPillar(context, obstacle, anim) {
 // -- candelabra flame flicker -------------------------------------------
 const FLAME_BASE_COLOR = '#f60';
 const FLAME_MID_COLOR = '#fa0';
-const FLAME_TIP_COLOR = '#fea';
 const FLAME_HEIGHT = 22;
 const FLAME_WIDTH = 12;
 const FLAME_FLICKER_SPEED = 9; // rad/s
@@ -106,7 +105,6 @@ function renderFlame(context, anim) {
   }
   teardrop(FLAME_BASE_COLOR, 1);
   teardrop(FLAME_MID_COLOR, 0.7);
-  teardrop(FLAME_TIP_COLOR, 0.4);
 }
 
 /* -- variant 2: square pillar with a flame on top -- still retired -------
@@ -214,7 +212,6 @@ function Pillar(x = 0, y = 0, props = {}) {
         // ellipse and side stripe give it depth.
         renderSlab(context, 0);
         fillRect(context, -26, -110, 52, 110, '#a99');
-        fillRect(context, 3.9, -110, 14.3, 110, '#444');
         fillEllipse(context, 0, -110, 26, 13, '#a99');
         renderSlab(context, -118);
       }

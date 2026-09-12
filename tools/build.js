@@ -24,7 +24,7 @@ const reoptimize = process.argv.includes('--reoptimize');
 const ROADROLLER_PARAMS = {
   numAbbreviations: 32,
   recipLearningRate: 2286,
-  modelRecipBaseCount: 26,
+  modelRecipBaseCount: 21,
   precision: 15,
   sparseSelectors: [0, 1, 2, 3, 6, 7, 13, 25, 26, 43, 170, 449],
 };
