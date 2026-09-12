@@ -221,7 +221,7 @@ function renderOrbEye(context, grub, center, azimuth, radius, diamond, theme) {
   context.globalAlpha = charge * 0.45;
   fillEllipse(context, x, y, radius * 1.7 * squash * grub.sz, radius * 1.7 * grub.sz, theme[3]);
   context.globalAlpha = 1;
-  [[1.25, BODY_COLORS[0]], [1, theme[3]], [0.45 + charge * 0.3, theme[4]]].forEach(([scale, color]) => {
+  [[1, theme[3]], [0.45 + charge * 0.3, theme[4]]].forEach(([scale, color]) => {
     const r = radius * scale * grub.sz;
     context.fillStyle = color;
     context.beginPath();
@@ -286,23 +286,12 @@ function renderWinglet(context, grub, center, side, [mountY, length, tilt, width
   context.strokeStyle = theme[0];
   context.lineWidth = 3 * grub.sz;
   context.stroke();
-  // The shard's center ridge.
-  context.beginPath();
-  context.moveTo(x0, y0);
-  context.lineTo(x2, y2);
-  context.lineWidth = 1.5 * grub.sz;
-  context.stroke();
 }
 
 function renderOrb(context, grub, flashTimer) {
   const flash = flashTimer > 0 ? Math.sin(Math.min(1, flashTimer / FLASH_DURATION) * Math.PI) : 0;
   const theme = ORB_THEMES[grub.ty];
   const center = orbCenter(grub);
-  // A soft ground shadow sells the hover.
-  context.globalAlpha = 0.25;
-  fillEllipse(context, grub.x, grub.y, ORB_RADIUS * 0.8 * grub.sz, ORB_RADIUS * 0.28 * grub.sz, '#000');
-  context.globalAlpha = 1;
-
   const parts = [{ d: 0, draw: () => renderOrbBody(context, grub, center, theme, flash) }];
   if (grub.ty === MEDIUM) {
     for (const side of [-1, 1]) {
@@ -343,7 +332,7 @@ const CHARGE_REACH = 40; // how far out the motes start
 
 function renderCharge(context, grub) {
   if (grub.state !== AIMING) return;
-  const { x, y } = muzzle(grub);
+  const m = muzzle(grub);
   for (let i = 0; i < CHARGE_MOTES; i++) {
     // `o` already winds faster as the tell nears its end (see tick), so
     // the motes fall in quicker and quicker; each trails the last by a
@@ -352,7 +341,7 @@ function renderCharge(context, grub) {
     const reach = (1 - fall) * CHARGE_REACH * grub.sz;
     const spin = i * TAU / CHARGE_MOTES + fall * 1.5;
     context.globalAlpha = 0.35 + fall * 0.65;
-    fillCircle(context, x + Math.cos(spin) * reach, y + Math.sin(spin) * reach * 0.75,
+    fillCircle(context, m.x + Math.cos(spin) * reach, m.y + Math.sin(spin) * reach * 0.75,
       (1.5 + fall * 3.5) * grub.sz, FACE_COLORS[grub.ty]);
   }
   context.globalAlpha = 1;

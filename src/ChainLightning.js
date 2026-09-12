@@ -1,4 +1,5 @@
 import { add, getObjectsByTag, remove } from './engine.js';
+import { TAU } from './mathUtils.js';
 import { TAG_ENEMY } from './tags.js';
 
 const HOP_DURATION = 0.2;
@@ -14,15 +15,14 @@ function renderBolt(context, source, target, start, end, time) {
   context.beginPath();
   const dx = target.x - source.x, dy = target.y - source.y;
   const length = Math.hypot(dx, dy) || 1;
-  for (let i = 0; i <= 32; i++) {
-    const u = start + (end - start) * i / 32;
+  for (let i = 0; i <= 16; i++) {
+    const u = start + (end - start) * i / 16;
     // Half-strength sine motion over a 90-unit upward arc; both offsets
     // taper to zero at the enemies so each hop still connects exactly.
-    const wave = Math.sin(u * Math.PI * 6 - time * 40) * Math.sin(u * Math.PI) * Math.min(9, length * 0.075);
+    const wave = Math.sin(u * TAU * 3 - time * 40) * Math.sin(u * TAU / 2) * Math.min(9, length * 0.075);
     const x = source.x + dx * u - dy / length * wave;
     const y = source.y - 30 + dy * u + dx / length * wave - 90 * 4 * u * (1 - u);
-    if (i) context.lineTo(x, y);
-    else context.moveTo(x, y);
+    context.lineTo(x, y);
   }
   context.stroke();
 }
