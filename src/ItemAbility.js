@@ -50,13 +50,13 @@ function drawValkyrieWings(context) {
   fillOutlined(context);
 }
 
-// A tapering spike, widened from a former 18-wide/40-tall bbox to a
-// squarer 24x32.
+// A narrow isosceles horn tilted 45 degrees, giving its long point a
+// square 32x32 footprint in both the pickup and HUD.
 function drawMithrilHorn(context) {
   context.beginPath();
-  context.moveTo(-12, 16);
-  context.quadraticCurveTo(-14, -8, 2, -16);
-  context.quadraticCurveTo(10, -6, 12, 16);
+  context.moveTo(-16, 8);
+  context.lineTo(16, -16);
+  context.lineTo(-8, 16);
   context.closePath();
   fillOutlined(context);
 }

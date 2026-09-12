@@ -3,7 +3,7 @@ import { TAG_ENEMY } from './tags.js';
 
 const HOP_DURATION = 0.2;
 const TRAIL_DURATION = 0.24;
-const MAX_BOUNCES = 3;
+const MAX_BOUNCES = 2;
 
 function renderBolt(context, source, target, start, end, time) {
   if (end <= start) return;
@@ -28,7 +28,7 @@ function renderBolt(context, source, target, start, end, time) {
   context.stroke();
 }
 
-// Three sequential hops, each measured from the last target. Keep object
+// Two sequential hops, each measured from the last target. Keep object
 // identities even after a kill so a chain can never revisit an enemy.
 function chainLightning(source) {
   const visited = [source];

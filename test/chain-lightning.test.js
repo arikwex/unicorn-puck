@@ -54,7 +54,7 @@ function renderEffects() {
   return calls;
 }
 
-test('Chromatic Hoof hits only three unique additional enemies, at 200 ms per hop', () => {
+test('Chromatic Hoof hits only two unique additional enemies, at 200 ms per hop', () => {
   const hero = player();
   const source = enemy(0), first = enemy(100), second = enemy(250), third = enemy(390), extra = enemy(500);
   source.hit(hero);
@@ -70,9 +70,9 @@ test('Chromatic Hoof hits only three unique additional enemies, at 200 ms per ho
   travel(0.199);
   assert.equal(third.hp, 5);
   travel(0.001);
-  assert.deepEqual([source.hp, first.hp, second.hp, third.hp, extra.hp], [4, 4, 4, 4, 5]);
-  assert.equal(sounds, 4, 'one existing hit sound per damaged enemy');
-  assert.equal(renderEffects().filter(({ text }) => text === '-1 hp').length, 4);
+  assert.deepEqual([source.hp, first.hp, second.hp, third.hp, extra.hp], [4, 4, 4, 5, 5]);
+  assert.equal(sounds, 3, 'one existing hit sound per damaged enemy');
+  assert.equal(renderEffects().filter(({ text }) => text === '-1 hp').length, 3);
   travel(1);
   assert.equal(extra.hp, 5);
 });
@@ -160,11 +160,11 @@ test('a target killed during travel is not damaged again or revived', () => {
   assert.equal(sounds, 2, 'no extra hit sound on a corpse');
 });
 
-test('travel carries excess frame time through all three hops and stops damaging enemies after them', () => {
+test('travel carries excess frame time through both hops and stops damaging enemies after them', () => {
   const source = enemy(0), first = enemy(100), second = enemy(250), third = enemy(400), extra = enemy(550);
   source.hit(player());
-  travel(0.65);
-  assert.deepEqual([first.hp, second.hp, third.hp, extra.hp], [4, 4, 4, 5]);
+  travel(0.45);
+  assert.deepEqual([first.hp, second.hp, third.hp, extra.hp], [4, 4, 5, 5]);
   assert.equal(renderEffects().filter(({ stroke }) => stroke?.stops).length, 1, 'shorter tail remains on the final hop');
   travel(0.6);
   assert.equal(renderEffects().filter(({ stroke }) => stroke?.stops).length, 0);
