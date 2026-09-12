@@ -741,4 +741,4 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
 }
 
 export default PlayerCharacter;
-export { PLAYER_RADIUS, renderPlayer, renderPlayerPortrait };
+export { PLAYER_RADIUS, renderPlayer, renderPlayerPortrait, traceWing };

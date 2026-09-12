@@ -5,6 +5,7 @@
 // run, like chaliceProgress.js) read by ItemAbilityHUD for its stack.
 
 import { fillCircle } from './canvasShapes.js';
+import { traceWing } from './PlayerCharacter.js';
 
 const OUTLINE_WIDTH = 4; // 2px thinner than its original 6
 // Same gold/dark-gold pair as Chalice.js/TreasureChest.js, for a consistent
@@ -33,20 +34,16 @@ function drawBattleArmor(context) {
   fillOutlined(context);
 }
 
-// Two swept feather-petal shapes meeting at a center point -- wide enough
-// that the fill still reads clearly under the outline stroke, rather than
-// being a sliver the stroke could nearly swallow, and pulled in from a
-// former 52-wide/30-tall bbox to a squarer 36x34.
+// Reuse the player's feathered silhouette with the standard icon palette.
 function drawValkyrieWings(context) {
+  context.save();
+  context.scale(0.6, 0.6);
+  context.translate(26.5, 24);
   context.beginPath();
-  context.moveTo(0, 12);
-  context.quadraticCurveTo(-10, -4, -18, -20);
-  context.quadraticCurveTo(-6, -8, -2, 14);
+  traceWing(context, 53, 48);
   context.closePath();
-  context.moveTo(0, 12);
-  context.quadraticCurveTo(10, -4, 18, -20);
-  context.quadraticCurveTo(6, -8, 2, 14);
-  context.closePath();
+  context.restore();
+  // Stroke after restoring so the outline stays the same 4px as its peers.
   fillOutlined(context);
 }
 
