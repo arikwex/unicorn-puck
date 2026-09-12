@@ -1,8 +1,30 @@
-# Unicorn Puck
+# PEGACORN BLOOD
 
-A small JS13k starter. It retains the reusable engine and packaging ideas from [Infernal Sigil](https://github.com/arikwex/infernal-sigil) without copying its game, assets, entities, maps, or rules. The initial scene contains only a placeholder player and its camera.
+![Pegacorn Blood title art](images/title-screen.png)
 
-## Setup and commands
+Your blood belongs in a pegacorn, not a dungeon's chalices. Take it back.
+
+A tiny browser dungeon crawler with pinball momentum: fling your winged unicorn through twisting halls, ram enemies, smash treasure chests, and dodge volleys of ooze. Reclaim every blood chalice and survive any active battle to win.
+
+## Features
+
+- **3 enemy types:** small grubs spit single shots, winged orbs fire three-shot spreads, and large orbs unleash eight-way volleys.
+- **A fresh dungeon every run:** seeded generation connects scattered rooms with maze-like corridors, treasure, and gated combat arenas.
+- **5 permanent upgrades:** Battle Armor adds health, Valkyrie Wings boosts launch power, Mithril Horn increases damage, Chromatic Hoof chains lightning, and Oracle Eyes reveals the minimap.
+- **Loot worth crashing into:** break chests for upgrades, health potions, and stackable bubble shields that each absorb one hit.
+- **Procedural presentation:** canvas-drawn characters, rainbow effects, synthesized sound effects, and a looping dungeon theme, built toward the JS13k **13,312-byte** limit.
+
+## Controls
+
+- **Click or tap** the title screen to start.
+- **Press and drag anywhere** to aim in the direction of your drag, then **release** to launch. Longer drags give stronger boosts.
+- **Ram enemies and chests at speed.** Use wall rebounds to keep moving and steer clear of incoming shots.
+
+Mouse and touch use the same controls; no keyboard required.
+
+## Development
+
+Use Node.js 24 and have `zip` available on your PATH.
 
 ```sh
 nvm use
@@ -10,32 +32,12 @@ npm install
 npm run dev
 ```
 
-`npm run dev` watches the source, generates `index.html` and `build.zip`, and serves the project at <http://127.0.0.1:8000>. Other build modes are:
+Open **http://127.0.0.1:8000**. The watcher rebuilds when source files change; refresh the browser to see updates. Use `npm run dev:minify` to watch with minification, or `npm test` to run the tests.
+
+## Production build
 
 ```sh
-npm run dev:minify # watch + Terser minification
-npm run build      # Terser + Roadroller production build
+npm run build
 ```
 
-Every mode emits a self-contained `index.html` and a `build.zip`. The production command prints the zip's size against the JS13k 13,312-byte limit.
-
-## Core modules
-
-- `src/engine.js` — animation loop, ordered game objects, lifecycle, and tag queries
-- `src/camera.js` — camera transform, exponential x/y following (k-factor easing), zoom, and coordinate conversion
-- `src/bus.js` — event subscription, one-shot handlers, emission, and cleanup
-- `src/audio.js` — Web Audio initialization, procedural buffers, SFX playback, channel volume, and crossfading looped music
-- `src/canvas.js` — full-window canvas setup and transform helper
-- `src/tags.js` — shared numeric camera, player, puck, and obstacle tags
-- `src/physics.js` — shared "puck-like" physics: damping, integration, and elastic-with-restitution collision resolution given two puck structs
-- `src/PhysicsWorld.js` — per-frame system that damps/integrates every puck and resolves puck-vs-puck and puck-vs-obstacle collisions via `physics.js`
-- `src/PlayerCharacter.js` — the hockey-puck-like player: physics state, `puck()` accessor, and render pass
-- `src/CubeObstacle.js` — static cube obstacle (`puck()` with `mass: Infinity`), rendered as a faux-3D box along the isometric basis vectors `(1, -1)` / `(1, 1)`
-- `src/input.js` — click-and-drag / touch-and-drag impulse control (Pointer Events) with the rainbow-hued drag-trail visualization
-- `src/mapCreator.js` — entry point that builds a map: player, camera, playpen obstacles, and input
-
-A "puck-like" object exposes a `puck()` method returning `{ mass, x, y, vx, vy, omega, angle, viscosity, angularViscosity, bounciness, ... }` (or, for a static obstacle, the same shape with `mass: Infinity`); `src/physics.js` operates only on that struct, so it works uniformly across every puck-like object.
-
-Game objects may implement `start()`, `update(dt)`, `render(ctx)`, and `destroy()`. Returning a truthy value from `update` removes the object. Use `add`, `remove`, `tag`, `untag`, and `getObjectsByTag` from `src/engine.js` to manage a scene.
-
-Browsers require audio to begin in a user gesture. Call `audio.init()` from a click or key handler before playing sound or music.
+Bundles with esbuild, minifies with Terser, and packs with Roadroller. Outputs a self-contained `index.html` and `build.zip`, then prints the ZIP size against the **13,312-byte** target.
