@@ -10,19 +10,12 @@ const YELLOW = '#ed4';
 const ORANGE = '#e93';
 const RED = '#d33';
 
-function healthColor(fraction) {
-  if (fraction > 0.75) return GREEN;
-  if (fraction > 0.5) return YELLOW;
-  if (fraction > 0.25) return ORANGE;
-  return RED;
-}
-
 // (x, y) is the bar's center: a white 2px outline around translucent black,
 // with `shields` extra blue ticks after the health ticks.
 function renderHealthBar(context, x, y, width, height, currentHp, maxHp, shields = 0) {
 
   const fraction = Math.max(0, Math.min(1, currentHp / maxHp));
-  const color = healthColor(fraction);
+  const color = fraction > 0.75 ? GREEN : fraction > 0.5 ? YELLOW : fraction > 0.25 ? ORANGE : RED;
   const left = x - width / 2;
   const top = y - height / 2;
 

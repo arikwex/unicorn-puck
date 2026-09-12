@@ -37,23 +37,6 @@ const DAMAGE_SPLAT_SIZE_MAX = 18;
 const DAMAGE_SPLAT_ARC_HEIGHT_TIME_MIN = 0.08;
 const DAMAGE_SPLAT_ARC_HEIGHT_TIME_MAX = 0.28;
 
-// Same disk-sampling shape as Grub's own fireSplats (sqrt(rng()) for uniform
-// area density, not just uniform radius), but plain Math.random() since the
-// player isn't seeded/reproducible the way patrol grubs are.
-function fireDamageSplats(x, y) {
-  DAMAGE_SPLAT_COLORS.forEach((color) => {
-    const angle = Math.random() * TAU;
-    const speed = Math.sqrt(Math.random()) * DAMAGE_SPLAT_SPEED_MAX;
-    const vx = Math.cos(angle) * speed;
-    const vy = Math.sin(angle) * speed;
-    const size = DAMAGE_SPLAT_SIZE_MIN + Math.random() * (DAMAGE_SPLAT_SIZE_MAX - DAMAGE_SPLAT_SIZE_MIN);
-    const arcHeightTime = DAMAGE_SPLAT_ARC_HEIGHT_TIME_MIN
-      + Math.random() * (DAMAGE_SPLAT_ARC_HEIGHT_TIME_MAX - DAMAGE_SPLAT_ARC_HEIGHT_TIME_MIN);
-    const arcHeight = Math.hypot(vx, vy) * arcHeightTime;
-    add(SplatEffect(x, y, vx, vy, color, size, arcHeight));
-  });
-}
-
 // While an aim drag is active (see DragController, which drives
 // `aiming`/`targetAngle` directly on the player object), heading eases
 // toward the target launch direction at a fixed, decently fast rate.
@@ -159,10 +142,6 @@ function zPosition(angle, centerX, centerY, offset) {
   ];
 }
 
-function earFacesCamera(angle, offset) {
-  return -Math.sin(angle) + Math.sign(offset) * Math.cos(angle) >= 0;
-}
-
 function fillEar(context, centerX, baseY, halfWidth, height, color) {
   const tipY = baseY - height;
   const turn = height * 0.22;
@@ -199,13 +178,6 @@ function traceHorn(context, halfWidth, length) {
   context.lineTo(0, -length);
 }
 
-function traceHornStripe(context, halfWidth, y) {
-  context.moveTo(-halfWidth, y);
-  context.lineTo(halfWidth, y - 4);
-  context.lineTo(halfWidth, y - 1);
-  context.lineTo(-halfWidth, y + 3);
-}
-
 function renderHorn(context, angle, headX, headY, charge) {
   const baseX = headX + Math.cos(angle) * 8;
   const baseY = headY - 13 - Math.sin(angle) * 6;
@@ -226,148 +198,44 @@ function renderHorn(context, angle, headX, headY, charge) {
   context.clip();
 
   for (let y = -4; y > -length; y -= 8) {
-    fillShape(context, '#c94', () => traceHornStripe(context, halfWidth, y));
+    fillShape(context, '#c94', () => {
+      context.moveTo(-halfWidth, y);
+      context.lineTo(halfWidth, y - 4);
+      context.lineTo(halfWidth, y - 1);
+      context.lineTo(-halfWidth, y + 3);
+    });
   }
   context.restore();
 }
 
-function renderEar(context, angle, headX, headY, offset) {
-  const facesCamera = earFacesCamera(angle, offset);
-  const [centerX, baseY] = zPosition(
-    angle,
-    headX - Math.cos(angle) * 5,
-    headY - 11 + Math.sin(angle) * 5,
-    offset,
-  );
-
-  fillEar(
-    context,
-    centerX,
-    facesCamera ? baseY + 3 : baseY,
-    8,
-    facesCamera ? 27 : 24,
-    facesCamera ? '#fff' : '#cce',
-  );
-
-  if (facesCamera) {
-    fillEar(context, centerX, baseY - 3, 4.5, 15, '#cce');
-  }
-}
-
 // `foreground` is compared loosely (here and in renderWingsAndTail): the
 // build ships boolean literals as 1/0 (see tools/build.js), and 1 !== true.
+// The single ear is drawn inline -- it was only ever called from here, and
+// this way the facing test it needs is the one already computed.
 function renderEars(context, angle, headX, headY, foreground) {
   const spacing = 10;
   [-spacing, spacing].forEach((offset) => {
-    if (earFacesCamera(angle, offset) == foreground) {
-      renderEar(context, angle, headX, headY, offset);
+    // An ear faces the camera when its own side of the head is turned toward
+    // it -- the same rotatedZ <= 0 depth convention used throughout.
+    const facesCamera = -Math.sin(angle) + Math.sign(offset) * Math.cos(angle) >= 0;
+    if (facesCamera != foreground) return;
+    const [centerX, baseY] = zPosition(
+      angle,
+      headX - Math.cos(angle) * 5,
+      headY - 11 + Math.sin(angle) * 5,
+      offset,
+    );
+    fillEar(
+      context,
+      centerX,
+      facesCamera ? baseY + 3 : baseY,
+      8,
+      facesCamera ? 27 : 24,
+      facesCamera ? '#fff' : '#cce',
+    );
+    if (facesCamera) {
+      fillEar(context, centerX, baseY - 3, 4.5, 15, '#cce');
     }
-  });
-}
-
-function renderConnector(context, headX, headY, headRadius, snoutX, snoutY, snoutRadius) {
-  const dx = snoutX - headX;
-  const dy = snoutY - headY;
-  const distance = Math.hypot(dx, dy);
-  const ux = dx / distance;
-  const uy = dy / distance;
-  const along = (headRadius - snoutRadius) / distance;
-  const across = Math.sqrt(1 - along * along);
-  const topX = ux * along + uy * across;
-  const topY = uy * along - ux * across;
-  const bottomX = ux * along - uy * across;
-  const bottomY = uy * along + ux * across;
-
-  fillShape(context, '#fff', () => {
-    context.moveTo(headX + topX * headRadius, headY + topY * headRadius);
-    context.lineTo(snoutX + topX * snoutRadius, snoutY + topY * snoutRadius);
-    context.lineTo(snoutX + bottomX * snoutRadius, snoutY + bottomY * snoutRadius);
-    context.lineTo(headX + bottomX * headRadius, headY + bottomY * headRadius);
-  });
-}
-
-function renderEyes(context, angle, headX, headY) {
-  const lookingForward = -Math.sin(angle) >= Math.cos(Math.PI / 8);
-  const sides = lookingForward
-    ? [-13, 13]
-    : [Math.cos(angle) >= 0 ? 13 : -13];
-  sides.forEach((side) => {
-    const [x, y] = orbit3d(1, -2, -side, angle);
-    const eyeX = headX + x;
-    const eyeY = headY + y;
-    fillCircle(context, eyeX, eyeY, 6, '#111');
-    fillCircle(context, eyeX + 2, eyeY - 2, 2, '#fff');
-  });
-}
-
-function renderNostrils(context, angle, snoutX, snoutY) {
-  if (Math.sin(angle) > 0) return;
-
-  const gap = 8;
-  [-gap / 2, gap / 2].forEach((side) => {
-    const [x, y] = orbit3d(6, 0, -side, angle);
-    fillCircle(context, snoutX + x, snoutY + y, 2.5, '#999');
-  });
-}
-
-function renderTail(context, player, angle, anim, charge) {
-  const perspectiveY = 0.6;
-  const tweenGamma = 1.5;
-  const depth = Math.sin(angle);
-  const front = Math.max(depth, 0) ** tweenGamma;
-  const hidden = Math.max(-depth, 0) ** tweenGamma;
-  const side = 1 - front - hidden;
-  const horizontal = Math.cos(angle);
-  const sideHorizontal = Math.sign(horizontal) * side;
-  const depthY = depth * 5 * perspectiveY;
-  const point = (sideX, sideY, frontX, frontY) => {
-    const frontYWithPerspective = 5 + (frontY - 5) * perspectiveY;
-    return [
-      player.x + sideX * sideHorizontal + frontX * front,
-      player.y + sideY * side + frontYWithPerspective * front + 12 * hidden
-        + depthY - Math.sin(anim * 12 + 0.8) * 3,
-    ];
-  };
-
-  // How much farther out the tail's far end (everything but its torso
-  // attachment point) reaches at charge = 1 -- a streaming-behind-you
-  // stretch, not a change to the tail's shape or attachment.
-  const stretch = 1 + TAIL_STRETCH * charge;
-
-  // Exchange the two side-view contours after each end-on extreme. At the
-  // exchange point their side contribution is zero, so the swap is seamless.
-  const swapCurves = horizontal < 0;
-  const start = point(-28, -10, 0, 5);
-  const topControlA = point(
-    (swapCurves ? -52 : -68) * stretch,
-    swapCurves ? 15 : -18,
-    -18,
-    12 * stretch,
-  );
-  const topControlB = point(
-    (swapCurves ? -22 : -35) * stretch,
-    swapCurves ? 35 : 15,
-    -15,
-    42 * stretch,
-  );
-  const tip = point(-68 * stretch, 20 + Math.sin(anim * 12 + 1.2) * 2, 0, 60 * stretch);
-  const bottomControlA = point(
-    (swapCurves ? -35 : -22) * stretch,
-    swapCurves ? 15 : 35,
-    15,
-    42 * stretch,
-  );
-  const bottomControlB = point(
-    (swapCurves ? -68 : -52) * stretch,
-    swapCurves ? -18 : 15,
-    18,
-    12 * stretch,
-  );
-
-  fillShape(context, '#aac', () => {
-    context.moveTo(...start);
-    context.bezierCurveTo(...topControlA, ...topControlB, ...tip);
-    context.bezierCurveTo(...bottomControlA, ...bottomControlB, ...start);
   });
 }
 
@@ -381,30 +249,6 @@ const FEATHER_LENGTH_MIN = 0.14; // root-most feather's protrusion length
 const FEATHER_CUT_PULL_1 = 0.55; // control point 1: how far from the tip, along FEATHER_CUT_ANGLE, as a fraction of that feather's own length
 const FEATHER_CUT_PULL_2 = 0.35; // control point 2: how far back from the next base point, along the baseline, as a fraction of one baseline segment
 
-// Traces the trailing edge as FEATHER_COUNT feathers running from `from`
-// (the terminal phalanx) to `to` (the blade of scapula), assuming the
-// current path position is already at `from`. Each feather is a straight
-// outward edge (at FEATHER_SWEEP_ANGLE off the from->to baseline) followed
-// by a bezier cutting back in (starting at FEATHER_CUT_ANGLE, sharper, then
-// smoothing into the next base point). Feather 1 has no outward edge of its
-// own -- whatever curve already ends at `from` doubles as its top edge.
-function traceFeathers(context, from, to) {
-  for (let i = 0; i < FEATHER_COUNT; i++) {
-    const p = i / (FEATHER_COUNT - 1);
-    const q = 1 - p;
-    const tipX = from[0] * q + to[0] * p;
-    const tipY = from[1] * q + to[1] * p;
-    const innerX = (from[0] * q + to[0] * p) * 0.5;
-    const innerY = (from[1] * q + to[1] * p) * 0.8 + 2;
-    const curve1X = (from[0] * q + to[0] * p) * 0.9;
-    const curve1Y = (from[1] * q + to[1] * p)  * 0.8 + 6;
-    const curve2X = (from[0] * q + to[0] * p) * 0.5;
-    const curve2Y = (from[1] * q + to[1] * p) * 0.8 + 6;
-    context.lineTo(tipX, tipY);
-    context.bezierCurveTo(curve1X, curve1Y, curve2X, curve2Y, innerX, innerY);
-  }
-}
-
 function traceWing(context, W, H) {
   context.moveTo(0, 0); // coracoid
 
@@ -414,8 +258,23 @@ function traceWing(context, W, H) {
   const terminalPhalanx = [W * -1.00, -H * 1.00];
   context.bezierCurveTo(W * -0.32, -H * 0.72, W * -0.68, -H * 0.92, terminalPhalanx[0], terminalPhalanx[1]);
 
+  // Trailing edge: FEATHER_COUNT feathers running from the terminal phalanx
+  // to the blade of scapula, the path already sitting at the phalanx. Each
+  // feather is a straight outward edge (at FEATHER_SWEEP_ANGLE off that
+  // baseline) followed by a bezier cutting back in (starting at
+  // FEATHER_CUT_ANGLE, sharper, then smoothing into the next base point).
+  // Feather 1 has no outward edge of its own -- whatever curve already ends
+  // at the phalanx doubles as its top edge. `bx`/`by` is that feather's own
+  // point along the baseline, which every control point is derived from.
   const bladeOfScapula = [W * -0.80, -H * 0.10];
-  traceFeathers(context, terminalPhalanx, bladeOfScapula);
+  for (let i = 0; i < FEATHER_COUNT; i++) {
+    const p = i / (FEATHER_COUNT - 1);
+    const q = 1 - p;
+    const bx = terminalPhalanx[0] * q + bladeOfScapula[0] * p;
+    const by = terminalPhalanx[1] * q + bladeOfScapula[1] * p;
+    context.lineTo(bx, by);
+    context.bezierCurveTo(bx * 0.9, by * 0.8 + 6, bx * 0.5, by * 0.8 + 6, bx * 0.5, by * 0.8 + 2);
+  }
 
   // Close: blade of scapula -> coracoid.
   context.bezierCurveTo(W * -0.55, -H * 0.05, W * -0.20, -H * 0.02, 0, 0);
@@ -423,27 +282,6 @@ function traceWing(context, W, H) {
 
 const WING_LENGTH = 48;
 const WING_WIDTH = 53;
-
-function renderWingShape(context, pivotX, pivotY, angle, wingDir, charge) {
-  context.save();
-  context.translate(pivotX, pivotY);
-  const length = WING_LENGTH * (1 - WING_SHORTEN * charge);
-  const WW = WING_WIDTH * (1 + WING_ELONGATE * charge) * Math.cos(angle);
-
-  if (Math.cos(angle) > 0 ^ wingDir) {
-    fillOutlinedShape(context, '#aac', 4, () => traceWing(context, WW, length));
-  } else {
-    fillOutlinedShape(context, '#fff', 4, () => traceWing(context, WW, length));
-    context.save();
-    context.scale(0.65, 0.65);
-    context.translate(-3, 3);
-    // Scale compensates for the 0.6x context so the stroke still renders 9 units wide.
-    fillOutlinedShape(context, '#aac', 2 / 0.65, () => traceWing(context, WW, length));
-    context.restore();
-  }
-
-  context.restore();
-}
 
 // Draws the wings and the tail together, sorted by their actual orbit3d
 // depth, so the tail can land between the two wings (in front of one,
@@ -461,21 +299,97 @@ function renderWingsAndTail(context, player, angle, anim, foreground, charge) {
     const sweepBack = WING_SWEEP_BACK * charge * Math.sign(defaultPlacement);
     return {
       depth,
-      draw: () => renderWingShape(
-        context,
-        player.x + rx,
-        player.y + ry - Math.sin(anim * 12 + 1.6) * 3.0 + WING_DROP * charge,
-        angle - defaultPlacement * 0.15 + sweepBack,
-        Math.sign(defaultPlacement) < 0,
-        charge,
-      ),
+      // One wing, drawn inline (its only call site): the far wing is a flat
+      // silhouette, the near one gets an inset second pass for shading.
+      draw: () => {
+        const wingAngle = angle - defaultPlacement * 0.15 + sweepBack;
+        context.save();
+        context.translate(player.x + rx, player.y + ry - Math.sin(anim * 12 + 1.6) * 3.0 + WING_DROP * charge);
+        const length = WING_LENGTH * (1 - WING_SHORTEN * charge);
+        const WW = WING_WIDTH * (1 + WING_ELONGATE * charge) * Math.cos(wingAngle);
+        if (Math.cos(wingAngle) > 0 ^ Math.sign(defaultPlacement) < 0) {
+          fillOutlinedShape(context, '#aac', 4, () => traceWing(context, WW, length));
+        } else {
+          fillOutlinedShape(context, '#fff', 4, () => traceWing(context, WW, length));
+          context.save();
+          context.scale(0.65, 0.65);
+          context.translate(-3, 3);
+          // Scale compensates for the 0.6x context so the stroke still renders 9 units wide.
+          fillOutlinedShape(context, '#aac', 2 / 0.65, () => traceWing(context, WW, length));
+          context.restore();
+        }
+        context.restore();
+      },
     };
   });
 
   // The tail is mounted opposite the head, straight back, with no
   // left/right offset.
   const [, , tailDepth] = orbit3d(-30, 0, 0, angle);
-  items.push({ depth: tailDepth, draw: () => renderTail(context, player, angle, anim, charge) });
+  items.push({
+    depth: tailDepth,
+    // The tail, drawn inline (its only call site).
+    draw: () => {
+      const perspectiveY = 0.6;
+      const tweenGamma = 1.5;
+      const depth = Math.sin(angle);
+      const front = Math.max(depth, 0) ** tweenGamma;
+      const hidden = Math.max(-depth, 0) ** tweenGamma;
+      const side = 1 - front - hidden;
+      const horizontal = Math.cos(angle);
+      const sideHorizontal = Math.sign(horizontal) * side;
+      const depthY = depth * 5 * perspectiveY;
+      const point = (sideX, sideY, frontX, frontY) => {
+        const frontYWithPerspective = 5 + (frontY - 5) * perspectiveY;
+        return [
+          player.x + sideX * sideHorizontal + frontX * front,
+          player.y + sideY * side + frontYWithPerspective * front + 12 * hidden
+            + depthY - Math.sin(anim * 12 + 0.8) * 3,
+        ];
+      };
+
+      // How much farther out the tail's far end (everything but its torso
+      // attachment point) reaches at charge = 1 -- a streaming-behind-you
+      // stretch, not a change to the tail's shape or attachment.
+      const stretch = 1 + TAIL_STRETCH * charge;
+
+      // Exchange the two side-view contours after each end-on extreme. At the
+      // exchange point their side contribution is zero, so the swap is seamless.
+      const swapCurves = horizontal < 0;
+      const start = point(-28, -10, 0, 5);
+      const topControlA = point(
+        (swapCurves ? -52 : -68) * stretch,
+        swapCurves ? 15 : -18,
+        -18,
+        12 * stretch,
+      );
+      const topControlB = point(
+        (swapCurves ? -22 : -35) * stretch,
+        swapCurves ? 35 : 15,
+        -15,
+        42 * stretch,
+      );
+      const tip = point(-68 * stretch, 20 + Math.sin(anim * 12 + 1.2) * 2, 0, 60 * stretch);
+      const bottomControlA = point(
+        (swapCurves ? -35 : -22) * stretch,
+        swapCurves ? 15 : 35,
+        15,
+        42 * stretch,
+      );
+      const bottomControlB = point(
+        (swapCurves ? -68 : -52) * stretch,
+        swapCurves ? -18 : 15,
+        18,
+        12 * stretch,
+      );
+
+      fillShape(context, '#aac', () => {
+        context.moveTo(...start);
+        context.bezierCurveTo(...topControlA, ...topControlB, ...tip);
+        context.bezierCurveTo(...bottomControlA, ...bottomControlB, ...start);
+      });
+    },
+  });
 
   items
     .filter((item) => (item.depth <= 0) == foreground)
@@ -496,12 +410,46 @@ function renderHead(context, angle, headX, headY, snoutX, snoutY, charge) {
   const facesCamera = Math.sin(angle) <= 0;
 
   if (!facesCamera) renderHorn(context, angle, headX, headY, charge);
-  renderConnector(context, headX, headY, headRadius, snoutX, snoutY, snoutRadius);
+
+  // The tapered band joining the head and snout circles: the two outer
+  // tangent lines between them, as one filled quad.
+  const dx = snoutX - headX;
+  const dy = snoutY - headY;
+  const distance = Math.hypot(dx, dy);
+  const ux = dx / distance;
+  const uy = dy / distance;
+  const along = (headRadius - snoutRadius) / distance;
+  const across = Math.sqrt(1 - along * along);
+  const topX = ux * along + uy * across;
+  const topY = uy * along - ux * across;
+  const bottomX = ux * along - uy * across;
+  const bottomY = uy * along + ux * across;
+  fillShape(context, '#fff', () => {
+    context.moveTo(headX + topX * headRadius, headY + topY * headRadius);
+    context.lineTo(snoutX + topX * snoutRadius, snoutY + topY * snoutRadius);
+    context.lineTo(snoutX + bottomX * snoutRadius, snoutY + bottomY * snoutRadius);
+    context.lineTo(headX + bottomX * headRadius, headY + bottomY * headRadius);
+  });
+
   renderEars(context, angle, headX, headY, false);
   fillCircle(context, headX, headY, headRadius, '#fff');
   fillCircle(context, snoutX, snoutY, snoutRadius, '#fff');
-  renderEyes(context, angle, headX, headY);
-  renderNostrils(context, angle, snoutX, snoutY);
+
+  // Eyes: both of them while looking forward, otherwise just the visible one.
+  (-Math.sin(angle) >= Math.cos(Math.PI / 8) ? [-13, 13] : [Math.cos(angle) >= 0 ? 13 : -13]).forEach((side) => {
+    const [x, y] = orbit3d(1, -2, -side, angle);
+    fillCircle(context, headX + x, headY + y, 6, '#111');
+    fillCircle(context, headX + x + 2, headY + y - 2, 2, '#fff');
+  });
+
+  // Nostrils, only while the snout faces the camera.
+  if (Math.sin(angle) <= 0) {
+    [-4, 4].forEach((side) => {
+      const [x, y] = orbit3d(6, 0, -side, angle);
+      fillCircle(context, snoutX + x, snoutY + y, 2.5, '#999');
+    });
+  }
+
   renderEars(context, angle, headX, headY, true);
   if (facesCamera) renderHorn(context, angle, headX, headY, charge);
 }
@@ -629,7 +577,19 @@ function PlayerCharacter(x = 0, y = 0, angle = 0) {
       if (this.shields > 0) this.shields--;
       else this.hp = Math.max(0, this.hp - amount);
       damageFlashTimer = DAMAGE_FLASH_DURATION;
-      fireDamageSplats(this.x, this.y);
+      // Same disk-sampling shape as Grub's own fireSplats (sqrt(rng()) for
+      // uniform area density, not just uniform radius), but plain
+      // Math.random() since the player isn't seeded the way patrol grubs are.
+      DAMAGE_SPLAT_COLORS.forEach((color) => {
+        const angle = Math.random() * TAU;
+        const speed = Math.sqrt(Math.random()) * DAMAGE_SPLAT_SPEED_MAX;
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed;
+        const size = DAMAGE_SPLAT_SIZE_MIN + Math.random() * (DAMAGE_SPLAT_SIZE_MAX - DAMAGE_SPLAT_SIZE_MIN);
+        const arcHeight = Math.hypot(vx, vy) * (DAMAGE_SPLAT_ARC_HEIGHT_TIME_MIN
+          + Math.random() * (DAMAGE_SPLAT_ARC_HEIGHT_TIME_MAX - DAMAGE_SPLAT_ARC_HEIGHT_TIME_MIN));
+        add(SplatEffect(this.x, this.y, vx, vy, color, size, arcHeight));
+      });
       playPlayerDamage();
     },
 

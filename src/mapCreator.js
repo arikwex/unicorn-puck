@@ -35,9 +35,6 @@ import ToastSystem, { showToast } from './ToastSystem.js';
 // 5-cell room dimensions (see its own ROOM_MIN_SIZE/ROOM_MAX_SIZE), a
 // non-square 3x5 (or 5x3) room -- "size 4" on average -- lands on the same
 // formula's 5 slots too, rather than needing a separate lookup table.
-function roomGrubCount(rawRoom) {
-  return rawRoom.w + rawRoom.h - 3;
-}
 const GRUB_ROOM_MARGIN = 50;
 // A hallway only ever gets a grub if it's a straight run of at least this
 // many raw grid cells (see findLongHallways) -- a short jog between two
@@ -96,11 +93,6 @@ const CORRIDOR_WIDTH_FACTOR = 3;
 // dungeon's physical scale relative to the player's radius doesn't shift.
 const TILE = 30 * 2 * Math.SQRT2;
 
-// The dungeon grid is square, `size` cells a side, centered on the origin.
-function gridToWorld(x, y, size) {
-  return { x: (x - size / 2) * TILE, y: (y - size / 2) * TILE };
-}
-
 // A grub's spawn point within its room (world space), scattered randomly
 // via `rng` across the room's own interior (inset by GRUB_ROOM_MARGIN off
 // its walls). The spawn room is enemy-free, so no player-distance check is
@@ -137,16 +129,6 @@ function pickPointInRoom(room, margin, rng) {
   };
 }
 
-// Closest-point-on-AABB distance: 0 while inside/touching the box, the
-// true gap once outside it. Walls always come out axis-aligned (see TILE's
-// own comment above), so a plain half-width/half-height box is exact, no
-// rotation to account for.
-function circleBoxGap(cx, cy, cr, box) {
-  const dx = Math.max(Math.abs(cx - box.x) - box.halfW, 0);
-  const dy = Math.max(Math.abs(cy - box.y) - box.halfH, 0);
-  return Math.hypot(dx, dy) - cr;
-}
-
 function circleCircleGap(cx, cy, cr, other) {
   return Math.hypot(cx - other.x, cy - other.y) - cr - other.r;
 }
@@ -154,43 +136,15 @@ function circleCircleGap(cx, cy, cr, other) {
 // True once a candidate of the given radius clears every wall (box) and
 // pillar/grub/chest (circle) by at least OBSTACLE_CLEARANCE, and every
 // room entrance (a point, radius 0) by ENTRANCE_CLEARANCE.
+// The wall test is a closest-point-on-AABB distance, inlined from its one
+// call site: 0 while inside/touching the box, the true gap once outside it.
+// Walls always come out axis-aligned (see TILE's own comment above), so a
+// plain half-width/half-height box is exact, no rotation to account for.
 function isClearSpot(x, y, radius, walls, circles, entrances) {
-  return walls.every((wall) => circleBoxGap(x, y, radius, wall) >= OBSTACLE_CLEARANCE)
+  return walls.every((wall) => Math.hypot(Math.max(Math.abs(x - wall.x) - wall.halfW, 0),
+    Math.max(Math.abs(y - wall.y) - wall.halfH, 0)) - radius >= OBSTACLE_CLEARANCE)
     && circles.every((circle) => circleCircleGap(x, y, radius, circle) >= OBSTACLE_CLEARANCE)
     && entrances.every((entrance) => circleCircleGap(x, y, radius, entrance) >= ENTRANCE_CLEARANCE);
-}
-
-// Resamples pickPointInRoom up to `attempts` times looking for a spot
-// clear of every obstacle and entrance; returns null if none work out.
-// Used by chest placement -- a chest is best-effort (goes without rather
-// than fighting for a better spot), so the first clear candidate is fine.
-function findClearSpot(room, margin, radius, attempts, rng, walls, circles, entrances) {
-  for (let attempt = 0; attempt < attempts; attempt++) {
-    const candidate = pickPointInRoom(room, margin, rng);
-    if (isClearSpot(candidate.x, candidate.y, radius, walls, circles, entrances)) return candidate;
-  }
-  return null;
-}
-
-// Like findClearSpot, but spends its whole attempt budget and keeps
-// whichever clear candidate landed closest to the room's own center,
-// instead of settling for the first one that happened to pass. Used for
-// chalice placement, which should hug room center as hard as the
-// walls/obstacles/doorway clearance rules allow rather than just being
-// clear of them.
-function findCenterMostClearSpot(room, margin, radius, attempts, rng, walls, circles, entrances) {
-  let best = null;
-  let bestDistance = Infinity;
-  for (let attempt = 0; attempt < attempts; attempt++) {
-    const candidate = pickPointInRoom(room, margin, rng);
-    if (!isClearSpot(candidate.x, candidate.y, radius, walls, circles, entrances)) continue;
-    const distance = Math.hypot(candidate.x - room.x, candidate.y - room.y);
-    if (distance < bestDistance) {
-      best = candidate;
-      bestDistance = distance;
-    }
-  }
-  return best;
 }
 
 // Fisher-Yates shuffle -- used to pick exactly CHALICE_ROOM_FRACTION of
@@ -215,8 +169,6 @@ function shuffled(list, rng) {
 // inflates/converts to world space itself, same as it already does for
 // dungeon.rooms.
 function findLongHallways(rawDungeon, isRawFloor) {
-  const isRoomCell = (x, y) => rawDungeon.rooms.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
-  const isCorridor = (x, y) => isRawFloor(x, y) && !isRoomCell(x, y);
   const hallways = [];
 
   const { size } = rawDungeon;
@@ -224,7 +176,11 @@ function findLongHallways(rawDungeon, isRawFloor) {
     for (let a = 0; a < size; a++) {
       let start = null;
       for (let b = 0; b <= size; b++) {
-        if (b < size && isCorridor(...(alongX ? [b, a] : [a, b]))) {
+        // A corridor cell: floor, and not inside any room.
+        const cx = alongX ? b : a;
+        const cy = alongX ? a : b;
+        if (b < size && isRawFloor(cx, cy)
+          && !rawDungeon.rooms.some((r) => cx >= r.x && cx < r.x + r.w && cy >= r.y && cy < r.y + r.h)) {
           if (start === null) start = b;
           continue;
         }
@@ -243,11 +199,18 @@ function findLongHallways(rawDungeon, isRawFloor) {
   return hallways;
 }
 
-// Builds the dungeon's walls as CubeObstacles and returns a world-space
-// spawn point (the center of its first room). `seed` drives the whole
+// Entry point for specifying everything in the scene: the dungeon itself
+// (walls as CubeObstacles, then pillars, grubs, chests and chalices),
+// followed by the player, camera, HUD and input. Swap or extend this module
+// to build different maps. `seed` drives the whole dungeon layout -- pass a
+// fresh one per run for a new map, or the same one to replay an identical
 // layout; pillar placement and grub scatter/patrol each offset from it so
 // they don't replay the room layout's own random sequence.
-function buildDungeon(seed) {
+//
+// The dungeon build runs inline here rather than as its own function: it had
+// exactly one caller, and handing its results across that boundary meant an
+// object whose keys (unlike locals) minification cannot shorten.
+function createMap(seed) {
   const pillarSeed = seed + 1;
   const grubSeed = seed + 2;
   const chestSeed = seed + 3;
@@ -281,7 +244,9 @@ function buildDungeon(seed) {
     isFloor,
   };
   const combatRoomIndices = selectCombatRooms(dungeon.rooms.length, seed + 6);
-  const toWorld = (x, y) => gridToWorld(x, y, dungeon.size);
+  // The dungeon grid is square, `size` cells a side, centered on the origin.
+  const halfSize = dungeon.size / 2;
+  const toWorld = (x, y) => ({ x: (x - halfSize) * TILE, y: (y - halfSize) * TILE });
   const nonSpawnRoomIndices = dungeon.rooms.map((_, i) => i).filter((i) => i !== 0);
   // A room's entrance cells (grid) as world-space points, radius 0 -- fed
   // into findClearSpot/isClearSpot's "circles" clearance check.
@@ -376,7 +341,9 @@ function buildDungeon(seed) {
     const typeRng = mulberry32(seed + 9 + roomIndex * 100);
     const enemies = [];
     if (roomIndex !== 0) {
-      const budget = roomGrubCount(rawDungeon.rooms[roomIndex]);
+      // See the enemy-budget comment at the top of this file for the formula.
+      const rawRoom = rawDungeon.rooms[roomIndex];
+      const budget = rawRoom.w + rawRoom.h - 3;
       for (let spent = 0; spent < budget;) {
         const roll = typeRng();
         // Split the 30% upgraded chance evenly; downgrade to fit remaining slots.
@@ -414,7 +381,15 @@ function buildDungeon(seed) {
     // blocking the way in.
     const entrancePoints = roomEntrancePoints(room);
     const chestRng = mulberry32(chestSeed + roomIndex);
-    const chestSpawn = findClearSpot(worldRoom, CHEST_ROOM_MARGIN, CHEST_RADIUS, CHEST_PLACEMENT_ATTEMPTS, chestRng, wallBoxes, obstacleCircles, entrancePoints);
+    // Resamples pickPointInRoom up to CHEST_PLACEMENT_ATTEMPTS times looking
+    // for a spot clear of every obstacle and entrance. A chest is
+    // best-effort (it goes without rather than fighting for a better spot),
+    // so the first clear candidate wins and no further samples are drawn.
+    let chestSpawn = null;
+    for (let attempt = 0; attempt < CHEST_PLACEMENT_ATTEMPTS && !chestSpawn; attempt++) {
+      const candidate = pickPointInRoom(worldRoom, CHEST_ROOM_MARGIN, chestRng);
+      if (isClearSpot(candidate.x, candidate.y, CHEST_RADIUS, wallBoxes, obstacleCircles, entrancePoints)) chestSpawn = candidate;
+    }
     if (chestSpawn) {
       add(TreasureChest(chestSpawn.x, chestSpawn.y, chestContentsFor(roomIndex)));
       // So a chalice placed afterward (see below) won't land on top of it.
@@ -469,19 +444,33 @@ function buildDungeon(seed) {
     const worldRoom = {
       x: roomCenter.x, y: roomCenter.y, w: room.w * TILE, h: room.h * TILE,
     };
-    // Chosen for a chalice, so unlike a chest this never gives up on the
-    // room -- it falls back to an unchecked (but still center-biased)
-    // point rather than skipping entirely and silently shrinking the
-    // required total below the count just committed to above.
-    const spawn = findCenterMostClearSpot(worldRoom, CHALICE_ROOM_MARGIN, CHALICE_RADIUS, CHALICE_PLACEMENT_ATTEMPTS, chaliceRng, wallBoxes, obstacleCircles, roomEntrancePoints(room))
-      || pickPointInRoom(worldRoom, CHALICE_ROOM_MARGIN, chaliceRng);
+    // Unlike a chest, this spends its whole attempt budget and keeps
+    // whichever clear candidate landed closest to the room's own center
+    // rather than settling for the first that passed -- a chalice should hug
+    // room center as hard as the clearance rules allow. And unlike a chest it
+    // never gives up on the room: it falls back to an unchecked (but still
+    // center-biased) point rather than skipping entirely and silently
+    // shrinking the required total below the count just committed to above.
+    const entrances = roomEntrancePoints(room);
+    let best = null;
+    let bestDistance = Infinity;
+    for (let attempt = 0; attempt < CHALICE_PLACEMENT_ATTEMPTS; attempt++) {
+      const candidate = pickPointInRoom(worldRoom, CHALICE_ROOM_MARGIN, chaliceRng);
+      if (!isClearSpot(candidate.x, candidate.y, CHALICE_RADIUS, wallBoxes, obstacleCircles, entrances)) continue;
+      const distance = Math.hypot(candidate.x - worldRoom.x, candidate.y - worldRoom.y);
+      if (distance < bestDistance) {
+        best = candidate;
+        bestDistance = distance;
+      }
+    }
+    const spawn = best || pickPointInRoom(worldRoom, CHALICE_ROOM_MARGIN, chaliceRng);
     add(Chalice(spawn.x, spawn.y));
   });
   resetChalices(chaliceRoomIndices.length);
 
   // The dungeon's own world-space bounding box -- always square, and always
   // this same fixed size/position for every seed (see donjonDungeon.js's
-  // own GRID_WIDTH/GRID_HEIGHT and classifyCells: every uncarved cell,
+  // own GRID_WIDTH/GRID_HEIGHT and cell classification: every uncarved cell,
   // including the whole boundary ring, is a wall, so it always fills the
   // grid to its edges). mapWorldMin is offset an extra half-TILE beyond
   // -mapWorldSpan/2 because a merged wall rect's own world center (see the
@@ -492,22 +481,12 @@ function buildDungeon(seed) {
   // re-deriving a wall bounding box from scratch every single frame.
   const mapWorldSpan = dungeon.size * TILE;
   const mapWorldMin = -mapWorldSpan / 2 - TILE / 2;
-  return {
-    ...playerSpawn, mapWorldSpan, mapWorldMin,
-  };
-}
 
-// Entry point for specifying everything in the scene: the player, camera,
-// obstacles, and input. Swap or extend this module to build different
-// maps. `seed` drives the whole dungeon layout -- pass a fresh one per run
-// for a new map, or the same one to replay an identical layout.
-function createMap(seed) {
-  const spawn = buildDungeon(seed);
-  const player = add(PlayerCharacter(spawn.x, spawn.y));
+  const player = add(PlayerCharacter(playerSpawn.x, playerSpawn.y));
   const playerHealthHUD = add(PlayerHealthHUD(player));
   const chaliceHUD = add(ChaliceHUD());
   const itemAbilityHUD = add(ItemAbilityHUD());
-  const miniMap = add(MiniMap(player, spawn.mapWorldSpan, spawn.mapWorldMin));
+  const miniMap = add(MiniMap(player, mapWorldSpan, mapWorldMin));
   add(ToastSystem());
   // Shown instantly (not after any delay) since it's establishing the
   // whole game's premise, not reacting to something the player just did.

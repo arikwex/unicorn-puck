@@ -10,11 +10,6 @@
 import { play, synth } from './audio.js';
 import { clamp, noise, TAU } from './mathUtils.js';
 
-// A soft square wave via hard-clamped sine, same trick the reference uses.
-function sqr(phase) {
-  return clamp(Math.sin(phase) * 1000, -1, 1);
-}
-
 // Defers buffer generation until first play, so nothing touches
 // AudioContext (and its sample rate) before one exists.
 function lazySound(duration, sample) {
@@ -76,7 +71,8 @@ const playerDamageBuffer = lazySound(0.4, (t) => {
   const envelope = Math.exp(-t * 6);
   const freq = 200 * Math.exp(-t * 2.5);
   const tremolo = 0.6 + 0.4 * Math.sin(TAU * 22 * t);
-  const buzz = sqr(TAU * freq * t);
+  // A soft square wave via hard-clamped sine, same trick the reference uses.
+  const buzz = clamp(Math.sin(TAU * freq * t) * 1000, -1, 1);
   return envelope * tremolo * (0.16 * buzz + 0.06 * noise());
 });
 

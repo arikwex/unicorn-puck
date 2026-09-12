@@ -26,53 +26,48 @@ const DEATH_SPLAT_SIZE_MAX = 26;
 // every trip back through the main menu would just be a jarring re-fade.
 let musicStarted = false;
 
-// Watches the live player for either end condition -- hp running out, or
-// every chalice collected -- and hands off to the matching status card.
-// Fires the death splats only for the loss case; both cases tear down
-// input and the HUD the same way (camera and dungeon stay put -- with
-// the player gone the camera holds still, so the view stays frozen right
-// where the run ended). Self-removes once fired.
-function GameWatcher(player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap) {
-  return {
-    tick() {
-      const won = chalicesComplete()
-        && !getObjectsByTag(TAG_COMBAT_ROOM).some((room) => room.state === COMBAT_ROOM_ACTIVE);
-      const lost = player.hp <= 0;
-      if (!won && !lost) return;
-
-      if (lost) fireSplatBurst(player.x, player.y, DEATH_SPLAT_COUNT, DEATH_SPLAT_COLORS, DEATH_SPLAT_SPEED_MAX, DEATH_SPLAT_SIZE_MIN, DEATH_SPLAT_SIZE_MAX);
-      remove([player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap]);
-      add(won
-        ? StatusCard(showMenu, ['PEGACORN BLOOD', 'RECLAIMED'], '#fff')
-        : StatusCard(showMenu));
-      return true;
-    },
-  };
-}
-
-function showMenu() {
-  clear();
-  add(MainMenu(startGame));
-}
-
-function startGame() {
-  if (!musicStarted) {
-    musicStarted = true;
-    playDungeonTheme();
-  }
-  clear();
-  const seed = (Math.random() * 0xffffffff) >>> 0;
-  const {
-    player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap,
-  } = createMap(seed);
-  add(GameWatcher(player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap));
-
-  // Add all ability items
-  // [0,1,2,3,4].map((i) => collectItemAbility(i, player));
-}
-
+// The menu itself is the entry point (it was only ever reached through a
+// one-line wrapper), and both the start-game callback and the end-condition
+// watcher are inlined into it -- each had exactly one reference, and the
+// wrappers plus the watcher's six-parameter hand-off cost real bytes.
 function startGameFlow() {
-  showMenu();
+  clear();
+  add(MainMenu(() => {
+    if (!musicStarted) {
+      musicStarted = true;
+      playDungeonTheme();
+    }
+    clear();
+    const seed = (Math.random() * 0xffffffff) >>> 0;
+    const {
+      player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap,
+    } = createMap(seed);
+
+    // Watches the live player for either end condition -- hp running out, or
+    // every chalice collected -- and hands off to the matching status card.
+    // Fires the death splats only for the loss case; both cases tear down
+    // input and the HUD the same way (camera and dungeon stay put -- with
+    // the player gone the camera holds still, so the view stays frozen right
+    // where the run ended). Self-removes once fired.
+    add({
+      tick() {
+        const won = chalicesComplete()
+          && !getObjectsByTag(TAG_COMBAT_ROOM).some((room) => room.state === COMBAT_ROOM_ACTIVE);
+        const lost = player.hp <= 0;
+        if (!won && !lost) return;
+
+        if (lost) fireSplatBurst(player.x, player.y, DEATH_SPLAT_COUNT, DEATH_SPLAT_COLORS, DEATH_SPLAT_SPEED_MAX, DEATH_SPLAT_SIZE_MIN, DEATH_SPLAT_SIZE_MAX);
+        remove([player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap]);
+        add(won
+          ? StatusCard(startGameFlow, ['PEGACORN BLOOD', 'RECLAIMED'], '#fff')
+          : StatusCard(startGameFlow));
+        return true;
+      },
+    });
+
+    // Add all ability items
+    // [0,1,2,3,4].map((i) => collectItemAbility(i, player));
+  }));
 }
 
 export default startGameFlow;

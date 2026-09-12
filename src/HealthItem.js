@@ -22,27 +22,6 @@ const HEART_OUTLINE_WIDTH = 3;
 const PULSE_SPEED = 4.5; // rad/s
 const PULSE_AMOUNT = 0.16; // +/- fraction of HEART_RADIUS
 
-// Two lobes (Bézier curves) meeting at a bottom point -- the classic
-// canvas heart shape, drawn centered on (x, y). `radius` sets the
-// horizontal spread; every vertical offset is additionally scaled by
-// `heightScale`, so the shape can be stretched tall independent of width.
-function renderHeart(context, x, y, radius, heightScale, fillColor, outlineColor, outlineWidth) {
-  const v = (fraction) => radius * fraction * heightScale;
-  const top = y - v(0.5);
-  context.beginPath();
-  context.moveTo(x, top + v(0.3));
-  context.bezierCurveTo(x - radius * 1.2, top - v(0.05), x - radius * 1.2, top + v(0.8), x, top + v(1.3));
-  context.bezierCurveTo(x + radius * 1.2, top + v(0.8), x + radius * 1.2, top - v(0.05), x, top + v(0.3));
-  context.closePath();
-  context.fillStyle = fillColor;
-  context.fill();
-  if (outlineWidth > 0) {
-    context.lineWidth = outlineWidth;
-    context.strokeStyle = outlineColor;
-    context.stroke();
-  }
-}
-
 function HealthItem(x, y) {
   let anim = Math.random() * TAU;
   let protection = SPAWN_PROTECTION;
@@ -70,9 +49,26 @@ function HealthItem(x, y) {
       return true;
     },
 
+    // Two lobes (Bézier curves) meeting at a bottom point -- the classic
+    // canvas heart shape, drawn centered on (x, y). `radius` sets the
+    // horizontal spread; every vertical offset is additionally scaled by
+    // HEART_HEIGHT_SCALE, so the shape stretches tall independent of width.
     render(context) {
+      const { x: cx, y: cy } = this;
       const pulse = 1 + Math.sin(anim * PULSE_SPEED) * PULSE_AMOUNT;
-      renderHeart(context, this.x, this.y, HEART_RADIUS * pulse, HEART_HEIGHT_SCALE, HEART_COLOR, HEART_OUTLINE_COLOR, HEART_OUTLINE_WIDTH);
+      const radius = HEART_RADIUS * pulse;
+      const v = (fraction) => radius * fraction * HEART_HEIGHT_SCALE;
+      const top = cy - v(0.5);
+      context.beginPath();
+      context.moveTo(cx, top + v(0.3));
+      context.bezierCurveTo(cx - radius * 1.2, top - v(0.05), cx - radius * 1.2, top + v(0.8), cx, top + v(1.3));
+      context.bezierCurveTo(cx + radius * 1.2, top + v(0.8), cx + radius * 1.2, top - v(0.05), cx, top + v(0.3));
+      context.closePath();
+      context.fillStyle = HEART_COLOR;
+      context.fill();
+      context.lineWidth = HEART_OUTLINE_WIDTH;
+      context.strokeStyle = HEART_OUTLINE_COLOR;
+      context.stroke();
     },
   };
 }

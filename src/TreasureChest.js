@@ -50,23 +50,6 @@ const WOOD_DARK_COLOR = '#642';
 const METAL_COLOR = '#eb4';
 const METAL_DARK_COLOR = '#a82';
 
-// Drawn in local coordinates, centered on (0, 0) -- the caller translates
-// (for the hit-pop) and rotates (for the hit-rattle) around that origin
-// before calling this, so the shape itself never needs to know about x/y.
-function renderChest(context, flash) {
-  const left = -CHEST_WIDTH / 2;
-  const baseTop = -BASE_HEIGHT / 2 + 3;
-  const lidTop = baseTop - LID_HEIGHT;
-
-  fillRect(context, left, baseTop, CHEST_WIDTH, BASE_HEIGHT, WOOD_COLOR);
-  fillRect(context, left, lidTop, CHEST_WIDTH, LID_HEIGHT, WOOD_DARK_COLOR);
-  fillRect(context, left, baseTop - 4.5, CHEST_WIDTH, 6, METAL_COLOR);
-  fillRect(context, left, lidTop, 7.5, LID_HEIGHT, METAL_COLOR);
-  fillRect(context, left + CHEST_WIDTH - 7.5, lidTop, 7.5, LID_HEIGHT, METAL_COLOR);
-  fillRect(context, -9, baseTop - 9, 18, 18, METAL_DARK_COLOR);
-  fillRect(context, left, lidTop, CHEST_WIDTH, BASE_HEIGHT + LID_HEIGHT, '#fff', flash);
-}
-
 // `contents` is what pops out when it finally breaks -- a (cx, cy) =>
 // gameObject factory, so the caller (mapCreator.js) decides at
 // map-generation time rather than this chest rolling it the moment it breaks.
@@ -117,7 +100,18 @@ function TreasureChest(x, y, contents) {
       context.save();
       context.translate(this.x, this.y + bounceY);
       context.rotate(rattle);
-      renderChest(context, flash);
+      // Drawn in local coordinates around that translated/rotated origin,
+      // so the shape itself never needs to know about x/y.
+      const left = -CHEST_WIDTH / 2;
+      const baseTop = -BASE_HEIGHT / 2 + 3;
+      const lidTop = baseTop - LID_HEIGHT;
+      fillRect(context, left, baseTop, CHEST_WIDTH, BASE_HEIGHT, WOOD_COLOR);
+      fillRect(context, left, lidTop, CHEST_WIDTH, LID_HEIGHT, WOOD_DARK_COLOR);
+      fillRect(context, left, baseTop - 4.5, CHEST_WIDTH, 6, METAL_COLOR);
+      fillRect(context, left, lidTop, 7.5, LID_HEIGHT, METAL_COLOR);
+      fillRect(context, left + CHEST_WIDTH - 7.5, lidTop, 7.5, LID_HEIGHT, METAL_COLOR);
+      fillRect(context, -9, baseTop - 9, 18, 18, METAL_DARK_COLOR);
+      fillRect(context, left, lidTop, CHEST_WIDTH, BASE_HEIGHT + LID_HEIGHT, '#fff', flash);
       context.restore();
     },
   };

@@ -35,16 +35,6 @@ function SplatEffect(x, y, vx, vy, color, size, arcHeight) {
   const landX = x + vx * flightDuration;
   const landY = y + vy * flightDuration;
 
-  // A point along the parabola at fraction `t` (0 = launch, 1 = landed).
-  // The "height" term only ever offsets screen-y upward, the same
-  // convention every other bit of faux-3D lift in this game uses.
-  function pointAt(t) {
-    return [
-      x + vx * flightDuration * t,
-      y + vy * flightDuration * t - arcHeight * 4 * t * (1 - t),
-    ];
-  }
-
   return {
     z: landY, // depth-sorts with everything else near where it lands
 
@@ -65,7 +55,12 @@ function SplatEffect(x, y, vx, vy, color, size, arcHeight) {
         context.lineWidth = ARC_LINE_WIDTH;
         context.beginPath();
         for (let i = 0; i <= ARC_SAMPLES; i++) {
-          const [px, py] = pointAt(Math.max(Math.min(i / ARC_SAMPLES * 0.4 + t * 0.8, 1), 0));
+          // A point along the parabola at fraction `at` (0 = launch, 1 =
+          // landed). The "height" term only ever offsets screen-y upward,
+          // the same convention every other faux-3D lift here uses.
+          const at = Math.max(Math.min(i / ARC_SAMPLES * 0.4 + t * 0.8, 1), 0);
+          const px = x + vx * flightDuration * at;
+          const py = y + vy * flightDuration * at - arcHeight * 4 * at * (1 - at);
           if (i === 0) context.moveTo(px, py);
           else context.lineTo(px, py);
         }

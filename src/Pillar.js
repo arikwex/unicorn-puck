@@ -12,18 +12,6 @@ function renderSlab(context, topY) {
   fillRect(context, -32, topY - 19.2, 64, 19.2, '#a99');
 }
 
-// -- variant 0: classic Roman column -----------------------------------
-// Small extruded square base, tall cylindrical shaft, small extruded
-// square capital. The shaft's ellipse and side stripe give it depth.
-function renderClassicPillar(context) {
-  // Every placed column uses these dimensions and wall-toned colors.
-  renderSlab(context, 0);
-  fillRect(context, -26, -110, 52, 110, '#a99');
-  fillRect(context, 3.9, -110, 14.3, 110, '#444');
-  fillEllipse(context, 0, -110, 26, 13, '#a99');
-  renderSlab(context, -118);
-}
-
 /* -- variant 1: crystal on a squat plinth -- retired to cut size;
    kept here commented rather than deleted.
 
@@ -166,40 +154,6 @@ const CANDELABRA_ARM_LENGTH = 22;
 const CANDELABRA_ARM_RISE = 14; // above the stem's own top, where the side arms end up
 const CANDELABRA_FLAME_SCALE = 0.7;
 
-function renderCandelabra(context, anim) {
-  const x = 0, y = 0;
-  const stemTop = y - CANDELABRA_STEM_HEIGHT;
-  const branchY = y - CANDELABRA_BRANCH_Y_OFFSET;
-
-  fillEllipse(context, x, y, 14, 5, CANDELABRA_METAL_DARK_COLOR);
-  fillEllipse(context, x, y - 2, 11, 4, CANDELABRA_METAL_COLOR);
-
-  context.strokeStyle = CANDELABRA_METAL_COLOR;
-  context.lineWidth = CANDELABRA_STEM_WIDTH;
-  context.beginPath();
-  context.moveTo(x, y - 4);
-  context.lineTo(x, stemTop);
-  context.stroke();
-  [-1, 1].forEach((side) => {
-    context.beginPath();
-    context.moveTo(x, branchY);
-    context.quadraticCurveTo(x + side * CANDELABRA_ARM_LENGTH, branchY, x + side * CANDELABRA_ARM_LENGTH, stemTop + CANDELABRA_ARM_RISE);
-    context.stroke();
-  });
-
-  [-1, 0, 1].forEach((side) => {
-    const tipX = x + side * CANDELABRA_ARM_LENGTH;
-    const tipY = side === 0 ? stemTop : stemTop + CANDELABRA_ARM_RISE;
-    fillEllipse(context, tipX, tipY, 5, 2.5, CANDELABRA_METAL_DARK_COLOR);
-    context.save();
-    context.translate(tipX, tipY);
-    context.scale(CANDELABRA_FLAME_SCALE, CANDELABRA_FLAME_SCALE);
-    // Phase-offset per arm so the three flames don't flicker in lockstep.
-    renderFlame(context, anim + side * 0.7);
-    context.restore();
-  });
-}
-
 // Both looks share a 26-unit collision radius. Only the variant is configurable;
 // fixed drawing dimensions avoid storing unused per-instance style properties.
 function Pillar(x = 0, y = 0, props = {}) {
@@ -219,11 +173,51 @@ function Pillar(x = 0, y = 0, props = {}) {
       anim += dt;
     },
 
+    // Local coordinates let both looks share one world translation, and both
+    // are drawn inline -- each was referenced exactly once, through the
+    // ternary that used to pick between two named renderers.
     render(context) {
-      // Local coordinates let both renderers share one world translation.
       context.save();
       context.translate(this.x, this.y);
-      (variant === 3 ? renderCandelabra : renderClassicPillar)(context, anim);
+      if (variant === 3) {
+        // -- variant 3: 3-prong candelabra, drawn around a local origin.
+        const stemTop = -CANDELABRA_STEM_HEIGHT;
+        const branchY = -CANDELABRA_BRANCH_Y_OFFSET;
+        fillEllipse(context, 0, 0, 14, 5, CANDELABRA_METAL_DARK_COLOR);
+        fillEllipse(context, 0, -2, 11, 4, CANDELABRA_METAL_COLOR);
+        context.strokeStyle = CANDELABRA_METAL_COLOR;
+        context.lineWidth = CANDELABRA_STEM_WIDTH;
+        context.beginPath();
+        context.moveTo(0, -4);
+        context.lineTo(0, stemTop);
+        context.stroke();
+        [-1, 1].forEach((side) => {
+          context.beginPath();
+          context.moveTo(0, branchY);
+          context.quadraticCurveTo(side * CANDELABRA_ARM_LENGTH, branchY, side * CANDELABRA_ARM_LENGTH, stemTop + CANDELABRA_ARM_RISE);
+          context.stroke();
+        });
+        [-1, 0, 1].forEach((side) => {
+          const tipX = side * CANDELABRA_ARM_LENGTH;
+          const tipY = side === 0 ? stemTop : stemTop + CANDELABRA_ARM_RISE;
+          fillEllipse(context, tipX, tipY, 5, 2.5, CANDELABRA_METAL_DARK_COLOR);
+          context.save();
+          context.translate(tipX, tipY);
+          context.scale(CANDELABRA_FLAME_SCALE, CANDELABRA_FLAME_SCALE);
+          // Phase-offset per arm so the three flames don't flicker in lockstep.
+          renderFlame(context, anim + side * 0.7);
+          context.restore();
+        });
+      } else {
+        // -- variant 0: classic Roman column -- small extruded square base,
+        // tall cylindrical shaft, small extruded square capital. The shaft's
+        // ellipse and side stripe give it depth.
+        renderSlab(context, 0);
+        fillRect(context, -26, -110, 52, 110, '#a99');
+        fillRect(context, 3.9, -110, 14.3, 110, '#444');
+        fillEllipse(context, 0, -110, 26, 13, '#a99');
+        renderSlab(context, -118);
+      }
       context.restore();
     },
   };

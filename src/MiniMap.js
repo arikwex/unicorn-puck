@@ -9,10 +9,6 @@ const BG_COLOR = '#444';
 const WALL_COLOR = '#111';
 const PLAYER_COLOR = '#fff';
 
-function isWall(object) {
-  return object.tags?.includes(TAG_OBSTACLE) && typeof object.w === 'number';
-}
-
 // Revealed only once the player has Oracle Eyes -- a bottom-left overview of
 // every wall (there are only ever a few dozen) plus the player's own
 // current position. `worldSpan`/`worldMin` are the dungeon's own fixed
@@ -38,7 +34,8 @@ function MiniMap(player, worldSpan, worldMin) {
 
       context.beginPath();
       context.fillStyle = WALL_COLOR;
-      getObjectsByTag(TAG_OBSTACLE).filter(isWall).forEach((wall) => {
+      // Walls only -- a tagged obstacle with box bounds, not a circle.
+      getObjectsByTag(TAG_OBSTACLE).filter((object) => typeof object.w === 'number').forEach((wall) => {
         const [x1, y1] = toMap(wall.x - wall.w / 2, wall.y - wall.h / 2);
         const [x2, y2] = toMap(wall.x + wall.w / 2, wall.y + wall.h / 2);
         context.fillRect(x1, y1, Math.max(1, x2 - x1), Math.max(1, y2 - y1));

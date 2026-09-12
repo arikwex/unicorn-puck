@@ -19,28 +19,19 @@ const COLONNADE_COUNT = 3; // pillars per row in a colonnade pattern
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-function roomFloorCells(room, isFloor) {
-  const cells = [];
-  for (let x = room.x; x < room.x + room.w; x++) {
-    for (let y = room.y; y < room.y + room.h; y++) {
-      if (isFloor(x, y)) cells.push({ x, y });
-    }
-  }
-  return cells;
-}
-
 // A room-floor cell on the room's own rectangle boundary that has a floor
 // neighbor *outside* that rectangle is where a corridor or door connects
 // in -- an entrance.
 function findEntranceCells(room, isFloor) {
-  const onBoundary = (x, y) => x === room.x || x === room.x + room.w - 1 || y === room.y || y === room.y + room.h - 1;
-  const inRoom = (x, y) => x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
-
   const entrances = [];
   for (let x = room.x; x < room.x + room.w; x++) {
     for (let y = room.y; y < room.y + room.h; y++) {
-      if (!onBoundary(x, y) || !isFloor(x, y)) continue;
-      const leadsOutside = DIRS.some(([dx, dy]) => !inRoom(x + dx, y + dy) && isFloor(x + dx, y + dy));
+      // On the room's own rectangle boundary, and floor.
+      if (!(x === room.x || x === room.x + room.w - 1 || y === room.y || y === room.y + room.h - 1)
+        || !isFloor(x, y)) continue;
+      // ...with a floor neighbor outside that rectangle.
+      const leadsOutside = DIRS.some(([dx, dy]) => !(x + dx >= room.x && x + dx < room.x + room.w
+        && y + dy >= room.y && y + dy < room.y + room.h) && isFloor(x + dx, y + dy));
       if (leadsOutside) entrances.push({ x, y });
     }
   }
@@ -88,59 +79,64 @@ const PATTERNS = [
   colonnade(COLONNADE_COUNT, false), // two rows lining the left/right walls
 ];
 
-function placeInRoom(rng, room, isFloor) {
-  if (room.w < MIN_ROOM_SPAN || room.h < MIN_ROOM_SPAN) return [];
-  const isLarge = room.w >= LARGE_ROOM_SPAN || room.h >= LARGE_ROOM_SPAN;
-  if (!isLarge && rng() < SKIP_ROOM_CHANCE) return [];
-
-  const innerX0 = room.x + WALL_MARGIN;
-  const innerX1 = room.x + room.w - 1 - WALL_MARGIN;
-  const innerY0 = room.y + WALL_MARGIN;
-  const innerY1 = room.y + room.h - 1 - WALL_MARGIN;
-  if (innerX0 >= innerX1 || innerY0 >= innerY1) return [];
-
-  const floorCells = roomFloorCells(room, isFloor);
-  const entrances = findEntranceCells(room, isFloor);
-  const pattern = PATTERNS[Math.floor(rng() * PATTERNS.length)];
-  // One look per room: classic columns (0) or candelabras (3).
-  const variant = rng() < 0.5 ? 0 : 3;
-
-  const placed = [];
-  pattern.forEach(([fx, fy]) => {
-    const target = {
-      x: Math.round(innerX0 + fx * (innerX1 - innerX0)),
-      y: Math.round(innerY0 + fy * (innerY1 - innerY0)),
-    };
-    const cell = nearestFloorCell(target, floorCells);
-    if (!cell) return;
-    if (entrances.some((entrance) => manhattan(entrance, cell) < ENTRANCE_CLEARANCE)) return;
-    if (placed.some((other) => manhattan(other, cell) < MIN_PILLAR_SPACING)) return;
-    placed.push({ ...cell, variant });
-  });
-
-  // A large room reads as too bare without at least one pillar -- if the
-  // rolled pattern's every candidate got rejected (too close to a doorway
-  // or to each other), fall back to whatever floor cell sits nearest the
-  // room's own center rather than leaving it empty.
-  if (isLarge && placed.length === 0) {
-    const center = {
-      x: Math.round(innerX0 + (innerX1 - innerX0) / 2),
-      y: Math.round(innerY0 + (innerY1 - innerY0) / 2),
-    };
-    const cell = nearestFloorCell(center, floorCells);
-    if (cell) placed.push({ ...cell, variant });
-  }
-
-  return placed;
-}
-
 // Returns every pillar's { x, y, variant } (grid cells) across the dungeon. Deterministic for a
 // given seed, independent of whatever seed the dungeon layout itself used.
+// The per-room pass runs inline (it was only ever called from here, and the
+// wrapper cost bytes); a bare `return` skips the room the way returning an
+// empty list used to.
 function placePillars(dungeon, seed) {
   const rng = mulberry32(seed);
+  const { isFloor } = dungeon;
   const pillars = [];
   dungeon.rooms.forEach((room) => {
-    pillars.push(...placeInRoom(rng, room, dungeon.isFloor));
+    if (room.w < MIN_ROOM_SPAN || room.h < MIN_ROOM_SPAN) return;
+    const isLarge = room.w >= LARGE_ROOM_SPAN || room.h >= LARGE_ROOM_SPAN;
+    if (!isLarge && rng() < SKIP_ROOM_CHANCE) return;
+
+    const innerX0 = room.x + WALL_MARGIN;
+    const innerX1 = room.x + room.w - 1 - WALL_MARGIN;
+    const innerY0 = room.y + WALL_MARGIN;
+    const innerY1 = room.y + room.h - 1 - WALL_MARGIN;
+    if (innerX0 >= innerX1 || innerY0 >= innerY1) return;
+
+    const floorCells = [];
+    for (let x = room.x; x < room.x + room.w; x++) {
+      for (let y = room.y; y < room.y + room.h; y++) {
+        if (isFloor(x, y)) floorCells.push({ x, y });
+      }
+    }
+    const entrances = findEntranceCells(room, isFloor);
+    const pattern = PATTERNS[Math.floor(rng() * PATTERNS.length)];
+    // One look per room: classic columns (0) or candelabras (3).
+    const variant = rng() < 0.5 ? 0 : 3;
+
+    const placed = [];
+    pattern.forEach(([fx, fy]) => {
+      const target = {
+        x: Math.round(innerX0 + fx * (innerX1 - innerX0)),
+        y: Math.round(innerY0 + fy * (innerY1 - innerY0)),
+      };
+      const cell = nearestFloorCell(target, floorCells);
+      if (!cell) return;
+      if (entrances.some((entrance) => manhattan(entrance, cell) < ENTRANCE_CLEARANCE)) return;
+      if (placed.some((other) => manhattan(other, cell) < MIN_PILLAR_SPACING)) return;
+      placed.push({ ...cell, variant });
+    });
+
+    // A large room reads as too bare without at least one pillar -- if the
+    // rolled pattern's every candidate got rejected (too close to a doorway
+    // or to each other), fall back to whatever floor cell sits nearest the
+    // room's own center rather than leaving it empty.
+    if (isLarge && placed.length === 0) {
+      const center = {
+        x: Math.round(innerX0 + (innerX1 - innerX0) / 2),
+        y: Math.round(innerY0 + (innerY1 - innerY0) / 2),
+      };
+      const cell = nearestFloorCell(center, floorCells);
+      if (cell) placed.push({ ...cell, variant });
+    }
+
+    pillars.push(...placed);
   });
   return pillars;
 }
