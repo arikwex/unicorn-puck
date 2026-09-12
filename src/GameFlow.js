@@ -68,7 +68,7 @@ function startGame() {
   add(GameWatcher(player, dragController, playerHealthHUD, chaliceHUD, itemAbilityHUD, miniMap));
 
   // Add all ability items
-  [0,1,2,3,4].map((i) => collectItemAbility(i, player));
+  // [0,1,2,3,4].map((i) => collectItemAbility(i, player));
 }
 
 function startGameFlow() {
