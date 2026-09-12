@@ -107,7 +107,7 @@ test('aiming rears the front of the body up and back while the tail stays plante
     grub.state = 1; // AIMING
     let previous = resting;
     for (const progress of [0.25, 0.5, 0.75, 1]) {
-      grub.aimT = progress;
+      grub.k = progress;
       const pose = segments();
       assert.ok(pose[0][1] < resting[0][1], 'head rises for every facing direction');
       assert.deepEqual(pose[3], resting[3], 'tail remains planted');
@@ -140,7 +140,7 @@ test('losing the player never cancels a tell; a charging hit only delays it', ()
   Object.assign(next.player, { x: next.grub.x - 60, y: next.grub.y, vx: 800, chg: 1 });
   next.player.tick(0);
   assert.equal(next.grub.state, 1, 'still aiming');
-  assert.equal(next.grub.aimT, 0.5, 'rewound to a full second before firing');
+  assert.equal(next.grub.k, 0.5, 'rewound to a full second before firing');
   assert.ok(next.grub.vx > 0);
   next.grub.tick(0.9);
   assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 0);

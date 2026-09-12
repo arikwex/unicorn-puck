@@ -57,7 +57,7 @@ const KNOCKBACK_DECAY = 16; // exponential velocity decay per second
 const AIM_DURATION = 2;
 // After firing, the body eases back to its idle pose over this long instead
 // of snapping -- reuses the aim pose's own rise/pullback curve, played in
-// reverse via aimT counting back down to 0.
+// reverse via k counting back down to 0.
 const RECOVER_DURATION = 0.35;
 const ATTACK_DELAY_MIN = 1;
 const ATTACK_DELAY_MAX = 4;
@@ -97,9 +97,9 @@ const PAUSE_MAX = 1.6;
 // SPINE_PERSPECTIVE the same way renderTail compresses depth.
 function segmentPosition(grub, index) {
   // The tell (and the recovery after it) rears the front of the body up and
-  // back, tapering to nothing at the planted tail. aimT runs 0 -> 1 through
+  // back, tapering to nothing at the planted tail. k runs 0 -> 1 through
   // the wind-up, then back down to 0 as it settles.
-  const pose = grub.state ? grub.aimT * (3 - index) / 3 : 0;
+  const pose = grub.state ? grub.k * (3 - index) / 3 : 0;
   const along = (1.5 - index) * SEGMENT_SPACING - pose * AIM_PULLBACK;
   const lift = pose * AIM_LIFT;
   let motionY = 0;
@@ -107,9 +107,9 @@ function segmentPosition(grub, index) {
     motionY = (1 - Math.abs(Math.sin(grub.anim * 6.0 + index * 2))) * (8 - index) * 1;
   }
   return {
-    x: grub.x + Math.cos(grub.a) * along * grub.size,
-    y: grub.y + (-Math.sin(grub.a) * along * SPINE_PERSPECTIVE - SEGMENT_RADII[index] / 2 + motionY - lift) * grub.size,
-    r: SEGMENT_RADII[index] * grub.size,
+    x: grub.x + Math.cos(grub.a) * along * grub.sz,
+    y: grub.y + (-Math.sin(grub.a) * along * SPINE_PERSPECTIVE - SEGMENT_RADII[index] / 2 + motionY - lift) * grub.sz,
+    r: SEGMENT_RADII[index] * grub.sz,
   };
 }
 
@@ -121,7 +121,7 @@ function renderGrub(context, grub, flashTimer) {
   // the fills drawn afterward except where a segment's own edge IS the
   // union's outer boundary -- the cheap way to get one continuous outline
   // around a blob of overlapping circles instead of each circle's own ring.
-  context.lineWidth = OUTLINE_WIDTH * grub.size;
+  context.lineWidth = OUTLINE_WIDTH * grub.sz;
   for (const [color, alpha] of [[OUTLINE_COLOR, 1], ['#fff', flash]]) {
     if (alpha <= 0) continue;
     context.strokeStyle = color;
@@ -154,26 +154,26 @@ function renderGrubFace(context, grub, head) {
   // way PlayerCharacter's own eyes ride off its facing angle. Draw with
   // the head so nearer body segments can cover the face when facing away.
   const sway = Math.sin(grub.anim * 7) * 0.3;
-  const color = FACE_COLORS[grub.type];
+  const color = FACE_COLORS[grub.ty];
   [-1, 1].forEach((side) => {
     if (Math.sin(grub.a - side * 0.6) > 0.22) {
       return;
     }
     const [x, y] = orbit3d(9, -4, -side * 12, grub.a + sway);
-    const ex = head.x + x * grub.size;
-    const ey = head.y + y * grub.size;
-    fillCircle(context, ex, ey, EYE_RADIUS * grub.size, color);
+    const ex = head.x + x * grub.sz;
+    const ey = head.y + y * grub.sz;
+    fillCircle(context, ex, ey, EYE_RADIUS * grub.sz, color);
   });
   if (Math.sin(grub.a) < 0.22) {
     const mouth = mouthPosition(grub, head);
-    fillCircle(context, mouth.x, mouth.y, MOUTH_RADIUS * grub.size, color);
+    fillCircle(context, mouth.x, mouth.y, MOUTH_RADIUS * grub.sz, color);
   }
 }
 
 function mouthPosition(grub, head = segmentPosition(grub, 0)) {
   const sway = Math.sin(grub.anim * 7) * 0.3;
   const [x, y] = orbit3d(12, 5, 0, grub.a + sway);
-  return { x: head.x + x * grub.size, y: head.y + y * grub.size };
+  return { x: head.x + x * grub.sz, y: head.y + y * grub.sz };
 }
 
 // -- hovering orb enemies (MEDIUM and LARGE) ----------------------------------
@@ -199,30 +199,30 @@ const ORBITER_RADIUS = 6.5;
 
 // World-space center of the body sphere: hovering, gently bobbing.
 function orbCenter(grub) {
-  return { x: grub.x, y: grub.y + (Math.sin(grub.t * 2.5) * 3 - ORB_HOVER) * grub.size };
+  return { x: grub.x, y: grub.y + (Math.sin(grub.t * 2.5) * 3 - ORB_HOVER) * grub.sz };
 }
 
 // A point on/around the orb, in its own local space (x forward, y down, z
 // sideways -- see orbit3d), as [screenX, screenY, depth].
 function orbPoint(grub, center, x, y, z) {
-  const [px, py, depth] = orbit3d(x, y, z, grub.a);
-  return [center.x + px * grub.size, center.y + py * grub.size, depth];
+  const [px, py, d] = orbit3d(x, y, z, grub.a);
+  return [center.x + px * grub.sz, center.y + py * grub.sz, d];
 }
 
 // An eye on the sphere's surface, facing out along local direction
 // `azimuth` from the facing angle: foreshortened toward the silhouette as it
 // turns away, and hidden once it's round the back. Diamond or oval.
 function renderOrbEye(context, grub, center, azimuth, radius, diamond, theme) {
-  const [x, y, depth] = orbPoint(grub, center, Math.cos(azimuth) * EYE_DISTANCE, -2, Math.sin(azimuth) * EYE_DISTANCE);
-  if (depth > EYE_DISTANCE * 0.2) return;
-  const squash = 0.3 + 0.7 * Math.min(1, Math.max(0, -depth / EYE_DISTANCE));
+  const [x, y, d] = orbPoint(grub, center, Math.cos(azimuth) * EYE_DISTANCE, -2, Math.sin(azimuth) * EYE_DISTANCE);
+  if (d > EYE_DISTANCE * 0.2) return;
+  const squash = 0.3 + 0.7 * Math.min(1, Math.max(0, -d / EYE_DISTANCE));
   // Aiming charges it up: the core swells and a halo builds around it.
-  const charge = (grub.state === AIMING) * grub.aimT;
+  const charge = (grub.state === AIMING) * grub.k;
   context.globalAlpha = charge * 0.45;
-  fillEllipse(context, x, y, radius * 1.7 * squash * grub.size, radius * 1.7 * grub.size, theme[3]);
+  fillEllipse(context, x, y, radius * 1.7 * squash * grub.sz, radius * 1.7 * grub.sz, theme[3]);
   context.globalAlpha = 1;
   [[1.25, BODY_COLORS[0]], [1, theme[3]], [0.45 + charge * 0.3, theme[4]]].forEach(([scale, color]) => {
-    const r = radius * scale * grub.size;
+    const r = radius * scale * grub.sz;
     context.fillStyle = color;
     context.beginPath();
     if (diamond) {
@@ -238,7 +238,7 @@ function renderOrbEye(context, grub, center, azimuth, radius, diamond, theme) {
 }
 
 function renderOrbBody(context, grub, center, theme, flash) {
-  const r = ORB_RADIUS * grub.size;
+  const r = ORB_RADIUS * grub.sz;
   fillCircle(context, center.x, center.y, r, BODY_COLORS[0]);
   // A dim lit cap on the upper side reads as roundness.
   context.globalAlpha = 0.25;
@@ -249,9 +249,9 @@ function renderOrbBody(context, grub, center, theme, flash) {
   context.beginPath();
   context.arc(center.x, center.y, r, 0, TAU);
   context.strokeStyle = flash > 0.5 ? '#fff' : OUTLINE_COLOR;
-  context.lineWidth = 4 * grub.size;
+  context.lineWidth = 4 * grub.sz;
   context.stroke();
-  if (grub.type === MEDIUM) {
+  if (grub.ty === MEDIUM) {
     renderOrbEye(context, grub, center, 0, 9, false, theme);
   } else {
     for (let k = 0; k < 4; k++) renderOrbEye(context, grub, center, k * TAU / 4, 8.5, true, theme);
@@ -284,31 +284,31 @@ function renderWinglet(context, grub, center, side, [mountY, length, tilt, width
   context.fillStyle = theme[facing ? 1 : 2];
   context.fill();
   context.strokeStyle = theme[0];
-  context.lineWidth = 3 * grub.size;
+  context.lineWidth = 3 * grub.sz;
   context.stroke();
   // The shard's center ridge.
   context.beginPath();
   context.moveTo(x0, y0);
   context.lineTo(x2, y2);
-  context.lineWidth = 1.5 * grub.size;
+  context.lineWidth = 1.5 * grub.sz;
   context.stroke();
 }
 
 function renderOrb(context, grub, flashTimer) {
   const flash = flashTimer > 0 ? Math.sin(Math.min(1, flashTimer / FLASH_DURATION) * Math.PI) : 0;
-  const theme = ORB_THEMES[grub.type];
+  const theme = ORB_THEMES[grub.ty];
   const center = orbCenter(grub);
   // A soft ground shadow sells the hover.
   context.globalAlpha = 0.25;
-  fillEllipse(context, grub.x, grub.y, ORB_RADIUS * 0.8 * grub.size, ORB_RADIUS * 0.28 * grub.size, '#000');
+  fillEllipse(context, grub.x, grub.y, ORB_RADIUS * 0.8 * grub.sz, ORB_RADIUS * 0.28 * grub.sz, '#000');
   context.globalAlpha = 1;
 
-  const parts = [{ depth: 0, draw: () => renderOrbBody(context, grub, center, theme, flash) }];
-  if (grub.type === MEDIUM) {
+  const parts = [{ d: 0, draw: () => renderOrbBody(context, grub, center, theme, flash) }];
+  if (grub.ty === MEDIUM) {
     for (const side of [-1, 1]) {
       WINGLETS.forEach((winglet) => parts.push({
         // Sorted by the winglet's midpoint, well back of its mount.
-        depth: orbPoint(grub, center, -ORB_RADIUS * 0.45 - winglet[1] * 0.4, 0, side * ORB_RADIUS)[2],
+        d: orbPoint(grub, center, -ORB_RADIUS * 0.45 - winglet[1] * 0.4, 0, side * ORB_RADIUS)[2],
         draw: () => renderWinglet(context, grub, center, side, winglet, theme),
       }));
     }
@@ -316,23 +316,23 @@ function renderOrb(context, grub, flashTimer) {
     // Five small orbs circling slowly in a tilted ring, each bobbing on its
     // own phase; nearer ones draw a touch larger.
     for (let i = 0; i < ORBITERS; i++) {
-      const phase = grub.orbit + i * TAU / ORBITERS;
-      const [x, y, depth] = orbPoint(grub, center, Math.cos(phase) * ORBIT_RADIUS,
+      const phase = grub.o + i * TAU / ORBITERS;
+      const [x, y, d] = orbPoint(grub, center, Math.cos(phase) * ORBIT_RADIUS,
         Math.sin(grub.t * 2 + i * 1.7) * 5, Math.sin(phase) * ORBIT_RADIUS);
       parts.push({
-        depth,
+        d,
         draw: () => {
-          const r = ORBITER_RADIUS * grub.size * (1 - depth / ORBIT_RADIUS * 0.15);
+          const r = ORBITER_RADIUS * grub.sz * (1 - d / ORBIT_RADIUS * 0.15);
           fillCircle(context, x, y, r, theme[1]);
           context.strokeStyle = theme[2];
-          context.lineWidth = 2 * grub.size;
+          context.lineWidth = 2 * grub.sz;
           context.stroke();
           fillCircle(context, x - r * 0.3, y - r * 0.3, r * 0.35, theme[4]);
         },
       });
     }
   }
-  parts.sort((a, b) => b.depth - a.depth).forEach((part) => part.draw());
+  parts.sort((a, b) => b.d - a.d).forEach((part) => part.draw());
 }
 
 // The tell every type shares: a ring of motes spiralling into the muzzle,
@@ -345,15 +345,15 @@ function renderCharge(context, grub) {
   if (grub.state !== AIMING) return;
   const { x, y } = muzzle(grub);
   for (let i = 0; i < CHARGE_MOTES; i++) {
-    // `orbit` already winds faster as the tell nears its end (see tick), so
+    // `o` already winds faster as the tell nears its end (see tick), so
     // the motes fall in quicker and quicker; each trails the last by a
     // seventh of the cycle, and brightens and swells as it lands.
-    const fall = (grub.orbit + i / CHARGE_MOTES) % 1;
-    const reach = (1 - fall) * CHARGE_REACH * grub.size;
+    const fall = (grub.o + i / CHARGE_MOTES) % 1;
+    const reach = (1 - fall) * CHARGE_REACH * grub.sz;
     const spin = i * TAU / CHARGE_MOTES + fall * 1.5;
     context.globalAlpha = 0.35 + fall * 0.65;
     fillCircle(context, x + Math.cos(spin) * reach, y + Math.sin(spin) * reach * 0.75,
-      (1.5 + fall * 3.5) * grub.size, FACE_COLORS[grub.type]);
+      (1.5 + fall * 3.5) * grub.sz, FACE_COLORS[grub.ty]);
   }
   context.globalAlpha = 1;
 }
@@ -361,9 +361,9 @@ function renderCharge(context, grub) {
 // Where a volley leaves from: the small grub's mouth, the medium orb's eye,
 // or the large orb's center.
 function muzzle(grub) {
-  if (grub.type === SMALL) return mouthPosition(grub);
+  if (grub.ty === SMALL) return mouthPosition(grub);
   const center = orbCenter(grub);
-  if (grub.type === LARGE) return center;
+  if (grub.ty === LARGE) return center;
   const [x, y] = orbPoint(grub, center, EYE_DISTANCE, -2, 0);
   return { x, y };
 }
@@ -374,9 +374,9 @@ function muzzle(grub) {
 // used to keep patrol waypoints inside it (and PATROL_MARGIN off its
 // walls), which is what keeps the grub "generally within its room" rather
 // than wandering the whole dungeon.
-function Grub(x, y, room, seed, type = SMALL) {
-  const size = [1, 1.4, 2.1][type];
-  const maxHp = [5, 8, 13][type];
+function Grub(x, y, room, seed, ty = SMALL) {
+  const sz = [1, 1.4, 2.1][ty];
+  const maxHp = [5, 8, 13][ty];
   const rng = mulberry32(seed);
   let pauseTimer = randRange(rng, PAUSE_MIN, PAUSE_MAX);
   let flashTimer = 0;
@@ -398,7 +398,7 @@ function Grub(x, y, room, seed, type = SMALL) {
   // fraction of the player's hit velocity. The seeded rng keeps the
   // launch pattern reproducible.
   function fireSplats(originX, originY, count, color, impactVx, impactVy) {
-    const splatColor = type ? FACE_COLORS[type] : color;
+    const splatColor = ty ? FACE_COLORS[ty] : color;
     for (let i = 0; i < count; i++) {
       const angle = rng() * TAU;
       const speed = Math.sqrt(rng()) * SPLAT_SPEED_MAX;
@@ -410,10 +410,10 @@ function Grub(x, y, room, seed, type = SMALL) {
     }
   }
 
-  const minX = room.x - room.w / 2 + PATROL_MARGIN * size;
-  const maxX = room.x + room.w / 2 - PATROL_MARGIN * size;
-  const minY = room.y - room.h / 2 + PATROL_MARGIN * size;
-  const maxY = room.y + room.h / 2 - PATROL_MARGIN * size;
+  const minX = room.x - room.w / 2 + PATROL_MARGIN * sz;
+  const maxX = room.x + room.w / 2 - PATROL_MARGIN * sz;
+  const minY = room.y - room.h / 2 + PATROL_MARGIN * sz;
+  const maxY = room.y + room.h / 2 - PATROL_MARGIN * sz;
 
   function pickWaypoint() {
     if (minX >= maxX || minY >= maxY) return { x: room.x, y: room.y };
@@ -423,24 +423,24 @@ function Grub(x, y, room, seed, type = SMALL) {
   return {
     x,
     y,
-    type,
-    size,
+    ty,
+    sz,
     maxHp,
-    enemyCost: type + 1,
+    enemyCost: ty + 1,
     vx: 0,
     vy: 0,
     a: Math.random() * TAU,
     anim: Math.random() * 7,
     t: Math.random() * 7, // running clock for orb bob/flutter
-    orbit: Math.random() * TAU, // large orbs' ring phase (spins up while aiming)
+    o: Math.random() * TAU, // large orbs' ring phase (spins up while aiming)
     target: null,
     state: PATROL,
-    aimT: 0, // 0..1 through the aim tell (and back down while recovering)
+    k: 0, // 0..1 through the aim tell (and back down while recovering)
     hp: maxHp,
     z: y,
     // A static circle the player bounces off (see physics.js); patrol and
     // hit momentum drive its position.
-    r: COLLISION_RADIUS * size,
+    r: COLLISION_RADIUS * sz,
     tags: [TAG_OBSTACLE, TAG_ENEMY],
 
     tick(dt) {
@@ -459,13 +459,13 @@ function Grub(x, y, room, seed, type = SMALL) {
       hadAimTarget = Boolean(canAim);
 
       if (this.state === RECOVERING) {
-        // Ease aimT back down to 0 instead of zeroing it outright --
+        // Ease k back down to 0 instead of zeroing it outright --
         // segmentPosition plays the aim pose's own curve in reverse off it.
         recoverElapsed += dt;
-        this.aimT = Math.max(0, 1 - recoverElapsed / RECOVER_DURATION);
+        this.k = Math.max(0, 1 - recoverElapsed / RECOVER_DURATION);
         if (recoverElapsed >= RECOVER_DURATION) {
           this.state = PATROL;
-          this.aimT = 0;
+          this.k = 0;
         }
       } else if (this.state === AIMING) {
         // Once wound up, a shot is never canceled by losing range/sight --
@@ -475,19 +475,19 @@ function Grub(x, y, room, seed, type = SMALL) {
         if (canAim) { targetX = player.x; targetY = player.y; }
         this.a = Math.atan2(this.y - targetY, targetX - this.x);
         aimElapsed += dt;
-        this.aimT = Math.min(1, aimElapsed / AIM_DURATION);
+        this.k = Math.min(1, aimElapsed / AIM_DURATION);
         if (aimElapsed >= AIM_DURATION) {
           const mouth = muzzle(this);
           const dx = targetX - mouth.x;
           const dy = targetY - mouth.y;
           const heading = Math.atan2(dy, dx);
-          const shots = [1, 3, 8][type];
-          const palette = type ? { color: FACE_COLORS[type], highlightColor: ORB_THEMES[type][4] } : undefined;
+          const shots = [1, 3, 8][ty];
+          const palette = ty ? { color: FACE_COLORS[ty], highlightColor: ORB_THEMES[ty][4] } : undefined;
           for (let i = 0; i < shots; i++) {
             // A large volley fans out from the aim itself -- one shot straight
             // at the player, the rest every 45 degrees around it -- so a
             // standing target is always hit.
-            const angle = heading + (type === LARGE ? i * TAU / 8 : (i - (shots - 1) / 2) * MEDIUM_SPREAD_ANGLE);
+            const angle = heading + (ty === LARGE ? i * TAU / 8 : (i - (shots - 1) / 2) * MEDIUM_SPREAD_ANGLE);
             add(GrubProjectile(mouth.x, mouth.y,
               Math.cos(angle) * PROJECTILE_SPEED, Math.sin(angle) * PROJECTILE_SPEED, palette));
           }
@@ -504,7 +504,7 @@ function Grub(x, y, room, seed, type = SMALL) {
         targetY = player.y;
         this.a = Math.atan2(this.y - player.y, player.x - this.x);
         aimElapsed = 0;
-        this.aimT = 0;
+        this.k = 0;
       } else if (!this.target) {
         pauseTimer -= dt;
         if (pauseTimer <= 0) this.target = pickWaypoint();
@@ -526,14 +526,14 @@ function Grub(x, y, room, seed, type = SMALL) {
         }
       }
 
-      const q = COLLISION_RADIUS * size;
+      const q = COLLISION_RADIUS * sz;
       this.x = clamp(this.x + this.vx * dt, minX + q, maxX - q);
       this.y = clamp(this.y + this.vy * dt, minY + q, maxY - q);
       this.vx -= this.vx * 4.5 * dt;
       this.vy -= this.vy * 4.5 * dt;
       this.z = this.y;
       this.t += dt;
-      this.orbit += dt * (0.5 + (this.state === AIMING) * this.aimT * 3);
+      this.o += dt * (0.5 + (this.state === AIMING) * this.k * 3);
 
       flashTimer = Math.max(0, flashTimer - dt);
       hitCooldown = Math.max(0, hitCooldown - dt);
@@ -567,10 +567,10 @@ function Grub(x, y, room, seed, type = SMALL) {
         // but never push it sooner (Math.min only ever pulls it earlier
         // in time, i.e. rewinds, never fast-forwards).
         aimElapsed = Math.min(aimElapsed, Math.max(0, AIM_DURATION - 1));
-        this.aimT = Math.min(1, aimElapsed / AIM_DURATION);
+        this.k = Math.min(1, aimElapsed / AIM_DURATION);
       } else {
         this.state = PATROL;
-        this.aimT = 0;
+        this.k = 0;
       }
       attackCooldown = randRange(rng, ATTACK_DELAY_MIN, ATTACK_DELAY_MAX);
       this.vx += vx * KNOCKBACK_TRANSFER;
@@ -586,11 +586,11 @@ function Grub(x, y, room, seed, type = SMALL) {
     },
 
     render(context) {
-      (type ? renderOrb : renderGrub)(context, this, flashTimer);
+      (ty ? renderOrb : renderGrub)(context, this, flashTimer);
       renderCharge(context, this);
       if (healthBarTimer > 0) {
-        renderHealthBar(context, this.x, this.y - (type ? 72 : HEALTH_BAR_OFFSET_Y) * size,
-          HEALTH_BAR_WIDTH * size, HEALTH_BAR_HEIGHT * size, this.hp, this.maxHp);
+        renderHealthBar(context, this.x, this.y - (ty ? 72 : HEALTH_BAR_OFFSET_Y) * sz,
+          HEALTH_BAR_WIDTH * sz, HEALTH_BAR_HEIGHT * sz, this.hp, this.maxHp);
       }
     },
   };

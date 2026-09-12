@@ -57,7 +57,7 @@ test('numeric types have scaled collision geometry, 5/8/13 HP, and cost 1/2/3 sl
   assert.equal(large.maxHp, 13);
   assert.ok(Math.abs(large.r - medium.r * 1.5) < 1e-8);
   assert.equal(large.enemyCost, 3);
-  assert.equal(Grub(0, 0, room, 1).type, SMALL);
+  assert.equal(Grub(0, 0, room, 1).ty, SMALL);
 });
 
 // Index of the first/last call matching a predicate.
@@ -76,7 +76,7 @@ test('medium orbs are a purple sphere with one foreshortened blue eye and four d
     && (color === '#3af' || color === '#27b');
   const eye = ({ method, color, alpha }) => method === 'ellipse' && color === '#3af' && alpha === 1;
   for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
-    Object.assign(medium, { a, state: PATROL, aimT: 0 });
+    Object.assign(medium, { a, state: PATROL, k: 0 });
     const calls = draw(medium);
     assert.equal(calls.find(body).args[2], 24 * 1.4, 'body sphere scales with size');
     assert.equal(calls.filter(winglet).length, 4, 'two big and two small winglets');
@@ -98,9 +98,9 @@ test('medium orbs are a purple sphere with one foreshortened blue eye and four d
   assert.ok(indexOf(calls, winglet) > indexOf(calls, body));
   // Charging siphons motes into the eye; nothing gathers while patrolling.
   const motes = (c) => c.filter(({ method, color }) => method === 'arc' && color === '#3de');
-  Object.assign(medium, { a: -Math.PI / 2, state: PATROL, aimT: 0 });
+  Object.assign(medium, { a: -Math.PI / 2, state: PATROL, k: 0 });
   assert.equal(motes(draw(medium)).length, 0);
-  Object.assign(medium, { state: AIMING, aimT: 0.9 });
+  Object.assign(medium, { state: AIMING, k: 0.9 });
   const charging = draw(medium);
   assert.equal(motes(charging).length, 7);
   const [ex, ey] = charging.find(eye).args;
@@ -118,11 +118,11 @@ test('all types fire their colored volley once per tell and leave matching ooze 
     const position = [grub.x, grub.y];
     grub.tick(1.99);
     assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 0);
-    grub.aimT = 1;
+    grub.k = 1;
     // Small grubs spit from the mouth, medium orbs shoot from the eye, large orbs from their center.
     const calls = draw(grub);
     const mouth = [
-      () => calls.filter(({ method, args }) => method === 'arc' && args[2] === 4 * grub.size).at(-1).args,
+      () => calls.filter(({ method, args }) => method === 'arc' && args[2] === 4 * grub.sz).at(-1).args,
       () => calls.filter(({ method, color, alpha }) => method === 'ellipse' && color === '#3af' && alpha === 1).at(-1).args,
       () => calls.find(({ method, color }) => method === 'arc' && color === '#334').args,
     ][type]();
@@ -214,7 +214,7 @@ test('large orbs have four diamond eyes (far ones hidden) and five orbiters circ
     && calls[i - 1]?.method === 'lineTo');
   let sawOrbitersOnBothSides = false;
   for (let k = 0; k < 16; k++) {
-    Object.assign(large, { a: k * Math.PI / 8, orbit: k * 0.7, state: PATROL, aimT: 0 });
+    Object.assign(large, { a: k * Math.PI / 8, o: k * 0.7, state: PATROL, k: 0 });
     const calls = draw(large);
     assert.equal(calls.find(body).args[2], 24 * 2.1, 'body sphere scales with size');
     const visible = eyes(calls).length;
@@ -225,8 +225,8 @@ test('large orbs have four diamond eyes (far ones hidden) and five orbiters circ
   }
   assert.ok(sawOrbitersOnBothSides, 'orbiters pass behind and in front of the body');
   // The ring drifts slowly, and spins up as a volley charges.
-  const spin = () => { const before = large.orbit; large.tick(0.05); return large.orbit - before; };
-  Object.assign(large, { state: PATROL, aimT: 0 });
+  const spin = () => { const before = large.o; large.tick(0.05); return large.o - before; };
+  Object.assign(large, { state: PATROL, k: 0 });
   assert.ok(spin() > 0, 'idle drift');
   add(PlayerCharacter(200, 0));
   for (let frame = 0; frame < 100 && large.state !== AIMING; frame++) large.tick(0.05);
@@ -249,8 +249,8 @@ test('large volleys fan out from the aim: one shot dead at the player, the rest 
     assert.equal(grub.a, Math.atan2(grub.y - y, x - grub.x));
     assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 0);
     // The volley leaves from the orb's center -- read it at the shake the
-    // firing frame itself will use (aimT lands on 1 as the shot goes off).
-    grub.aimT = 1;
+    // firing frame itself will use (k lands on 1 as the shot goes off).
+    grub.k = 1;
     const [cx, cy] = draw(grub).find(({ method, color }) => method === 'arc' && color === '#334').args;
     grub.tick(0.01);
     const shots = getObjectsByTag(TAG_PROJECTILE);

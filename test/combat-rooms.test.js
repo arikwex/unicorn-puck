@@ -226,7 +226,7 @@ test('map creation attaches seeded combat rooms to their weighted enemy budget a
   const seed = 42;
   const { player } = createMap(seed);
   const controllers = getObjectsByTag(TAG_COMBAT_ROOM);
-  const types = controllers.map((room) => room.enemies.map((enemy) => enemy.type));
+  const types = controllers.map((room) => room.enemies.map((enemy) => enemy.ty));
   assert.ok(types.flat().includes(1), 'the seeded map includes medium grubs');
   const dungeon = inflateDungeon(generateDungeon(seed), 3);
   assert.equal(controllers.length, Math.round((dungeon.rooms.length - 1) / 2));
@@ -252,7 +252,7 @@ test('map creation attaches seeded combat rooms to their weighted enemy budget a
   assert.ok(grates.every((grate) => !getObjects().includes(grate)));
   clear();
   createMap(seed);
-  assert.deepEqual(getObjectsByTag(TAG_COMBAT_ROOM).map((room) => room.enemies.map((enemy) => enemy.type)), types);
+  assert.deepEqual(getObjectsByTag(TAG_COMBAT_ROOM).map((room) => room.enemies.map((enemy) => enemy.ty)), types);
   assert.ok(getObjectsByTag(TAG_COMBAT_ROOM).every((room) => room.state === READY));
   assert.equal(getObjectsByTag(TAG_OBSTACLE).length, unlocked.size, 'a fresh map starts with every gate open');
 });
@@ -266,8 +266,8 @@ test('seeded rooms include all three grub types and always spend their exact ene
       const budget = Math.round((room.bounds.w + room.bounds.h) / (3 * 60 * Math.SQRT2)) - 3;
       assert.equal(room.enemies.reduce((sum, enemy) => sum + enemy.enemyCost, 0), budget);
       for (const enemy of room.enemies) {
-        types.add(enemy.type);
-        assert.equal(enemy.enemyCost, enemy.type + 1);
+        types.add(enemy.ty);
+        assert.equal(enemy.enemyCost, enemy.ty + 1);
       }
     }
   }

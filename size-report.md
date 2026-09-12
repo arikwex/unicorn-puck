@@ -168,6 +168,21 @@ large change; it costs only build time.
 
 ## F2. No visible change (−27 stacked)
 
+Applied and re-measured on 2026-09-12 with `npm run build`, keeping the
+existing pinned packer settings unchanged:
+
+| Artifact | Before | After | Δ |
+|---|---:|---:|---:|
+| `build.zip` (build limit) | 14,047 | 14,019 | −28 |
+| `index.html` | 18,202 | 18,163 | −39 |
+| `dist/build.js` | 18,057 | 18,018 | −39 |
+
+All three recommendations below are applied, with trail arrays destructured
+when rendering and the rename scoped to `Grub.js` plus the affected test
+references. `npm test` passes 101/101 before and after. The measured zip saving
+is 0.20%; the build remains 707 bytes above 13,312. The original research
+estimates follow.
+
 | Change | Δ alone |
 |---|---|
 | ChainLightning: trail entries as `[source, target, end]` arrays instead of dicts | −14 |

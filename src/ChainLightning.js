@@ -11,7 +11,6 @@ function renderBolt(context, source, target, start, end, time) {
   for (let i = 0; i <= 6; i++) gradient.addColorStop(i / 6, `hsl(${i * 60},90%,60%)`);
   context.strokeStyle = gradient;
   context.lineWidth = 15;
-  context.lineCap = context.lineJoin = 'round';
   context.beginPath();
   const dx = target.x - source.x, dy = target.y - source.y;
   const length = Math.hypot(dx, dy) || 1;
@@ -62,11 +61,7 @@ function chainLightning(source) {
         // Keep a connected path through the impact positions, even if the
         // enemies move or die before the tail finishes following it.
         const destination = { x: target.x, y: target.y };
-        trails.push({
-          source,
-          target: destination,
-          end: time - elapsed,
-        });
+        trails.push([source, destination, time - elapsed]);
         // Another hit may kill the locked target during travel.
         if (target.hp > 0 && target.hurt(1)) remove(target);
         visited.push(target);
@@ -76,18 +71,15 @@ function chainLightning(source) {
       }
       // The tail follows the head by 240 ms, including after
       // the final hit. Remove a segment only when the tail reaches its end.
-      trails = trails.filter((trail) => time - trail.end < TRAIL_DURATION);
+      trails = trails.filter((trail) => time - trail[2] < TRAIL_DURATION);
       return !target && !trails.length;
     },
     render(context) {
-      context.save();
-      context.globalAlpha = 1;
-      for (const trail of trails) {
-        const tail = Math.max(0, (time - TRAIL_DURATION - trail.end + HOP_DURATION) / HOP_DURATION);
-        renderBolt(context, trail.source, trail.target, tail, 1, time);
+      for (const [source, target, end] of trails) {
+        const tail = Math.max(0, (time - TRAIL_DURATION - end + HOP_DURATION) / HOP_DURATION);
+        renderBolt(context, source, target, tail, 1, time);
       }
       if (target) renderBolt(context, source, target, 0, elapsed / HOP_DURATION, time);
-      context.restore();
     },
   });
 }
