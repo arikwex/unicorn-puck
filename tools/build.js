@@ -61,8 +61,7 @@ async function packageBuild() {
   // Browsers infer <html>/<head>/<body>. canvas.js sizes the canvas to the
   // window in pixels, so the CSS only has to kill margins and scrollbars.
   fs.writeFileSync(htmlPath,
-    '<meta name=viewport content="width=device-width">'
-    + '<title>PEGACORN BLOOD</title><style>body{margin:0;overflow:hidden;background:#224}canvas{display:block}</style>' +
+    '<title>PEGACORN BLOOD</title><style>body{margin:0;overflow:hidden;background:#224}canvas{display:block}</style>' +
     '<canvas></canvas><script>' + code + '</script>');
 
   // Native zip with -X: no macOS extra file attributes (~50 bytes).
