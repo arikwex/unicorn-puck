@@ -321,3 +321,25 @@ before renames; the same ordering bug bit the `batch-new3` stacks earlier.
 4. F3's micro visual trims (Stack 2's four, −48 more) if D lands short.
 5. Leave the rename (−13 in combination, but it churns three test files), the
    tell and the lightning alone unless still over.
+
+
+## Main menu simplification — applied 2026-09-12
+
+`npm run build` before: **13,828 bytes**; after: **13,676 bytes**.
+Saved **152 bytes (1.10%)**; **364 bytes** remain above the 13,312-byte limit.
+
+Removed the menu's walls, candelabra and chalice. Kept the animated unicorn,
+replaced per-letter title colors with one red–yellow–blue linear gradient on
+both title lines, and enlarged the pulsing prompt from 22px to 28px with the
+text `[Click to Start]`. Pointer input still starts the game on click or tap.
+
+Follow-up typography adjustment: title font is 1.5× larger below 600px canvas
+width; the start prompt is now 56px (2× larger). Text is constrained to the
+available width to avoid clipping on phones. `npm run build` increases from
+13,676 to **13,690 bytes** (+14), leaving **378 bytes** above the limit.
+
+Second mobile adjustment: title font is another 50% larger (2.25× the original),
+and mobile detection includes device screen width for phones with a wider
+layout viewport. Both title lines fit the canvas width; the mobile prompt's
+baseline now sits 12% of the canvas height above the bottom. Build size:
+13,690 → **13,709 bytes** (+19), **397 bytes** above the limit.
