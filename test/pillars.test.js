@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import generateDungeon from '../src/donjonDungeon.js';
-import inflateDungeon from '../src/inflateDungeon.js';
+import { widenedDungeon } from './helpers/dungeon.js';
 import Pillar from '../src/Pillar.js';
 import placePillars from '../src/placePillars.js';
 
 test('seeded rooms use either classic pillars or candelabras, with one look per room', () => {
   const variants = new Set();
   for (const seed of [1, 2, 42]) {
-    const dungeon = inflateDungeon(generateDungeon(seed), 3);
+    const dungeon = widenedDungeon(seed);
     const pillars = placePillars(dungeon, seed + 1);
     assert.deepEqual(placePillars(dungeon, seed + 1), pillars);
     for (const room of dungeon.rooms) {

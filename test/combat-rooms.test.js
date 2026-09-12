@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { selectCombatRooms } from '../src/combatRoomLayout.js';
-import generateDungeon from '../src/donjonDungeon.js';
-import inflateDungeon from '../src/inflateDungeon.js';
+import { widenedDungeon } from './helpers/dungeon.js';
 import { findEntranceCells } from '../src/placePillars.js';
 
 const listeners = new Map();
@@ -90,18 +89,17 @@ test('exactly half of non-start rooms are seeded in advance (rounded for odd cou
 
 test('generated layouts gate every open room-boundary edge, including widened corridors', () => {
   for (const seed of [1, 42, 2026]) {
-    const dungeon = inflateDungeon(generateDungeon(seed), 3);
-    const floor = new Set(dungeon.floor.map(({ x, y }) => `${x},${y}`));
-    for (const room of dungeon.rooms) {
+    const { rooms, isFloor } = widenedDungeon(seed);
+    for (const room of rooms) {
       // mapCreator.js closes one tile-sized grate over each entrance cell.
-      const entrances = new Set(findEntranceCells(room, floor).map(({ x, y }) => `${x},${y}`));
+      const entrances = new Set(findEntranceCells(room, isFloor).map(({ x, y }) => `${x},${y}`));
       assert.ok(entrances.size > 0);
       for (let x = room.x; x < room.x + room.w; x++) {
         for (let y = room.y; y < room.y + room.h; y++) {
           for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
             const nx = x + dx; const ny = y + dy;
             if (nx >= room.x && nx < room.x + room.w && ny >= room.y && ny < room.y + room.h) continue;
-            if (!floor.has(`${x},${y}`) || !floor.has(`${nx},${ny}`)) continue;
+            if (!isFloor(x, y) || !isFloor(nx, ny)) continue;
             assert.ok(entrances.has(`${x},${y}`));
           }
         }
@@ -228,7 +226,7 @@ test('map creation attaches seeded combat rooms to their weighted enemy budget a
   const controllers = getObjectsByTag(TAG_COMBAT_ROOM);
   const types = controllers.map((room) => room.enemies.map((enemy) => enemy.ty));
   assert.ok(types.flat().includes(1), 'the seeded map includes medium grubs');
-  const dungeon = inflateDungeon(generateDungeon(seed), 3);
+  const dungeon = widenedDungeon(seed);
   assert.equal(controllers.length, Math.round((dungeon.rooms.length - 1) / 2));
   for (const room of controllers) {
     const budget = Math.round((room.bounds.w + room.bounds.h) / (3 * 60 * Math.SQRT2)) - 3;

@@ -10,7 +10,6 @@ import generateDungeon, { mulberry32 } from './donjonDungeon.js';
 import { add } from './engine.js';
 import Grub, { SMALL, MEDIUM, LARGE } from './Grub.js';
 import HealthItem from './HealthItem.js';
-import inflateDungeon from './inflateDungeon.js';
 import DragController from './input.js';
 import Item from './Item.js';
 import { ITEM_ABILITY_CATALOG, resetItemAbilities } from './ItemAbility.js';
@@ -76,9 +75,12 @@ const ENTRANCE_CLEARANCE = 3; // world units of clearance required off any room 
 const OBSTACLE_CLEARANCE = 2; // world units of clearance required off every wall/pillar/grub/chest
 // The raw generator's corridors are a single grid cell wide -- just barely
 // wider than the player puck, which feels awful to actually fly through.
-// Post-inflating by 2x guarantees every corridor and room is at least 2
-// cells wide, without changing the dungeon's layout/topology at all (see
-// inflateDungeon.js).
+// Every raw cell therefore stands for a CORRIDOR_WIDTH_FACTOR-square block
+// of the grid this module actually places in, which guarantees every
+// corridor and room is that many cells wide without changing the dungeon's
+// layout/topology at all. Nothing ever materializes those blocks as cells
+// (see buildDungeon): room rectangles and merged wall rects are simply
+// scaled up, and the floor test divides back down.
 const CORRIDOR_WIDTH_FACTOR = 3;
 
 // Plain axis-aligned grid -- no isometric basis, so walls come out running
@@ -212,10 +214,9 @@ function shuffled(list, rng) {
 // returned as a {x, y, w, h} box in that same raw grid -- the caller
 // inflates/converts to world space itself, same as it already does for
 // dungeon.rooms.
-function findLongHallways(rawDungeon) {
-  const floorSet = new Set(rawDungeon.floor.map(({ x, y }) => `${x},${y}`));
+function findLongHallways(rawDungeon, isRawFloor) {
   const isRoomCell = (x, y) => rawDungeon.rooms.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
-  const isCorridor = (x, y) => floorSet.has(`${x},${y}`) && !isRoomCell(x, y);
+  const isCorridor = (x, y) => isRawFloor(x, y) && !isRoomCell(x, y);
   const hallways = [];
 
   const { size } = rawDungeon;
@@ -251,24 +252,40 @@ function buildDungeon(seed) {
   const grubSeed = seed + 2;
   const chestSeed = seed + 3;
   const hallwayGrubSeed = seed + 7;
-  // `dungeon` (and every room/obstacle placement below, including chests)
-  // works entirely off this already-inflated result, never the raw
-  // generateDungeon() output -- so chest placement's own room bounds and
-  // obstacle clearance checks are always in the same post-inflation world
-  // scale as the walls/pillars/grubs actually added to the engine. The raw
-  // (pre-inflation) result is kept too, purely so findLongHallways can
-  // analyze corridor shape while it's still exactly one grid cell wide --
-  // trivial to reason about -- rather than after inflateDungeon widens
-  // every passage into a CORRIDOR_WIDTH_FACTOR-cell-thick block.
+  // The generator's grid gets read at two resolutions. Its own raw cells --
+  // corridors exactly one cell wide, trivial to reason about -- are what
+  // findLongHallways analyzes, and `isRawFloor` answers membership there.
+  // Everything placed below instead works in the widened grid (see
+  // CORRIDOR_WIDTH_FACTOR), so that chest/chalice room bounds and obstacle
+  // clearance checks all sit in the same world scale as the
+  // walls/pillars/grubs actually added to the engine. That widened grid
+  // needs only room rectangles (scaled here) and a floor test, never a
+  // materialized cell list: the upscale is exact, so a widened cell is
+  // floor precisely when the raw cell containing it is.
   const rawDungeon = generateDungeon(seed);
-  const dungeon = inflateDungeon(rawDungeon, CORRIDOR_WIDTH_FACTOR);
+  const rawFloor = new Set(rawDungeon.floor.map(({ x, y }) => `${x},${y}`));
+  const isRawFloor = (x, y) => rawFloor.has(`${x},${y}`);
+  // Truncating toward zero is safe for a negative coordinate too (the
+  // doorway scan below probes one cell outside a room): it lands on the
+  // grid's outer ring, which is never carved (see donjonDungeon.js), so the
+  // answer comes back false either way.
+  const isFloor = (x, y) => isRawFloor((x / CORRIDOR_WIDTH_FACTOR) | 0, (y / CORRIDOR_WIDTH_FACTOR) | 0);
+  const dungeon = {
+    rooms: rawDungeon.rooms.map(({ x, y, w, h }) => ({
+      x: x * CORRIDOR_WIDTH_FACTOR,
+      y: y * CORRIDOR_WIDTH_FACTOR,
+      w: w * CORRIDOR_WIDTH_FACTOR,
+      h: h * CORRIDOR_WIDTH_FACTOR,
+    })),
+    size: rawDungeon.size * CORRIDOR_WIDTH_FACTOR,
+    isFloor,
+  };
   const combatRoomIndices = selectCombatRooms(dungeon.rooms.length, seed + 6);
   const toWorld = (x, y) => gridToWorld(x, y, dungeon.size);
-  const floorSet = new Set(dungeon.floor.map(({ x, y }) => `${x},${y}`));
   const nonSpawnRoomIndices = dungeon.rooms.map((_, i) => i).filter((i) => i !== 0);
   // A room's entrance cells (grid) as world-space points, radius 0 -- fed
   // into findClearSpot/isClearSpot's "circles" clearance check.
-  const roomEntrancePoints = (room) => findEntranceCells(room, floorSet).map((cell) => {
+  const roomEntrancePoints = (room) => findEntranceCells(room, isFloor).map((cell) => {
     const world = toWorld(cell.x, cell.y);
     return { x: world.x, y: world.y, r: 0 };
   });
@@ -314,16 +331,22 @@ function buildDungeon(seed) {
 
   // Collapses the (many, small) unit wall cells into far fewer large
   // rectangles before ever touching the engine -- purely a performance
-  // simplification, see mergeWalls.js.
-  mergeWallsIntoRects(dungeon.walls).forEach((rect) => {
-    // A rect's grid bounds run from (rect.x, rect.y) to
-    // (rect.x + rect.w, rect.y + rect.h) exclusive; its world-space center
-    // sits half a cell in from that top-left corner, same as any single
-    // cell's own center would.
-    const center = toWorld(rect.x + (rect.w - 1) / 2, rect.y + (rect.h - 1) / 2);
-    add(CubeObstacle(center.x, center.y, rect.w * TILE, rect.h * TILE));
+  // simplification, see mergeWalls.js. Merging runs on the raw cells and
+  // scales each rect up afterward, which lands on exactly the rectangles
+  // merging the widened grid cell-by-cell would have produced: the greedy
+  // scan grows each run until the wall pattern breaks, and the upscale
+  // repeats every raw row and column CORRIDOR_WIDTH_FACTOR times, so every
+  // run it can find is simply that many times longer.
+  mergeWallsIntoRects(rawDungeon.walls).forEach((rect) => {
+    const w = rect.w * CORRIDOR_WIDTH_FACTOR;
+    const h = rect.h * CORRIDOR_WIDTH_FACTOR;
+    // A rect's grid bounds run from (x, y) to (x + w, y + h) exclusive; its
+    // world-space center sits half a cell in from that top-left corner,
+    // same as any single cell's own center would.
+    const center = toWorld(rect.x * CORRIDOR_WIDTH_FACTOR + (w - 1) / 2, rect.y * CORRIDOR_WIDTH_FACTOR + (h - 1) / 2);
+    add(CubeObstacle(center.x, center.y, w * TILE, h * TILE));
     wallBoxes.push({
-      x: center.x, y: center.y, halfW: (rect.w * TILE) / 2, halfH: (rect.h * TILE) / 2,
+      x: center.x, y: center.y, halfW: (w * TILE) / 2, halfH: (h * TILE) / 2,
     });
   });
 
@@ -375,7 +398,7 @@ function buildDungeon(seed) {
       const doorways = [];
       for (let i = -1; i <= room.w; i++) {
         for (let j = -1; j <= room.h; j++) {
-          if ((i < 0 || i === room.w) !== (j < 0 || j === room.h) && floorSet.has(`${room.x + i},${room.y + j}`)) {
+          if ((i < 0 || i === room.w) !== (j < 0 || j === room.h) && isFloor(room.x + i, room.y + j)) {
             doorways.push({ ...toWorld(room.x + i, room.y + j), w: TILE, h: TILE });
           }
         }
@@ -405,7 +428,7 @@ function buildDungeon(seed) {
   // -- pickGrubSpawn and Grub's own patrol bounds don't care whether the
   // box they're given is a room or a corridor.
   const hallwayRng = mulberry32(hallwayGrubSeed);
-  findLongHallways(rawDungeon).forEach((hallway, hallwayIndex) => {
+  findLongHallways(rawDungeon, isRawFloor).forEach((hallway, hallwayIndex) => {
     const inflated = {
       x: hallway.x * CORRIDOR_WIDTH_FACTOR,
       y: hallway.y * CORRIDOR_WIDTH_FACTOR,

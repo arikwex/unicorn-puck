@@ -1,14 +1,16 @@
 // Decides where to stand pillars within a generated dungeon's rooms, in
 // integer grid coordinates -- turning that into world-space Pillar
 // obstacles is the caller's job (see mapCreator.js), same division of
-// labor as donjonDungeon.js/mergeWalls.js.
+// labor as donjonDungeon.js/mergeWalls.js. `dungeon` only has to supply
+// `rooms` and an `isFloor(x, y)` test, both in the widened grid.
 import { mulberry32 } from './donjonDungeon.js';
 
 const WALL_MARGIN = 2; // min cells a pillar must sit inset from the room's own walls
 const ENTRANCE_CLEARANCE = 2; // min cells (Manhattan) from any entrance cell -- never blocks a doorway
 const MIN_ROOM_SPAN = 5; // smaller rooms (either axis) get no pillars -- too cramped to matter
 // Rooms currently come in only two footprints, 9 or 15 cells per axis (see
-// donjonDungeon.js's ROOM_MIN/MAX_SIZE post-inflation) -- 12 sits cleanly
+// donjonDungeon.js's ROOM_MIN/MAX_SIZE, widened by mapCreator.js's own
+// CORRIDOR_WIDTH_FACTOR -- the grid this module works in) -- 12 sits cleanly
 // between them, so this flags exactly the 15-either-axis rooms as "large".
 const LARGE_ROOM_SPAN = 12; // either axis at least this big always gets a pillar, no skipping
 const MIN_PILLAR_SPACING = 2; // min cells between two pillars placed in the same room
@@ -17,15 +19,11 @@ const COLONNADE_COUNT = 3; // pillars per row in a colonnade pattern
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-function key(x, y) {
-  return `${x},${y}`;
-}
-
-function roomFloorCells(room, floorSet) {
+function roomFloorCells(room, isFloor) {
   const cells = [];
   for (let x = room.x; x < room.x + room.w; x++) {
     for (let y = room.y; y < room.y + room.h; y++) {
-      if (floorSet.has(key(x, y))) cells.push({ x, y });
+      if (isFloor(x, y)) cells.push({ x, y });
     }
   }
   return cells;
@@ -34,15 +32,15 @@ function roomFloorCells(room, floorSet) {
 // A room-floor cell on the room's own rectangle boundary that has a floor
 // neighbor *outside* that rectangle is where a corridor or door connects
 // in -- an entrance.
-function findEntranceCells(room, floorSet) {
+function findEntranceCells(room, isFloor) {
   const onBoundary = (x, y) => x === room.x || x === room.x + room.w - 1 || y === room.y || y === room.y + room.h - 1;
   const inRoom = (x, y) => x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
 
   const entrances = [];
   for (let x = room.x; x < room.x + room.w; x++) {
     for (let y = room.y; y < room.y + room.h; y++) {
-      if (!onBoundary(x, y) || !floorSet.has(key(x, y))) continue;
-      const leadsOutside = DIRS.some(([dx, dy]) => !inRoom(x + dx, y + dy) && floorSet.has(key(x + dx, y + dy)));
+      if (!onBoundary(x, y) || !isFloor(x, y)) continue;
+      const leadsOutside = DIRS.some(([dx, dy]) => !inRoom(x + dx, y + dy) && isFloor(x + dx, y + dy));
       if (leadsOutside) entrances.push({ x, y });
     }
   }
@@ -90,7 +88,7 @@ const PATTERNS = [
   colonnade(COLONNADE_COUNT, false), // two rows lining the left/right walls
 ];
 
-function placeInRoom(rng, room, floorSet) {
+function placeInRoom(rng, room, isFloor) {
   if (room.w < MIN_ROOM_SPAN || room.h < MIN_ROOM_SPAN) return [];
   const isLarge = room.w >= LARGE_ROOM_SPAN || room.h >= LARGE_ROOM_SPAN;
   if (!isLarge && rng() < SKIP_ROOM_CHANCE) return [];
@@ -101,8 +99,8 @@ function placeInRoom(rng, room, floorSet) {
   const innerY1 = room.y + room.h - 1 - WALL_MARGIN;
   if (innerX0 >= innerX1 || innerY0 >= innerY1) return [];
 
-  const floorCells = roomFloorCells(room, floorSet);
-  const entrances = findEntranceCells(room, floorSet);
+  const floorCells = roomFloorCells(room, isFloor);
+  const entrances = findEntranceCells(room, isFloor);
   const pattern = PATTERNS[Math.floor(rng() * PATTERNS.length)];
   // One look per room: classic columns (0) or candelabras (3).
   const variant = rng() < 0.5 ? 0 : 3;
@@ -140,10 +138,9 @@ function placeInRoom(rng, room, floorSet) {
 // given seed, independent of whatever seed the dungeon layout itself used.
 function placePillars(dungeon, seed) {
   const rng = mulberry32(seed);
-  const floorSet = new Set(dungeon.floor.map(({ x, y }) => key(x, y)));
   const pillars = [];
   dungeon.rooms.forEach((room) => {
-    pillars.push(...placeInRoom(rng, room, floorSet));
+    pillars.push(...placeInRoom(rng, room, dungeon.isFloor));
   });
   return pillars;
 }

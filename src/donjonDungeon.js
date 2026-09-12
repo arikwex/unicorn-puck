@@ -282,8 +282,8 @@ function removeDeadEnds(grid) {
 // the outer ring (never reachable by carving -- see the GRID_WIDTH/
 // GRID_HEIGHT comment, so the dungeon always ends up fully enclosed for
 // "egress=no" with no extra work needed). Classifying every cell means
-// there's no leftover "hole" for a later pass (e.g. inflateDungeon.js's
-// tile-for-tile upscale) to render as neither floor nor wall.
+// there's no leftover "hole" for a later pass (e.g. mapCreator.js's
+// widened grid) to treat as neither floor nor wall.
 function classifyCells(grid) {
   const floor = [];
   const walls = [];
@@ -296,7 +296,7 @@ function classifyCells(grid) {
 // Generates a rooms-and-corridors dungeon in integer grid coordinates.
 // Deterministic for a given seed: the same seed always produces the exact
 // same layout. `floor` is every carved (room, corridor, or door) cell --
-// e.g. for a post-process like inflateDungeon.js to widen corridors from.
+// e.g. for mapCreator.js's widened grid to base its corridor widths on.
 function generateDonjonDungeon(seed) {
   const rng = mulberry32(seed);
   const grid = Grid();

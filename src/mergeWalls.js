@@ -1,5 +1,5 @@
 // Post-processing pass that collapses a dense field of unit wall cells
-// (as produced by donjonDungeon.js / inflateDungeon.js) into far fewer,
+// (as produced by donjonDungeon.js) into far fewer,
 // larger rectangular obstacles spanning the same exact bounds -- purely a
 // performance simplification, since a few hundred big CubeObstacles cost
 // the physics loop a lot less than several thousand 1x1 ones covering

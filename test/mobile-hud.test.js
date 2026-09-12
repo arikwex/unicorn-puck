@@ -25,11 +25,12 @@ const canvas = { getContext: () => context };
 globalThis.document = { querySelector: () => canvas };
 globalThis.innerWidth = 800;
 globalThis.innerHeight = 600;
+globalThis.screen = { width: 800 };
 globalThis.addEventListener = () => {};
 globalThis.matchMedia = () => ({ matches: coarse });
 globalThis.requestAnimationFrame = (callback) => { nextFrame = callback; };
 
-const { hudScale, renderScreenHUD } = await import('../src/hud.js');
+const { renderScreenHUD } = await import('../src/hud.js');
 const { add, clear, start, stop } = await import('../src/engine.js');
 const { default: MiniMap } = await import('../src/MiniMap.js');
 const { default: CubeObstacle } = await import('../src/CubeObstacle.js');
@@ -42,7 +43,7 @@ const { default: StatusCard } = await import('../src/StatusCard.js');
 
 afterEach(() => {
   stop(); clear(); draws = []; coarse = false;
-  canvas.width = 800; canvas.height = 600;
+  canvas.width = 800; canvas.height = 600; screen.width = 800;
 });
 
 function screenRect(call) {
@@ -51,14 +52,26 @@ function screenRect(call) {
   return [x * sx + tx, y * sy + ty, w * sx, h * sy];
 }
 
-test('HUD uses 0.65 scale on narrow screens and coarse-pointer devices, updating on resize', () => {
-  assert.equal(hudScale(), 1);
+test('HUD doubles below 600px device width regardless of canvas width or pointer type', () => {
+  const renderedScale = () => {
+    let scale;
+    renderScreenHUD({ hudAnchor: [0, 0], hud(ctx) { scale = ctx.transform[0]; } }, context);
+    return scale;
+  };
+  assert.equal(renderedScale(), 1);
   canvas.width = 390;
-  assert.equal(hudScale(), 0.65);
-  canvas.width = 1024; coarse = true;
-  assert.equal(hudScale(), 0.65, 'landscape phones and tablets remain mobile-sized');
+  assert.equal(renderedScale(), 1, 'a narrow desktop window keeps desktop scaling');
+  coarse = true;
+  assert.equal(renderedScale(), 1, 'pointer type does not determine HUD scaling');
+  screen.width = 390;
+  canvas.width = 980;
+  assert.equal(renderedScale(), 2, 'phones can have a wider layout viewport');
   coarse = false;
-  assert.equal(hudScale(), 1);
+  assert.equal(renderedScale(), 2);
+  screen.width = 599;
+  assert.equal(renderedScale(), 2);
+  screen.width = 600;
+  assert.equal(renderedScale(), 1, 'device width changes are reflected on the next render');
 });
 
 test('minimap is bottom-left on desktop and mobile, with a white player dot', () => {
@@ -68,8 +81,8 @@ test('minimap is bottom-left on desktop and mobile, with a white player dot', ()
   renderScreenHUD(map, context);
   assert.equal(draws.length, 0, 'Oracle Eyes still controls visibility');
   player.oracleEyes = true;
-  for (const [width, height, scale] of [[800, 600, 1], [390, 844, 0.65]]) {
-    canvas.width = width; canvas.height = height; draws = [];
+  for (const [width, height, scale] of [[800, 600, 1], [390, 844, 2]]) {
+    canvas.width = width; canvas.height = height; screen.width = width; draws = [];
     renderScreenHUD(map, context);
     const panel = draws.find(({ method }) => method === 'fillRect');
     const expected = [10 * scale, height - 170 * scale, 160 * scale, 160 * scale];
@@ -81,7 +94,7 @@ test('minimap is bottom-left on desktop and mobile, with a white player dot', ()
 });
 
 test('health, counter, abilities, toasts and status cards all opt into anchored mobile scaling', () => {
-  canvas.width = 390; canvas.height = 844;
+  canvas.width = 390; canvas.height = 844; screen.width = 390;
   const huds = [
     PlayerHealthHUD(PlayerCharacter()), ChaliceHUD(), ItemAbilityHUD(),
     add(ToastSystem()), StatusCard(() => {}),
@@ -96,17 +109,17 @@ test('health, counter, abilities, toasts and status cards all opt into anchored 
     };
     renderScreenHUD(hud, context);
     const [ax, ay] = hud.hudAnchor;
-    assert.deepEqual(observed, [0.65, 0, 0, 0.65, canvas.width * ax * 0.35, canvas.height * ay * 0.35]);
+    assert.deepEqual(observed, [2, 0, 0, 2, -canvas.width * ax, -canvas.height * ay]);
     assert.deepEqual(context.transform, [1, 0, 0, 1, 0, 0], 'HUD scaling cannot leak to the next object');
   }
   const healthOutline = draws.find(({ method }) => method === 'strokeRect');
-  assert.deepEqual(screenRect(healthOutline), [88 * 0.65, 33 * 0.65, 180 * 0.65, 30 * 0.65]);
+  assert.deepEqual(screenRect(healthOutline), [176, 66, 360, 60]);
   const toast = draws.find(({ method, args }) => method === 'fillText' && args[0] === 'Defeat all enemies to exit room');
   assert.equal(toast.args[1] * toast.transform[0] + toast.transform[4], canvas.width / 2);
 });
 
 test('engine applies scaling only to anchored UI, leaving aim overlays and world rendering unscaled', () => {
-  canvas.width = 390;
+  canvas.width = 390; screen.width = 390;
   let worldTransform; let hudTransform; let aimTransform;
   add({
     render(ctx) { worldTransform = [...ctx.transform]; },
@@ -118,5 +131,5 @@ test('engine applies scaling only to anchored UI, leaving aim overlays and world
   stop();
   assert.deepEqual(worldTransform, [1, 0, 0, 1, 0, 0]);
   assert.deepEqual(aimTransform, [1, 0, 0, 1, 0, 0]);
-  assert.deepEqual(hudTransform, [0.65, 0, 0, 0.65, 0, 0]);
+  assert.deepEqual(hudTransform, [2, 0, 0, 2, -0, -0]);
 });
