@@ -99,16 +99,16 @@ const ITEM_ABILITY_CATALOG = [
     player.maxHp += 2;
     player.heal(2); // granted immediately, not just headroom for later
   }],
-  ['VALKYRIE WINGS', 'higher max boost speed', drawValkyrieWings, (player) => {
+  ['VALKYRIE WINGS', 'increase boost speed', drawValkyrieWings, (player) => {
     player.boostPower *= VALKYRIE_BOOST_MULTIPLIER;
   }],
-  ['MITHRIL HORN', '+1 impact damage', drawMithrilHorn, (player) => {
+  ['MITHRIL HORN', '+1 damage', drawMithrilHorn, (player) => {
     player.horn += 1;
   }],
-  ['CHROMATIC HOOF', 'chain lightning hits +3 enemies', drawChromaticHoof, (player) => {
+  ['CHROMATIC HOOF', 'chain lightning', drawChromaticHoof, (player) => {
     player.hoof = true;
   }],
-  ['ORACLE EYES', 'reveals the minimap', drawOracleEyes, (player) => {
+  ['ORACLE EYES', 'show minimap', drawOracleEyes, (player) => {
     player.oracleEyes = true;
   }],
 ];
