@@ -237,8 +237,10 @@ function mouthPosition(grub, head = segmentPosition(grub, 0)) {
 // it turns, and eyes round the far side are hidden by it.
 const ORB_RADIUS = 24;
 const ORB_HOVER = 22; // body center height above the ground point
-// Per type: [body, outline, crystal/orbiter fill, crystal/orbiter far side, eye, eye core].
-const ORB_THEMES = [, ['#154', '#3db', '#9fe', '#4bc', '#39f', '#dff'], ['#321', '#f93', '#fb5', '#c62', '#f93', '#fe9']];
+// Bodies reuse the grub's own dark shell and purple outline; only the
+// trim differs. Per type: [accent, crystal/orbiter fill, its far side, eye,
+// eye core].
+const ORB_THEMES = [, ['#3db', '#9fe', '#4bc', '#39f', '#dff'], ['#f93', '#fb5', '#c62', '#f93', '#fe9']];
 const EYE_DISTANCE = ORB_RADIUS * 0.82; // eye centers sit just inside the silhouette
 // Medium crystal winglets per side: [height on the body (+ is down),
 // length, tilt up from horizontal (radians), half-width]. Two big ones
@@ -284,9 +286,9 @@ function renderOrbEye(context, grub, center, azimuth, radius, diamond, theme) {
   // Aiming charges it up: the core swells and a halo builds around it.
   const charge = (grub.state === AIMING) * grub.aimT;
   context.globalAlpha = charge * 0.45;
-  fillEllipse(context, x, y, radius * 1.7 * squash * grub.size, radius * 1.7 * grub.size, theme[4]);
+  fillEllipse(context, x, y, radius * 1.7 * squash * grub.size, radius * 1.7 * grub.size, theme[3]);
   context.globalAlpha = 1;
-  [[1.25, theme[0]], [1, theme[4]], [0.45 + charge * 0.3, theme[5]]].forEach(([scale, color]) => {
+  [[1.25, BODY_COLORS[0]], [1, theme[3]], [0.45 + charge * 0.3, theme[4]]].forEach(([scale, color]) => {
     const r = radius * scale * grub.size;
     context.fillStyle = color;
     context.beginPath();
@@ -304,16 +306,16 @@ function renderOrbEye(context, grub, center, azimuth, radius, diamond, theme) {
 
 function renderOrbBody(context, grub, center, theme, flash) {
   const r = ORB_RADIUS * grub.size;
-  fillCircle(context, center.x, center.y, r, theme[0]);
+  fillCircle(context, center.x, center.y, r, BODY_COLORS[0]);
   // A dim lit cap on the upper side reads as roundness.
   context.globalAlpha = 0.25;
-  fillCircle(context, center.x - r * 0.25, center.y - r * 0.3, r * 0.55, theme[1]);
+  fillCircle(context, center.x - r * 0.25, center.y - r * 0.3, r * 0.55, OUTLINE_COLOR);
   context.globalAlpha = flash;
   fillCircle(context, center.x, center.y, r, '#fff');
   context.globalAlpha = 1;
   context.beginPath();
   context.arc(center.x, center.y, r, 0, TAU);
-  context.strokeStyle = flash > 0.5 ? '#fff' : theme[1];
+  context.strokeStyle = flash > 0.5 ? '#fff' : OUTLINE_COLOR;
   context.lineWidth = 4 * grub.size;
   context.stroke();
   if (grub.type === MEDIUM) {
@@ -346,9 +348,9 @@ function renderWinglet(context, grub, center, side, [mountY, length, tilt, width
   context.beginPath();
   kite.forEach(([x, y]) => context.lineTo(x, y));
   context.closePath();
-  context.fillStyle = theme[facing ? 2 : 3];
+  context.fillStyle = theme[facing ? 1 : 2];
   context.fill();
-  context.strokeStyle = theme[1];
+  context.strokeStyle = theme[0];
   context.lineWidth = 3 * grub.size;
   context.stroke();
   // The shard's center ridge.
@@ -388,11 +390,11 @@ function renderOrb(context, grub, flashTimer) {
         depth,
         draw: () => {
           const r = ORBITER_RADIUS * grub.size * (1 - depth / ORBIT_RADIUS * 0.15);
-          fillCircle(context, x, y, r, theme[2]);
-          context.strokeStyle = theme[3];
+          fillCircle(context, x, y, r, theme[1]);
+          context.strokeStyle = theme[2];
           context.lineWidth = 2 * grub.size;
           context.stroke();
-          fillCircle(context, x - r * 0.3, y - r * 0.3, r * 0.35, theme[5]);
+          fillCircle(context, x - r * 0.3, y - r * 0.3, r * 0.35, theme[4]);
         },
       });
     }
@@ -417,6 +419,7 @@ function muzzle(grub) {
 // walls), which is what keeps the grub "generally within its room" rather
 // than wandering the whole dungeon.
 function Grub(x, y, room, seed, type = SMALL) {
+  type = LARGE;
   const size = [1, 1.4, 2.1][type];
   const maxHp = [5, 8, 13][type];
   const rng = mulberry32(seed);
@@ -525,7 +528,7 @@ function Grub(x, y, room, seed, type = SMALL) {
           const dy = targetY - mouth.y;
           const heading = Math.atan2(dy, dx);
           const shots = [1, 3, 8][type];
-          const palette = type ? { color: FACE_COLORS[type], highlightColor: ORB_THEMES[type][5] } : undefined;
+          const palette = type ? { color: FACE_COLORS[type], highlightColor: ORB_THEMES[type][4] } : undefined;
           for (let i = 0; i < shots; i++) {
             // Large volleys use fixed compass directions even while tracking the player.
             const angle = type === LARGE ? i * TAU / 8 : heading + (i - (shots - 1) / 2) * MEDIUM_SPREAD_ANGLE;

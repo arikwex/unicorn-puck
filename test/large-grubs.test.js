@@ -66,7 +66,7 @@ const lastIndexOf = (calls, test) => calls.length - 1 - [...calls].reverse().fin
 
 test('medium orbs are a teal sphere with one foreshortened blue eye and four depth-sorted crystal winglets', () => {
   const medium = make(MEDIUM);
-  const body = ({ method, color }) => method === 'arc' && color === '#154';
+  const body = ({ method, color }) => method === 'arc' && color === '#334'; // the grub's own shell
   const winglet = ({ method, color }) => method === 'fill' && (color === '#9fe' || color === '#4bc');
   const eye = ({ method, color, alpha }) => method === 'ellipse' && color === '#39f' && alpha === 1;
   for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
@@ -113,7 +113,7 @@ test('all types fire their colored volley once per tell and leave matching ooze 
     const mouth = [
       () => calls.filter(({ method, args }) => method === 'arc' && args[2] === 4 * grub.size).at(-1).args,
       () => calls.filter(({ method, color, alpha }) => method === 'ellipse' && color === '#39f' && alpha === 1).at(-1).args,
-      () => calls.find(({ method, color }) => method === 'arc' && color === '#321').args,
+      () => calls.find(({ method, color }) => method === 'arc' && color === '#334').args,
     ][type]();
     grub.tick(0.01);
     const shots = getObjectsByTag(TAG_PROJECTILE);
@@ -196,7 +196,7 @@ test('a medium grub keeps combat locked until it dies, then clears once despite 
 
 test('large orbs have four diamond eyes (far ones hidden) and five orbiters circling around and behind them', () => {
   const large = make(LARGE);
-  const body = ({ method, color }) => method === 'arc' && color === '#321';
+  const body = ({ method, color }) => method === 'arc' && color === '#334'; // the grub's own shell
   const orbiter = ({ method, color }) => method === 'arc' && color === '#fb5';
   // Diamond eyes: the outer orange fill after a moveTo/lineTo path.
   const eyes = (calls) => calls.filter(({ method, color, alpha }, i) => method === 'fill' && color === '#f93' && alpha === 1
