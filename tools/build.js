@@ -23,11 +23,10 @@ const reoptimize = process.argv.includes('--reoptimize');
 // again starting from these and prints any better set to paste in here.
 const ROADROLLER_PARAMS = {
   numAbbreviations: 32,
-  recipLearningRate: 2090,
-  modelMaxCount: 5,
-  modelRecipBaseCount: 29,
+  recipLearningRate: 2286,
+  modelRecipBaseCount: 26,
   precision: 15,
-  sparseSelectors: [0, 1, 2, 3, 5, 7, 11, 13, 25, 42, 113, 142],
+  sparseSelectors: [0, 1, 2, 3, 6, 7, 13, 25, 26, 43, 170, 449],
 };
 
 fs.mkdirSync(dist, { recursive: true });
