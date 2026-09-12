@@ -62,13 +62,19 @@ test('numeric types have scaled collision geometry, 5/8/13 HP, and cost 1/2/3 sl
 
 // Index of the first/last call matching a predicate.
 const indexOf = (calls, test) => calls.findIndex(test);
-const lastIndexOf = (calls, test) => calls.length - 1 - [...calls].reverse().findIndex(test);
+const lastIndexOf = (calls, test) => { // scans in place: predicates may look at neighbors
+  let found = -1;
+  calls.forEach((call, i, all) => { if (test(call, i, all)) found = i; });
+  return found;
+};
 
-test('medium orbs are a teal sphere with one foreshortened blue eye and four depth-sorted crystal winglets', () => {
+test('medium orbs are a purple sphere with one foreshortened blue eye and four depth-sorted crystal winglets', () => {
   const medium = make(MEDIUM);
   const body = ({ method, color }) => method === 'arc' && color === '#334'; // the grub's own shell
-  const winglet = ({ method, color }) => method === 'fill' && (color === '#9fe' || color === '#4bc');
-  const eye = ({ method, color, alpha }) => method === 'ellipse' && color === '#39f' && alpha === 1;
+  // Winglet kites are the closePath'd fills; the eye's fill follows an ellipse.
+  const winglet = ({ method, color }, i, calls) => method === 'fill' && calls[i - 1]?.method === 'closePath'
+    && (color === '#3af' || color === '#27b');
+  const eye = ({ method, color, alpha }) => method === 'ellipse' && color === '#3af' && alpha === 1;
   for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
     Object.assign(medium, { a, state: PATROL, aimT: 0 });
     const calls = draw(medium);
@@ -112,7 +118,7 @@ test('all types fire their colored volley once per tell and leave matching ooze 
     const calls = draw(grub);
     const mouth = [
       () => calls.filter(({ method, args }) => method === 'arc' && args[2] === 4 * grub.size).at(-1).args,
-      () => calls.filter(({ method, color, alpha }) => method === 'ellipse' && color === '#39f' && alpha === 1).at(-1).args,
+      () => calls.filter(({ method, color, alpha }) => method === 'ellipse' && color === '#3af' && alpha === 1).at(-1).args,
       () => calls.find(({ method, color }) => method === 'arc' && color === '#334').args,
     ][type]();
     grub.tick(0.01);
@@ -125,11 +131,11 @@ test('all types fire their colored volley once per tell and leave matching ooze 
       assert.equal(shot.x, mouth[0]); assert.equal(shot.y, mouth[1]);
       assert.ok(Math.abs(Math.hypot(shot.vx, shot.vy) - 340) < 1e-8);
       const offset = type === MEDIUM ? (i - 1) * Math.PI / 12 : 0;
-      const angle = type === LARGE ? i * Math.PI / 4 : heading + offset;
+      const angle = heading + (type === LARGE ? i * Math.PI / 4 : offset);
       assert.ok(Math.abs(shot.vx - Math.cos(angle) * 340) < 1e-8);
       assert.ok(Math.abs(shot.vy - Math.sin(angle) * 340) < 1e-8);
       assert.deepEqual(draw(shot).filter(({ method }) => method === 'fill').map(({ color }) => color),
-        [['#4f5', '#dfd'], ['#3de', '#dff'], ['#f93', '#fe9']][type]);
+        [['#4f5', '#dfd'], ['#3de', '#cef'], ['#f93', '#fe9']][type]);
     });
     assert.equal(grub.state, RECOVERING);
     grub.tick(0.1);
@@ -225,10 +231,7 @@ test('large orbs have four diamond eyes (far ones hidden) and five orbiters circ
   assert.ok(spin() > early * 2, 'faster late in the tell');
 });
 
-test('large grubs track moving players but always fire the same eight compass directions', () => {
-  const diagonal = Math.SQRT1_2;
-  const directions = [[1, 0], [diagonal, diagonal], [0, 1], [-diagonal, diagonal],
-    [-1, 0], [-diagonal, -diagonal], [0, -1], [diagonal, -diagonal]];
+test('large volleys fan out from the aim: one shot dead at the player, the rest every 45 degrees', () => {
   for (const [x, y] of [[180, 90], [-150, 210], [-200, -130], [120, -230]]) {
     clear(); soundStarts = 0;
     const player = add(PlayerCharacter(200, 0));
@@ -240,13 +243,23 @@ test('large grubs track moving players but always fire the same eight compass di
     grub.tick(0.99);
     assert.equal(grub.a, Math.atan2(grub.y - y, x - grub.x));
     assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 0);
+    // The volley leaves from the orb's center -- read it at the shake the
+    // firing frame itself will use (aimT lands on 1 as the shot goes off).
+    grub.aimT = 1;
+    const [cx, cy] = draw(grub).find(({ method, color }) => method === 'arc' && color === '#334').args;
     grub.tick(0.01);
     const shots = getObjectsByTag(TAG_PROJECTILE);
     assert.equal(shots.length, 8);
+    const heading = Math.atan2(y - cy, x - cx);
     shots.forEach((shot, i) => {
-      assert.ok(Math.abs(shot.vx / 340 - directions[i][0]) < 1e-8);
-      assert.ok(Math.abs(shot.vy / 340 - directions[i][1]) < 1e-8);
+      const angle = heading + i * Math.PI / 4;
+      assert.ok(Math.abs(shot.vx - Math.cos(angle) * 340) < 1e-8);
+      assert.ok(Math.abs(shot.vy - Math.sin(angle) * 340) < 1e-8);
     });
+    // The first shot runs straight along the line to the player.
+    const toPlayer = Math.hypot(x - cx, y - cy);
+    assert.ok(Math.abs(shots[0].vx / 340 - (x - cx) / toPlayer) < 1e-8);
+    assert.ok(Math.abs(shots[0].vy / 340 - (y - cy) / toPlayer) < 1e-8);
     grub.tick(0.1);
     assert.equal(getObjectsByTag(TAG_PROJECTILE).length, 8);
     assert.equal(soundStarts, 1);

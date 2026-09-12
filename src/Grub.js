@@ -240,7 +240,7 @@ const ORB_HOVER = 22; // body center height above the ground point
 // Bodies reuse the grub's own dark shell and purple outline; only the
 // trim differs. Per type: [accent, crystal/orbiter fill, its far side, eye,
 // eye core].
-const ORB_THEMES = [, ['#3db', '#9fe', '#4bc', '#39f', '#dff'], ['#f93', '#fb5', '#c62', '#f93', '#fe9']];
+const ORB_THEMES = [, ['#6ef', '#3af', '#27b', '#3af', '#cef'], ['#f93', '#fb5', '#c62', '#f93', '#fe9']];
 const EYE_DISTANCE = ORB_RADIUS * 0.82; // eye centers sit just inside the silhouette
 // Medium crystal winglets per side: [height on the body (+ is down),
 // length, tilt up from horizontal (radians), half-width]. Two big ones
@@ -419,7 +419,6 @@ function muzzle(grub) {
 // walls), which is what keeps the grub "generally within its room" rather
 // than wandering the whole dungeon.
 function Grub(x, y, room, seed, type = SMALL) {
-  type = LARGE;
   const size = [1, 1.4, 2.1][type];
   const maxHp = [5, 8, 13][type];
   const rng = mulberry32(seed);
@@ -530,8 +529,10 @@ function Grub(x, y, room, seed, type = SMALL) {
           const shots = [1, 3, 8][type];
           const palette = type ? { color: FACE_COLORS[type], highlightColor: ORB_THEMES[type][4] } : undefined;
           for (let i = 0; i < shots; i++) {
-            // Large volleys use fixed compass directions even while tracking the player.
-            const angle = type === LARGE ? i * TAU / 8 : heading + (i - (shots - 1) / 2) * MEDIUM_SPREAD_ANGLE;
+            // A large volley fans out from the aim itself -- one shot straight
+            // at the player, the rest every 45 degrees around it -- so a
+            // standing target is always hit.
+            const angle = heading + (type === LARGE ? i * TAU / 8 : (i - (shots - 1) / 2) * MEDIUM_SPREAD_ANGLE);
             add(GrubProjectile(mouth.x, mouth.y,
               Math.cos(angle) * PROJECTILE_SPEED, Math.sin(angle) * PROJECTILE_SPEED, palette));
           }
