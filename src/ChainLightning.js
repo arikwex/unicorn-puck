@@ -8,20 +8,17 @@ const MAX_BOUNCES = 2;
 
 function renderBolt(context, source, target, start, end, time) {
   if (end <= start) return;
-  const gradient = context.createLinearGradient(source.x, source.y - 30, target.x, target.y - 30);
-  for (let i = 0; i <= 6; i++) gradient.addColorStop(i / 6, `hsl(${i * 60},90%,60%)`);
-  context.strokeStyle = gradient;
+  context.strokeStyle = `hsl(${time * 1200},90%,60%)`;
   context.lineWidth = 15;
   context.beginPath();
   const dx = target.x - source.x, dy = target.y - source.y;
-  const length = Math.hypot(dx, dy) || 1;
   for (let i = 0; i <= 16; i++) {
     const u = start + (end - start) * i / 16;
-    // Half-strength sine motion over a 90-unit upward arc; both offsets
-    // taper to zero at the enemies so each hop still connects exactly.
-    const wave = Math.sin(u * TAU * 3 - time * 40) * Math.sin(u * TAU / 2) * Math.min(9, length * 0.075);
-    const x = source.x + dx * u - dy / length * wave;
-    const y = source.y - 30 + dy * u + dx / length * wave - 90 * 4 * u * (1 - u);
+    // The parabola doubles as the ripple's envelope, so both fade to zero at
+    // the enemies and each hop still connects exactly.
+    const arc = u * (1 - u);
+    const x = source.x + dx * u + Math.sin(u * TAU * 3 - time * 40) * arc * 40;
+    const y = source.y - 30 + dy * u - 360 * arc;
     context.lineTo(x, y);
   }
   context.stroke();

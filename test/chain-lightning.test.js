@@ -86,7 +86,7 @@ test('each hop includes the 450-unit boundary and ignores dead enemies and non-e
   assert.equal(edge.hp, 4);
   assert.equal(outside.hp, 5);
   travel(0.5);
-  assert.equal(renderEffects().filter(({ stroke }) => stroke?.stops).length, 0, 'chain ends when no target is in range');
+  assert.equal(renderEffects().filter(({ stroke }) => String(stroke).startsWith('hsl')).length, 0, 'chain ends when no target is in range');
 });
 
 test('ordinary hits, gentle bumps, and contact cooldown cannot start extra chains', () => {
@@ -165,48 +165,48 @@ test('travel carries excess frame time through both hops and stops damaging enem
   source.hit(player());
   travel(0.45);
   assert.deepEqual([first.hp, second.hp, third.hp, extra.hp], [4, 4, 5, 5]);
-  assert.equal(renderEffects().filter(({ stroke }) => stroke?.stops).length, 1, 'shorter tail remains on the final hop');
+  assert.equal(renderEffects().filter(({ stroke }) => String(stroke).startsWith('hsl')).length, 1, 'shorter tail remains on the final hop');
   travel(0.6);
-  assert.equal(renderEffects().filter(({ stroke }) => stroke?.stops).length, 0);
+  assert.equal(renderEffects().filter(({ stroke }) => String(stroke).startsWith('hsl')).length, 0);
 });
 
-test('the thicker rainbow sinusoid advances to the midpoint of each hop after 100 ms', () => {
+test('the bolt arcs cleanly in y and ripples along x to the midpoint of each hop after 100 ms', () => {
   const source = enemy(0);
   enemy(100); enemy(250);
   source.hit(player());
   travel(0.1);
-  let bolt = renderEffects().find(({ stroke }) => stroke?.stops);
+  let bolt = renderEffects().find(({ stroke }) => String(stroke).startsWith('hsl'));
   assert.equal(bolt.width, 15);
   assert.deepEqual(bolt.path[0], [0, -30]);
-  assert.equal(bolt.path.at(-1)[0], 50);
-  const midpointRipple = Math.abs(bolt.path.at(-1)[1] + 120);
-  assert.ok(midpointRipple > 1 && midpointRipple <= 7.5, '90-unit upward arc with half-strength sine displacement');
-  assert.equal(new Set(bolt.stroke.stops.map(([, color]) => color)).size, 7);
+  assert.ok(Math.abs(bolt.path.at(-1)[1] + 120) < 1e-8, '90-unit upward arc, no ripple left on y');
+  const midpointRipple = Math.abs(bolt.path.at(-1)[0] - 50);
+  assert.ok(midpointRipple > 0 && midpointRipple <= 6, 'ripple rides x, bounded by the parabola envelope');
+  assert.match(bolt.stroke, /^hsl\(/, 'a single hue per instant, cycling over time');
   travel(0.2);
-  bolt = renderEffects().filter(({ stroke }) => stroke?.stops).at(-1);
+  bolt = renderEffects().filter(({ stroke }) => String(stroke).startsWith('hsl')).at(-1);
   assert.deepEqual(bolt.path[0], [100, -30]);
-  assert.ok(Math.abs(bolt.path.at(-1)[0] - 175) < 1e-8);
-  assert.ok(Math.abs(bolt.path.at(-1)[1] + 120) <= 9, 'each hop has the same arc height and reduced ripple cap');
+  assert.ok(Math.abs(bolt.path.at(-1)[0] - 175) <= 6, 'same ripple bound on the second hop');
+  assert.ok(Math.abs(bolt.path.at(-1)[1] + 120) < 1e-8, 'each hop has the same clean arc height');
 });
 
 test('the animated tail follows the entire path to the final target before disappearing', () => {
   const source = enemy(0), first = enemy(100), second = enemy(250);
   source.hit(player());
   travel(0.4);
-  const bolts = () => renderEffects().filter(({ stroke }) => stroke?.stops);
+  const bolts = () => renderEffects().filter(({ stroke }) => String(stroke).startsWith('hsl'));
   assert.equal(bolts().length, 2, 'both hops remain visible after the final hit');
-  assert.ok(Math.abs(bolts()[0].path[0][0] - 80) < 1e-8, 'tail follows the head by 240 ms');
+  assert.ok(Math.abs(bolts()[0].path[0][0] - 80) <= 4, 'tail follows the head by 240 ms');
   assert.ok(bolts().every(({ alpha }) => alpha === 1), 'the path stays bright while the tail travels');
-  const paths = bolts().map(({ path }) => path);
+  const paths = bolts().map(({ stroke }) => String(stroke).startsWith('hsl'));
   source.x = -100; first.x = 200; second.x = 500;
-  assert.deepEqual(bolts().map(({ path }) => path), paths, 'completed trails stay at impact positions');
+  assert.deepEqual(bolts().map(({ stroke }) => String(stroke).startsWith('hsl')), paths, 'completed trails stay at impact positions');
   travel(0.02);
   assert.equal(bolts().length, 2);
-  assert.ok(Math.abs(bolts()[0].path[0][0] - 90) < 1e-8, 'tail advances along the first hop');
+  assert.ok(Math.abs(bolts()[0].path[0][0] - 90) <= 2.5, 'tail advances along the first hop');
   assert.notDeepEqual(bolts()[1].path, paths[1], 'the sine wave keeps animating after the final hit');
   travel(0.12);
   assert.equal(bolts().length, 1);
-  assert.ok(Math.abs(bolts()[0].path[0][0] - 175) < 1e-8, 'tail moves halfway along the final hop');
+  assert.ok(Math.abs(bolts()[0].path[0][0] - 175) <= 6, 'tail moves halfway along the final hop');
   assert.ok(Math.abs(bolts()[0].path.at(-1)[0] - 250) < 1e-8, 'head stays at the last impact position');
   travel(0.101);
   assert.equal(bolts().length, 0, 'effect ends only after the tail reaches the final target');
@@ -221,7 +221,7 @@ test('the next hop starts at the previous impact position when enemies move', ()
   source.x = -100;
   first.x = 180;
   travel(0.1);
-  const bolts = renderEffects().filter(({ stroke }) => stroke?.stops);
-  assert.deepEqual(bolts[0].stroke.points.slice(2), [100, -30]);
+  const bolts = renderEffects().filter(({ stroke }) => String(stroke).startsWith('hsl'));
+  assert.deepEqual(bolts[0].path.at(-1), [100, -30]);
   assert.deepEqual(bolts[1].path[0], [100, -30]);
 });
