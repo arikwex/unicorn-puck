@@ -213,13 +213,16 @@ test('large orbs have four diamond eyes (far ones hidden) and five orbiters circ
     sawOrbitersOnBothSides ||= indexOf(calls, orbiter) < bodyAt && lastIndexOf(calls, orbiter) > bodyAt;
   }
   assert.ok(sawOrbitersOnBothSides, 'orbiters pass behind and in front of the body');
-  // The ring drifts slowly, and spins up while charging a volley.
-  Object.assign(large, { orbit: 0, state: PATROL, aimT: 0 });
-  large.tick(0.1);
-  const idleSpin = large.orbit;
-  Object.assign(large, { orbit: 0, state: AIMING, aimT: 0.9 });
-  large.tick(0.1);
-  assert.ok(idleSpin > 0 && large.orbit > idleSpin * 2);
+  // The ring drifts slowly, and spins up as a volley charges.
+  const spin = () => { const before = large.orbit; large.tick(0.05); return large.orbit - before; };
+  Object.assign(large, { state: PATROL, aimT: 0 });
+  assert.ok(spin() > 0, 'idle drift');
+  add(PlayerCharacter(200, 0));
+  for (let frame = 0; frame < 100 && large.state !== AIMING; frame++) large.tick(0.05);
+  assert.equal(large.state, AIMING);
+  const early = spin();
+  large.tick(1.7);
+  assert.ok(spin() > early * 2, 'faster late in the tell');
 });
 
 test('large grubs track moving players but always fire the same eight compass directions', () => {
